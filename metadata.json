@@ -1,0 +1,6 @@
+{
+  "name": "iLuvKeyks Coffee and Tea",
+  "description": "iLuvKeyks Coffee and Tea cafe platform featuring an interactive Customer Ordering Portal (Dine-in, Takeout, Delivery, drink customizer, digital receipts, live tracker) and Barista/Admin Management Portal with real-time KDS, menu catalog, inventory tracking, and POS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
