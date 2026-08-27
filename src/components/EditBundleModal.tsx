@@ -16,7 +16,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
   onSave,
   onDelete,
   bundleToEdit,
-  menuItems,
+  menuItems = [],
 }) => {
   if (!isOpen) return null;
 

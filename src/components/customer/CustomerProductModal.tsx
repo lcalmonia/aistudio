@@ -28,10 +28,12 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   isOpen,
   onClose,
   product,
-  addonsList,
+  addonsList = [],
   onAddToCart,
 }) => {
   if (!isOpen || !product) return null;
+
+  const safeAddonsList = addonsList || [];
 
   // Determine available temperatures
   const defaultTemp: 'Hot' | 'Iced' | 'N/A' =
@@ -73,8 +75,8 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   const isColdDrink = selectedTemperature === 'Iced';
 
   // Filter applicable add-ons for this product
-  const applicableAddons = addonsList.filter((addon) => {
-    if (!addon.available) return false;
+  const applicableAddons = safeAddonsList.filter((addon) => {
+    if (!addon || !addon.available) return false;
     if (product.addons && product.addons.length > 0) {
       return product.addons.includes(addon.id);
     }
@@ -96,7 +98,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   const basePrice = product.price;
   const sizePriceDelta = selectedSize?.priceDelta || 0;
   const addonsPrice = selectedAddonIds.reduce((sum, id) => {
-    const found = addonsList.find((a) => a.id === id);
+    const found = safeAddonsList.find((a) => a.id === id);
     return sum + (found ? found.price : 0);
   }, 0);
 
@@ -104,7 +106,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
-    const chosenAddons = addonsList.filter((a) => selectedAddonIds.includes(a.id));
+    const chosenAddons = safeAddonsList.filter((a) => a && selectedAddonIds.includes(a.id));
     const cartItem: CustomerCartItem = {
       id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       menuItem: product,

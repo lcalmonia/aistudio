@@ -14,7 +14,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   isOpen,
   onClose,
   onCreateOrder,
-  menuItems,
+  menuItems = [],
   categories = [],
 }) => {
   const [customerName, setCustomerName] = useState('');

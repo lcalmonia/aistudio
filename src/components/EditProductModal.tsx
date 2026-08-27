@@ -324,16 +324,17 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     onClose();
   };
 
-  const filteredAddonsList = addonsList.filter((a) => {
+  const filteredAddonsList = (addonsList || []).filter((a) => {
+    if (!a) return false;
     const matchesCategory = addonCategoryFilter === 'All' || a.category === addonCategoryFilter;
     const matchesSearch =
-      a.name.toLowerCase().includes(addonSearch.toLowerCase()) ||
-      a.category.toLowerCase().includes(addonSearch.toLowerCase());
+      (a.name || '').toLowerCase().includes(addonSearch.toLowerCase()) ||
+      (a.category || '').toLowerCase().includes(addonSearch.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const filteredCategoriesForManager = categoriesList.filter((c) =>
-    c.toLowerCase().includes(categorySearchQuery.toLowerCase())
+  const filteredCategoriesForManager = (categoriesList || []).filter((c) =>
+    (c || '').toLowerCase().includes(categorySearchQuery.toLowerCase())
   );
 
   return (

@@ -3,15 +3,15 @@ import { Order, MenuItem } from '../types';
 import { reportingService } from '../services/reportingService';
 
 interface StatsViewProps {
-  orders: Order[];
+  orders?: Order[];
   menuItems?: MenuItem[];
-  dailyGoal: number;
+  dailyGoal?: number;
 }
 
 export const StatsView: React.FC<StatsViewProps> = ({
-  orders,
+  orders = [],
   menuItems = [],
-  dailyGoal,
+  dailyGoal = 100,
 }) => {
   const summary = reportingService.calculateSalesSummary(orders);
   const hourlyData = reportingService.calculateHourlyThroughput(orders);

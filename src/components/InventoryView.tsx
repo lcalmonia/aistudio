@@ -12,8 +12,8 @@ interface InventoryViewProps {
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
-  items,
-  categories,
+  items = [],
+  categories = [],
   onSaveItem,
   onDeleteItem,
   onAddCategory,

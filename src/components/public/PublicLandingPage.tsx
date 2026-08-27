@@ -14,9 +14,9 @@ interface PublicLandingPageProps {
 }
 
 export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
-  menuItems,
-  promoBundles,
-  categories,
+  menuItems = [],
+  promoBundles = [],
+  categories = [],
   storeSettings,
   currentCustomer,
   onOrderOnline,
@@ -39,9 +39,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   const socialIg = storeSettings?.socialIg || '@iluvkeyks.ph';
 
   // Filtered menu items preview
-  const displayItems = menuItems.filter((item) => {
+  const displayItems = (menuItems || []).filter((item) => {
+    if (!item) return false;
     if (activeCategory === 'All') return item.popular || item.tags?.includes('Bestseller') || true;
-    return item.category.toLowerCase() === activeCategory.toLowerCase();
+    return (item.category || '').toLowerCase() === activeCategory.toLowerCase();
   }).slice(0, 8);
 
   const scrollToSection = (id: string) => {

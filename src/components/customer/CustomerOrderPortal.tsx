@@ -29,11 +29,11 @@ interface CustomerOrderPortalProps {
 }
 
 export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
-  menuItems,
-  categories,
-  addons,
-  promoBundles,
-  orders,
+  menuItems = [],
+  categories = [],
+  addons = [],
+  promoBundles = [],
+  orders = [],
   currentCustomer,
   onPlaceCustomerOrder,
   onSwitchToAdmin,

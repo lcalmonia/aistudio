@@ -8,25 +8,29 @@ interface CustomerManagementViewProps {
 }
 
 export const CustomerManagementView: React.FC<CustomerManagementViewProps> = ({
-  customers,
-  orders,
+  customers = [],
+  orders = [],
   onShowNotification,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
-  const filteredCustomers = customers.filter((c) => {
+  const customerList = customers || [];
+  const orderList = orders || [];
+
+  const filteredCustomers = customerList.filter((c) => {
+    if (!c) return false;
     const q = searchQuery.toLowerCase();
     return (
-      c.name.toLowerCase().includes(q) ||
-      c.id.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.mobile.includes(q)
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.id || '').toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.mobile || '').includes(q)
     );
   });
 
   const getCustomerOrders = (customerId: string) => {
-    return orders.filter((o) => o.customerId === customerId);
+    return orderList.filter((o) => o && o.customerId === customerId);
   };
 
   const getCustomerTotalSpend = (customerId: string) => {

@@ -23,9 +23,9 @@ interface AdminMenuViewProps {
 }
 
 export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
-  menuItems,
-  addons,
-  promoBundles,
+  menuItems = [],
+  addons = [],
+  promoBundles = [],
   categories = [],
   onAddProduct,
   onEditProduct,

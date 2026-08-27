@@ -10,7 +10,7 @@ interface ActiveOrdersViewProps {
 }
 
 export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
-  orders,
+  orders = [],
   onUpdateOrderStatus,
   onOpenNewOrder,
   onShowNotification,
@@ -18,14 +18,17 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'New' | 'Brewing' | 'Ready' | 'Completed'>('All');
   const [activeMenuOrderId, setActiveMenuOrderId] = useState<string | null>(null);
 
-  // Counts
-  const newCount = orders.filter((o) => o.status === 'New').length;
-  const brewingCount = orders.filter((o) => o.status === 'Brewing' || o.status === 'Preparing').length;
-  const readyCount = orders.filter((o) => o.status === 'Ready').length;
-  const completedCount = orders.filter((o) => o.status === 'Completed').length;
-  const allActiveCount = orders.filter((o) => o.status !== 'Completed').length;
+  const orderList = orders || [];
 
-  const filteredOrders = orders.filter((order) => {
+  // Counts
+  const newCount = orderList.filter((o) => o && o.status === 'New').length;
+  const brewingCount = orderList.filter((o) => o && (o.status === 'Brewing' || o.status === 'Preparing')).length;
+  const readyCount = orderList.filter((o) => o && o.status === 'Ready').length;
+  const completedCount = orderList.filter((o) => o && o.status === 'Completed').length;
+  const allActiveCount = orderList.filter((o) => o && o.status !== 'Completed').length;
+
+  const filteredOrders = orderList.filter((order) => {
+    if (!order) return false;
     if (selectedFilter === 'All') return order.status !== 'Completed';
     if (selectedFilter === 'New') return order.status === 'New';
     if (selectedFilter === 'Brewing') return order.status === 'Brewing' || order.status === 'Preparing';

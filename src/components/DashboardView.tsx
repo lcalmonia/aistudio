@@ -14,7 +14,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  orders,
+  orders = [],
   onViewAllOrders,
   onSelectOrder,
   cupsServed,
@@ -24,14 +24,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onLogBrew,
   onOpenNewOrder,
 }) => {
-  const activeOrdersCount = orders.filter(
-    (o) => o.status === 'New' || o.status === 'Brewing' || o.status === 'Ready' || o.status === 'Preparing' || o.status === 'Pending'
+  const activeOrdersCount = (orders || []).filter(
+    (o) => o && (o.status === 'New' || o.status === 'Brewing' || o.status === 'Ready' || o.status === 'Preparing' || o.status === 'Pending')
   ).length;
 
   const goalPercentage = dailyGoal > 0 ? Math.min(100, Math.round((cupsServed / dailyGoal) * 100)) : 0;
 
   // Get recent 3 orders for display
-  const recentOrders = orders.slice(0, 3);
+  const recentOrders = (orders || []).slice(0, 3);
 
   return (
     <div className="pt-20 pb-28 px-3.5 sm:px-5 max-w-lg mx-auto">

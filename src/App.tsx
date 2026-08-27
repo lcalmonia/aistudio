@@ -21,6 +21,7 @@ import {
   settingsService,
   loyaltyService,
   reportingService,
+  storageAdapter,
   generateOrderId,
   generateOrderNumber,
 } from './services';
@@ -54,7 +55,7 @@ export default function App() {
   const [portalMode, setPortalMode] = useState<'public' | 'customer' | 'admin'>('public');
 
   // Customer & Auth State
-  const [customers, setCustomers] = useState<CustomerUser[]>([]);
+  const [customers, setCustomers] = useState<CustomerUser[]>(() => storageAdapter.getCustomers());
   const [currentCustomer, setCurrentCustomer] = useState<CustomerUser | null>(() => authService.getCurrentCustomer());
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => authService.isStaffAuthenticated());
 
@@ -64,22 +65,10 @@ export default function App() {
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
 
   // Store Branding & Profile Settings State
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
-    name: 'iLuvKeyks',
-    tagline: 'Coffee • Tea • Artisanal Sweets',
-    address: 'Brgy. San Roque, Antipolo City, Rizal',
-    phone: '+63 917 888 5395',
-    email: 'hello@iluvkeyks.ph',
-    instagram: '@iluvkeyks',
-    facebook: 'fb.com/iluvkeyks',
-    primaryColor: '#26170c',
-    heroSubtitle: 'Handcrafted espresso, soothing milk teas, and fresh artisan pastries made daily.',
-    announcement: '☕ Buy 1 Take 1 on Signature Spanish Latte every Monday 2PM-5PM!',
-    enableCustomerOrdering: true,
-  });
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(() => storageAdapter.getStoreSettings());
 
   // Orders State
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(() => storageAdapter.getOrders());
   const [lastCustomerOrder, setLastCustomerOrder] = useState<Order | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('admin-menu');
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
@@ -87,14 +76,21 @@ export default function App() {
   const [notification, setNotification] = useState<string | null>(null);
 
   // Categories & Menu State
-  const [categories, setCategories] = useState<string[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [addons, setAddons] = useState<ProductAddon[]>([]);
-  const [promoBundles, setPromoBundles] = useState<PromoBundle[]>([]);
+  const [categories, setCategories] = useState<string[]>(() => storageAdapter.getCategories());
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => storageAdapter.getMenuItems());
+  const [addons, setAddons] = useState<ProductAddon[]>(() => storageAdapter.getAddons());
+  const [promoBundles, setPromoBundles] = useState<PromoBundle[]>(() => storageAdapter.getPromoBundles());
 
   // Inventory Management State
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
-  const [inventoryCategories, setInventoryCategories] = useState<string[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => storageAdapter.getInventory());
+  const [inventoryCategories, setInventoryCategories] = useState<string[]>(() => [
+    'Coffee Beans',
+    'Dairy & Plant Milk',
+    'Syrups & Flavors',
+    'Pastry Ingredients',
+    'Packaging & Cups',
+    'Tea & Infusions',
+  ]);
 
   // Modals for Admin CRUD
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
@@ -721,8 +717,8 @@ export default function App() {
             {/* Stats View */}
             {currentTab === 'stats' && (
               <StatsView
-                todaySales={todaySales}
-                cupsServed={cupsServed}
+                orders={orders}
+                menuItems={menuItems}
                 dailyGoal={dailyGoal}
               />
             )}
