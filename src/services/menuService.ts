@@ -60,4 +60,9 @@ export const menuService = {
     storageAdapter.setMenuItems(items);
     return updatedItem;
   },
+
+  async saveMenuItems(items: MenuItem[]): Promise<MenuItem[]> {
+    storageAdapter.setMenuItems(items);
+    return items;
+  },
 };

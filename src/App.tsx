@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  INITIAL_ORDERS,
-  INITIAL_MENU_ITEMS,
-  INITIAL_ADDONS,
-  INITIAL_PROMO_BUNDLES,
-  DEFAULT_CATEGORIES,
-  INVENTORY_ITEMS,
-  DEFAULT_INVENTORY_CATEGORIES,
-  DEFAULT_STORE_SETTINGS,
-  INITIAL_CUSTOMERS,
-} from './data/initialData';
-import {
   Order,
   OrderStatus,
   MenuItem,
@@ -20,30 +9,21 @@ import {
   StoreSettings,
   CustomerUser,
 } from './types';
-import { generateOrderId, generateOrderNumber } from './services/idGenerator';
-import { reportingService } from './services/reportingService';
 import {
-  getStoredCustomers,
-  saveCustomers,
-  getStoredCurrentCustomer,
-  saveCurrentCustomer,
-  getStoredAdminAuth,
-  saveAdminAuth,
-  getStoredOrders,
-  saveOrders,
-  getStoredMenuItems,
-  saveMenuItems,
-  getStoredCategories,
-  saveCategories,
-  getStoredAddons,
-  saveAddons,
-  getStoredBundles,
-  saveBundles,
-  getStoredInventory,
-  saveInventory,
-  getStoredSettings,
-  saveSettings,
-} from './data/storage';
+  authService,
+  customerService,
+  orderService,
+  menuService,
+  categoryService,
+  addonService,
+  promoService,
+  inventoryService,
+  settingsService,
+  loyaltyService,
+  reportingService,
+  generateOrderId,
+  generateOrderNumber,
+} from './services';
 
 // Portal & Navigation Components
 import { PublicLandingPage } from './components/public/PublicLandingPage';
@@ -74,9 +54,9 @@ export default function App() {
   const [portalMode, setPortalMode] = useState<'public' | 'customer' | 'admin'>('public');
 
   // Customer & Auth State
-  const [customers, setCustomers] = useState<CustomerUser[]>(() => getStoredCustomers());
-  const [currentCustomer, setCurrentCustomer] = useState<CustomerUser | null>(() => getStoredCurrentCustomer());
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => getStoredAdminAuth());
+  const [customers, setCustomers] = useState<CustomerUser[]>([]);
+  const [currentCustomer, setCurrentCustomer] = useState<CustomerUser | null>(() => authService.getCurrentCustomer());
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => authService.isStaffAuthenticated());
 
   // Auth Modals State
   const [isCustomerAuthModalOpen, setIsCustomerAuthModalOpen] = useState<boolean>(false);
@@ -84,10 +64,22 @@ export default function App() {
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
 
   // Store Branding & Profile Settings State
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>(() => getStoredSettings());
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    name: 'iLuvKeyks',
+    tagline: 'Coffee • Tea • Artisanal Sweets',
+    address: 'Brgy. San Roque, Antipolo City, Rizal',
+    phone: '+63 917 888 5395',
+    email: 'hello@iluvkeyks.ph',
+    instagram: '@iluvkeyks',
+    facebook: 'fb.com/iluvkeyks',
+    primaryColor: '#26170c',
+    heroSubtitle: 'Handcrafted espresso, soothing milk teas, and fresh artisan pastries made daily.',
+    announcement: '☕ Buy 1 Take 1 on Signature Spanish Latte every Monday 2PM-5PM!',
+    enableCustomerOrdering: true,
+  });
 
   // Orders State
-  const [orders, setOrders] = useState<Order[]>(() => getStoredOrders());
+  const [orders, setOrders] = useState<Order[]>([]);
   const [lastCustomerOrder, setLastCustomerOrder] = useState<Order | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('admin-menu');
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
@@ -95,14 +87,14 @@ export default function App() {
   const [notification, setNotification] = useState<string | null>(null);
 
   // Categories & Menu State
-  const [categories, setCategories] = useState<string[]>(() => getStoredCategories());
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => getStoredMenuItems());
-  const [addons, setAddons] = useState<ProductAddon[]>(() => getStoredAddons());
-  const [promoBundles, setPromoBundles] = useState<PromoBundle[]>(() => getStoredBundles());
+  const [categories, setCategories] = useState<string[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [addons, setAddons] = useState<ProductAddon[]>([]);
+  const [promoBundles, setPromoBundles] = useState<PromoBundle[]>([]);
 
   // Inventory Management State
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => getStoredInventory());
-  const [inventoryCategories, setInventoryCategories] = useState<string[]>(DEFAULT_INVENTORY_CATEGORIES);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryCategories, setInventoryCategories] = useState<string[]>([]);
 
   // Modals for Admin CRUD
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
@@ -114,7 +106,7 @@ export default function App() {
   const [isAddonModalOpen, setIsAddonModalOpen] = useState<boolean>(false);
   const [addonToEdit, setAddonToEdit] = useState<ProductAddon | null>(null);
 
-  // Live metrics calculation from real orders data
+  // Live metrics calculation from real orders data via reportingService
   const [extraLoggedCups, setExtraLoggedCups] = useState<number>(0);
   const todaySales = reportingService.calculateTotalSales(orders);
   const cupsServed = reportingService.calculateCupsServed(orders) + extraLoggedCups;
@@ -128,93 +120,101 @@ export default function App() {
     }, 3500);
   };
 
-  // Sync state changes with persistence
+  // Initial data loading through Service Layer
   useEffect(() => {
-    saveOrders(orders);
-  }, [orders]);
+    async function initServicesData() {
+      try {
+        const [
+          loadedCustomers,
+          loadedOrders,
+          loadedMenuItems,
+          loadedCategories,
+          loadedAddons,
+          loadedBundles,
+          loadedInventory,
+          loadedSettings,
+          loadedInventoryCats,
+        ] = await Promise.all([
+          customerService.listCustomers(),
+          orderService.listOrders(),
+          menuService.listMenuItems(),
+          categoryService.listCategories(),
+          addonService.listAddons(),
+          promoService.listPromoBundles(),
+          inventoryService.listInventory(),
+          settingsService.getStoreSettings(),
+          inventoryService.listCategories(),
+        ]);
 
-  useEffect(() => {
-    saveCustomers(customers);
-  }, [customers]);
+        setCustomers(loadedCustomers);
+        setOrders(loadedOrders);
+        setMenuItems(loadedMenuItems);
+        setCategories(loadedCategories);
+        setAddons(loadedAddons);
+        setPromoBundles(loadedBundles);
+        setInventoryItems(loadedInventory);
+        setStoreSettings(loadedSettings);
+        setInventoryCategories(loadedInventoryCats);
+      } catch (err) {
+        console.error('[App] Failed to load data from services', err);
+      }
+    }
 
-  useEffect(() => {
-    saveMenuItems(menuItems);
-  }, [menuItems]);
-
-  useEffect(() => {
-    saveCategories(categories);
-  }, [categories]);
-
-  useEffect(() => {
-    saveAddons(addons);
-  }, [addons]);
-
-  useEffect(() => {
-    saveBundles(promoBundles);
-  }, [promoBundles]);
-
-  useEffect(() => {
-    saveInventory(inventoryItems);
-  }, [inventoryItems]);
-
-  useEffect(() => {
-    saveSettings(storeSettings);
-  }, [storeSettings]);
+    initServicesData();
+  }, []);
 
   // -------------------------------------------------------------
   // Customer Auth Handlers
   // -------------------------------------------------------------
   const handleCustomerLoginSuccess = (customer: CustomerUser) => {
     setCurrentCustomer(customer);
-    saveCurrentCustomer(customer);
+    authService.updateCurrentCustomerSession(customer);
     setIsCustomerAuthModalOpen(false);
     setPortalMode('customer');
     showNotification(`Welcome back, ${customer.name}! (${customer.id}) ☕`);
   };
 
-  const handleCustomerRegisterSuccess = (customer: CustomerUser) => {
-    setCustomers((prev) => {
-      const updated = [...prev, customer];
-      saveCustomers(updated);
-      return updated;
-    });
+  const handleCustomerRegisterSuccess = async (customer: CustomerUser) => {
+    const updated = await customerService.listCustomers();
+    setCustomers(updated);
     setCurrentCustomer(customer);
-    saveCurrentCustomer(customer);
+    authService.updateCurrentCustomerSession(customer);
     setIsCustomerAuthModalOpen(false);
     setPortalMode('customer');
     showNotification(`Welcome to iLuvKeyks, ${customer.name}! ID: ${customer.id} 🎉`);
   };
 
   const handleCustomerLogout = () => {
+    authService.logoutCustomer();
     setCurrentCustomer(null);
-    saveCurrentCustomer(null);
     setPortalMode('public');
     showNotification('You have been signed out.');
   };
 
-  const handleUpdateCustomerProfile = (updated: Partial<CustomerUser>) => {
+  const handleUpdateCustomerProfile = async (updated: Partial<CustomerUser>) => {
     if (!currentCustomer) return;
-    const updatedUser = { ...currentCustomer, ...updated };
-    setCurrentCustomer(updatedUser);
-    saveCurrentCustomer(updatedUser);
-    setCustomers((prev) => prev.map((c) => (c.id === updatedUser.id ? updatedUser : c)));
-    showNotification('Profile updated successfully.');
+    const res = await customerService.updateCustomer(currentCustomer.id, updated);
+    if (res.success && res.customer) {
+      setCurrentCustomer(res.customer);
+      setCustomers((prev) => prev.map((c) => (c.id === res.customer!.id ? res.customer! : c)));
+      showNotification('Profile updated successfully.');
+    }
   };
 
   // -------------------------------------------------------------
   // Admin Auth Handlers
   // -------------------------------------------------------------
   const handleAdminLoginSuccess = () => {
+    authService.setStaffAuthenticated(true);
     setIsAdminAuthenticated(true);
-    saveAdminAuth(true);
     setIsAdminAuthModalOpen(false);
     setPortalMode('admin');
     showNotification('Staff / Admin session authenticated.');
   };
 
   const handleAdminLogout = () => {
+    authService.logoutStaff();
     setIsAdminAuthenticated(false);
-    saveAdminAuth(false);
     setPortalMode('public');
     showNotification('Staff / Admin logged out.');
   };
@@ -247,54 +247,52 @@ export default function App() {
   // -------------------------------------------------------------
   // Category Management Handlers
   // -------------------------------------------------------------
-  const handleSaveCategory = (newCategory: string, oldCategory?: string) => {
+  const handleSaveCategory = async (newCategory: string, oldCategory?: string) => {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
 
     if (oldCategory && oldCategory !== trimmed) {
-      setCategories((prev) => prev.map((c) => (c === oldCategory ? trimmed : c)));
-      setMenuItems((prev) =>
-        prev.map((item) => (item.category === oldCategory ? { ...item, category: trimmed } : item))
+      await categoryService.renameCategory(oldCategory, trimmed);
+      // Update menu items in category
+      const updatedMenu = menuItems.map((item) =>
+        item.category === oldCategory ? { ...item, category: trimmed } : item
       );
+      await menuService.saveMenuItems(updatedMenu);
+      setCategories(await categoryService.listCategories());
+      setMenuItems(updatedMenu);
       showNotification(`Category renamed to "${trimmed}" across all items.`);
     } else if (!categories.includes(trimmed)) {
-      setCategories((prev) => [...prev, trimmed]);
+      const updatedCats = await categoryService.addCategory(trimmed);
+      setCategories(updatedCats);
       showNotification(`New category "${trimmed}" added to menu catalog! 🎉`);
     }
   };
 
-  const handleDeleteCategory = (categoryToDelete: string) => {
+  const handleDeleteCategory = async (categoryToDelete: string) => {
     if (categories.length <= 1) {
       showNotification('At least one category must remain.');
       return;
     }
     const remaining = categories.filter((c) => c !== categoryToDelete);
     const fallback = remaining[0] || 'Coffee';
-    setCategories(remaining);
-    setMenuItems((prev) =>
-      prev.map((item) =>
-        item.category === categoryToDelete ? { ...item, category: fallback } : item
-      )
+    await categoryService.deleteCategory(categoryToDelete);
+    const updatedMenu = menuItems.map((item) =>
+      item.category === categoryToDelete ? { ...item, category: fallback } : item
     );
+    await menuService.saveMenuItems(updatedMenu);
+    setCategories(remaining);
+    setMenuItems(updatedMenu);
     showNotification(`Category "${categoryToDelete}" deleted. Products moved to "${fallback}".`);
   };
 
   // -------------------------------------------------------------
   // Order Management Handlers
   // -------------------------------------------------------------
-  const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.id === orderId) {
-          return {
-            ...ord,
-            status: newStatus,
-            timeAgo: 'Updated just now',
-          };
-        }
-        return ord;
-      })
-    );
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    const updated = await orderService.updateOrderStatus(orderId, newStatus);
+    if (updated) {
+      setOrders(await orderService.listOrders());
+    }
 
     if (newStatus === 'Completed') {
       showNotification(`Order #${orderId} marked as Completed!`);
@@ -305,62 +303,52 @@ export default function App() {
     }
   };
 
-  const handleCreateOrder = (orderData: Partial<Order>) => {
-    const newOrder: Order = {
-      id: generateOrderId(),
-      orderNumber: generateOrderNumber(),
+  const handleCreateOrder = async (orderData: Partial<Order>) => {
+    const created = await orderService.createOrder({
+      ...orderData,
       customerId: orderData.customerId || currentCustomer?.id,
       customerName: orderData.customerName || 'Walk-in Guest',
-      customerPhone: orderData.customerPhone,
-      timeAgo: 'Just now',
-      timestamp: Date.now(),
       status: 'New',
-      items: orderData.items || [],
-      total: orderData.total || 0,
-      subtotal: orderData.subtotal || orderData.total || 0,
-      image:
-        orderData.image ||
-        (orderData.items?.[0]?.name.toLowerCase().includes('matcha')
-          ? 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=400&q=80'
-          : 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=400&q=80'),
-      notes: orderData.notes,
       orderType: orderData.orderType || 'Dine-In',
       tableNumber: orderData.tableNumber || (orderData.orderType === 'Dine-In' ? 'Table 1' : undefined),
       paymentMethod: orderData.paymentMethod || 'Cash',
       isCustomerOrder: false,
-    };
+    });
 
-    setOrders((prev) => [newOrder, ...prev]);
-    showNotification(`New POS Ticket #${newOrder.orderNumber} placed for ₱${newOrder.total.toFixed(2)}`);
+    setOrders((prev) => [created, ...prev.filter((o) => o.id !== created.id)]);
+    showNotification(`New POS Ticket #${created.orderNumber} placed for ₱${created.total.toFixed(2)}`);
   };
 
-  const handlePlaceCustomerOrder = (customerOrder: Order) => {
-    const enrichedOrder: Order = {
+  const handlePlaceCustomerOrder = async (customerOrder: Order) => {
+    const created = await orderService.createOrder({
       ...customerOrder,
-      id: customerOrder.id || generateOrderId(),
-      orderNumber: customerOrder.orderNumber || generateOrderNumber(),
       customerId: currentCustomer?.id,
       customerName: customerOrder.customerName || currentCustomer?.name || 'Customer',
       customerEmail: currentCustomer?.email,
       customerPhone: customerOrder.customerPhone || currentCustomer?.mobile,
-      timestamp: Date.now(),
       isCustomerOrder: true,
-    };
+    });
 
-    setOrders((prev) => [enrichedOrder, ...prev]);
-    setLastCustomerOrder(enrichedOrder);
+    setOrders((prev) => [created, ...prev.filter((o) => o.id !== created.id)]);
+    setLastCustomerOrder(created);
 
-    // Update customer stamp balance
+    // Update customer stamps and points via loyaltyService
     if (currentCustomer) {
-      const nextStamps = ((currentCustomer.stamps || 0) % 10) + 1;
-      const nextPoints = (currentCustomer.points || 0) + Math.floor(enrichedOrder.total / 10);
-      handleUpdateCustomerProfile({
-        stamps: nextStamps,
-        points: nextPoints,
-      });
+      const rewardCalc = loyaltyService.calculateOrderRewards(
+        created.total,
+        currentCustomer.stamps || 0,
+        currentCustomer.points || 0
+      );
+      await loyaltyService.addStamp(currentCustomer.id);
+      await loyaltyService.addPoints(currentCustomer.id, rewardCalc.earnedPoints);
+      const updatedCust = await customerService.getCustomer(currentCustomer.id);
+      if (updatedCust) {
+        setCurrentCustomer(updatedCust);
+        setCustomers(await customerService.listCustomers());
+      }
     }
 
-    showNotification(`🎉 Order #${enrichedOrder.orderNumber} placed successfully! Barista notified.`);
+    showNotification(`🎉 Order #${created.orderNumber} placed successfully! Barista notified.`);
   };
 
   // -------------------------------------------------------------
@@ -376,33 +364,30 @@ export default function App() {
     setIsProductModalOpen(true);
   };
 
-  const handleSaveProduct = (product: MenuItem) => {
+  const handleSaveProduct = async (product: MenuItem) => {
     if (productToEdit) {
-      setMenuItems((prev) => prev.map((item) => (item.id === product.id ? product : item)));
+      await menuService.updateMenuItem(product.id, product);
       showNotification(`"${product.name}" updated successfully!`);
     } else {
-      setMenuItems((prev) => [product, ...prev]);
+      await menuService.createMenuItem(product);
       showNotification(`"${product.name}" added to menu catalog! ☕`);
     }
+    setMenuItems(await menuService.listMenuItems());
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     const itemToDelete = menuItems.find((i) => i.id === productId);
-    setMenuItems((prev) => prev.filter((item) => item.id !== productId));
+    await menuService.deleteMenuItem(productId);
+    setMenuItems(await menuService.listMenuItems());
     showNotification(`"${itemToDelete?.name || 'Item'}" removed from catalog.`);
   };
 
-  const handleToggleProductAvailability = (productId: string) => {
-    setMenuItems((prev) =>
-      prev.map((item) => {
-        if (item.id === productId) {
-          const nextState = item.available === false ? true : false;
-          showNotification(`"${item.name}" is now ${nextState ? 'Available' : 'Sold Out'}.`);
-          return { ...item, available: nextState };
-        }
-        return item;
-      })
-    );
+  const handleToggleProductAvailability = async (productId: string) => {
+    const updated = await menuService.toggleAvailability(productId);
+    if (updated) {
+      setMenuItems(await menuService.listMenuItems());
+      showNotification(`"${updated.name}" is now ${updated.available !== false ? 'Available' : 'Sold Out'}.`);
+    }
   };
 
   // -------------------------------------------------------------
@@ -418,18 +403,20 @@ export default function App() {
     setIsBundleModalOpen(true);
   };
 
-  const handleSaveBundle = (bundle: PromoBundle) => {
+  const handleSaveBundle = async (bundle: PromoBundle) => {
     if (bundleToEdit) {
-      setPromoBundles((prev) => prev.map((b) => (b.id === bundle.id ? bundle : b)));
+      await promoService.updatePromoBundle(bundle.id, bundle);
       showNotification(`Bundle "${bundle.name}" updated!`);
     } else {
-      setPromoBundles((prev) => [bundle, ...prev]);
+      await promoService.createPromoBundle(bundle);
       showNotification(`New Combo Bundle "${bundle.name}" published! 🎉`);
     }
+    setPromoBundles(await promoService.listPromoBundles());
   };
 
-  const handleDeleteBundle = (bundleId: string) => {
-    setPromoBundles((prev) => prev.filter((b) => b.id !== bundleId));
+  const handleDeleteBundle = async (bundleId: string) => {
+    await promoService.deletePromoBundle(bundleId);
+    setPromoBundles(await promoService.listPromoBundles());
     showNotification('Combo Bundle removed.');
   };
 
@@ -446,38 +433,36 @@ export default function App() {
     setIsAddonModalOpen(true);
   };
 
-  const handleSaveAddon = (addon: ProductAddon) => {
+  const handleSaveAddon = async (addon: ProductAddon) => {
     if (addonToEdit) {
-      setAddons((prev) => prev.map((a) => (a.id === addon.id ? addon : a)));
+      await addonService.updateAddon(addon.id, addon);
       showNotification(`Modifier "${addon.name}" updated!`);
     } else {
-      setAddons((prev) => [...prev, addon]);
+      await addonService.createAddon(addon);
       showNotification(`New Modifier "${addon.name}" added!`);
     }
+    setAddons(await addonService.listAddons());
   };
 
-  const handleDeleteAddon = (addonId: string) => {
-    setAddons((prev) => prev.filter((a) => a.id !== addonId));
+  const handleDeleteAddon = async (addonId: string) => {
+    await addonService.deleteAddon(addonId);
+    setAddons(await addonService.listAddons());
     showNotification('Modifier deleted.');
   };
 
-  const handleToggleAddonStock = (addonId: string) => {
-    setAddons((prev) =>
-      prev.map((a) => {
-        if (a.id === addonId) {
-          const next = !a.inStock;
-          showNotification(`Modifier "${a.name}" is now ${next ? 'In Stock' : 'Out of Stock'}.`);
-          return { ...a, inStock: next };
-        }
-        return a;
-      })
-    );
+  const handleToggleAddonStock = async (addonId: string) => {
+    const updated = await addonService.toggleStock(addonId);
+    if (updated) {
+      setAddons(await addonService.listAddons());
+      showNotification(`Modifier "${updated.name}" is now ${updated.available !== false ? 'In Stock' : 'Out of Stock'}.`);
+    }
   };
 
   // -------------------------------------------------------------
   // Store Settings Handlers
   // -------------------------------------------------------------
-  const handleSaveStoreSettings = (newSettings: StoreSettings) => {
+  const handleSaveStoreSettings = async (newSettings: StoreSettings) => {
+    await settingsService.updateStoreSettings(newSettings);
     setStoreSettings(newSettings);
     showNotification('Store profile & branding settings applied successfully! ✨');
   };
@@ -485,19 +470,21 @@ export default function App() {
   // -------------------------------------------------------------
   // Inventory Handlers
   // -------------------------------------------------------------
-  const handleSaveInventoryItem = (item: InventoryItem) => {
+  const handleSaveInventoryItem = async (item: InventoryItem) => {
     const exists = inventoryItems.some((i) => i.id === item.id);
     if (exists) {
-      setInventoryItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+      await inventoryService.updateInventoryItem(item.id, item);
       showNotification(`Inventory item "${item.name}" updated.`);
     } else {
-      setInventoryItems((prev) => [...prev, item]);
+      await inventoryService.createInventoryItem(item);
       showNotification(`New inventory item "${item.name}" added.`);
     }
+    setInventoryItems(await inventoryService.listInventory());
   };
 
-  const handleDeleteInventoryItem = (itemId: string) => {
-    setInventoryItems((prev) => prev.filter((i) => i.id !== itemId));
+  const handleDeleteInventoryItem = async (itemId: string) => {
+    await inventoryService.deleteInventoryItem(itemId);
+    setInventoryItems(await inventoryService.listInventory());
     showNotification('Inventory item removed.');
   };
 
@@ -601,7 +588,7 @@ export default function App() {
           <Header
             onOpenDrawer={() => setIsDrawerOpen(true)}
             onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
-            activeOrdersCount={orders.filter((o) => o.status === 'New' || o.status === 'Brewing' || o.status === 'Preparing').length}
+            activeOrdersCount={reportingService.calculateActiveOrdersCount(orders)}
             onSwitchToCustomerPortal={() => {
               if (currentCustomer) {
                 setPortalMode('customer');
@@ -674,8 +661,9 @@ export default function App() {
               <SettingsView
                 settings={storeSettings}
                 onSaveSettings={handleSaveStoreSettings}
-                onResetSettings={() => {
-                  setStoreSettings(DEFAULT_STORE_SETTINGS);
+                onResetSettings={async () => {
+                  const reset = await settingsService.resetStoreSettings();
+                  setStoreSettings(reset);
                   showNotification('Settings reset to default!');
                 }}
                 onShowNotification={showNotification}

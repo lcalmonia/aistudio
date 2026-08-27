@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { MenuItem, ProductAddon, ProductSize, ProductTemperature } from '../types';
-import { DEFAULT_CATEGORIES } from '../data/initialData';
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -78,7 +77,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onSaveAddon,
   onDeleteAddon,
   onToggleAddonStock,
-  categoriesList = DEFAULT_CATEGORIES,
+  categoriesList = [],
   onSaveCategory,
   onDeleteCategory,
 }) => {

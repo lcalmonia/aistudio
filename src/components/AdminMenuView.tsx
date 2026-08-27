@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { MenuItem, ProductAddon, PromoBundle, ProductTemperature } from '../types';
-import { DEFAULT_CATEGORIES } from '../data/initialData';
 
 interface AdminMenuViewProps {
   menuItems: MenuItem[];
@@ -27,7 +26,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   menuItems,
   addons,
   promoBundles,
-  categories = DEFAULT_CATEGORIES,
+  categories = [],
   onAddProduct,
   onEditProduct,
   onDeleteProduct,

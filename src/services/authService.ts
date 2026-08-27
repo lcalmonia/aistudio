@@ -95,6 +95,10 @@ export const authService = {
     return storageAdapter.getCurrentCustomer();
   },
 
+  updateCurrentCustomerSession(customer: CustomerUser | null): void {
+    storageAdapter.setCurrentCustomer(customer);
+  },
+
   // -------------------------------------------------------------
   // Staff & Admin Authentication
   // -------------------------------------------------------------
@@ -117,6 +121,22 @@ export const authService = {
 
     storageAdapter.setStaffSession(staffSession);
     return { success: true, staff: staffSession };
+  },
+
+  setStaffAuthenticated(isAuth: boolean, role: UserRole = 'admin'): void {
+    if (isAuth) {
+      const staffSession: StaffUser = {
+        id: `staff_${Date.now()}`,
+        name: role === 'super_admin' ? 'Store Owner' : role === 'admin' ? 'Duty Manager' : 'Barista Staff',
+        email: 'staff@iluvkeyks.ph',
+        role,
+        active: true,
+        lastLogin: new Date().toISOString(),
+      };
+      storageAdapter.setStaffSession(staffSession);
+    } else {
+      storageAdapter.setStaffSession(null);
+    }
   },
 
   logoutStaff(): void {

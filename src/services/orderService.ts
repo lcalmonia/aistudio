@@ -86,4 +86,9 @@ export const orderService = {
     storageAdapter.setOrders(filtered);
     return true;
   },
+
+  async saveOrders(orders: Order[]): Promise<Order[]> {
+    storageAdapter.setOrders(orders);
+    return orders;
+  },
 };

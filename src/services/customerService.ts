@@ -78,4 +78,9 @@ export const customerService = {
     storageAdapter.setCustomers(updated);
     return { success: true };
   },
+
+  async saveCustomers(customers: CustomerUser[]): Promise<CustomerUser[]> {
+    storageAdapter.setCustomers(customers);
+    return customers;
+  },
 };

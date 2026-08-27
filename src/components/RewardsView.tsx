@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { CustomerUser } from '../types';
-import { loyaltyService } from '../services/auxiliaryServices';
+import { loyaltyService } from '../services';
 
 interface RewardsViewProps {
   currentCustomer?: CustomerUser | null;
