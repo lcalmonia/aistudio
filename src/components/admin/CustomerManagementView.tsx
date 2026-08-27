@@ -60,7 +60,7 @@ export const CustomerManagementView: React.FC<CustomerManagementViewProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by Customer ID (e.g. CUST-00001), name, email, or phone..."
+          placeholder="Search by Customer ID, name, email, or phone number..."
           className="w-full pl-10 pr-4 py-3 bg-white border border-[#dec1af] rounded-2xl text-xs sm:text-sm text-[#26170c] shadow-xs focus:outline-none focus:ring-2 focus:ring-[#26170c]"
         />
         <span className="material-symbols-outlined absolute left-3 top-3 text-[#81756e] text-[20px]">

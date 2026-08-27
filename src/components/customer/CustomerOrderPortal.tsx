@@ -224,71 +224,71 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   const stampsArray = Array.from({ length: 10 }, (_, i) => i < currentStamps);
 
   return (
-    <div className="min-h-screen bg-[#fff8f5] text-[#1d1b1a] flex flex-col font-sans pb-24 selection:bg-[#fbddca] selection:text-[#26170c]">
+    <div className="min-h-screen bg-[#fff8f5] text-[#1d1b1a] flex flex-col font-sans pb-24 selection:bg-[#fbddca] selection:text-[#26170c] w-full max-w-full overflow-x-hidden">
       {/* ========================================================================= */}
       {/* 1. TOP CUSTOMER HEADER & ACCOUNT BAR                                      */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-40 bg-[#fff8f5]/95 backdrop-blur-md border-b border-[#dec1af]/60 shadow-xs">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 sm:h-18 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-[#fff8f5]/95 backdrop-blur-md border-b border-[#dec1af]/60 shadow-xs w-full">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 h-15 sm:h-18 flex items-center justify-between gap-2 sm:gap-3">
           {/* Logo & Store Identity */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
             <button
               onClick={onExitToLanding}
-              className="p-1.5 -ml-1.5 hover:bg-[#f3ecea] text-[#4f453f] hover:text-[#26170c] rounded-xl transition-colors cursor-pointer"
+              className="p-1 -ml-1 sm:p-1.5 sm:-ml-1.5 hover:bg-[#f3ecea] text-[#4f453f] hover:text-[#26170c] rounded-xl transition-colors cursor-pointer flex-shrink-0"
               title="Return to Public Website"
             >
-              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+              <span className="material-symbols-outlined text-[20px] sm:text-[22px]">arrow_back</span>
             </button>
 
             {logoUrl ? (
               <img
                 src={logoUrl}
                 alt="Store Logo"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl object-cover border border-[#dec1af] shadow-xs flex-shrink-0"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl object-cover border border-[#dec1af] shadow-xs flex-shrink-0"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#26170c] text-white flex items-center justify-center shadow-xs flex-shrink-0">
-                <span className="material-symbols-outlined text-[20px] text-[#dec1af]">local_cafe</span>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-[#26170c] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px] text-[#dec1af]">local_cafe</span>
               </div>
             )}
 
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-serif text-base sm:text-lg font-bold text-[#26170c] leading-none truncate max-w-[140px] sm:max-w-[200px]">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                <h1 className="font-serif text-sm sm:text-lg font-bold text-[#26170c] leading-none truncate">
                   {storeName}
                 </h1>
-                <span className="px-2 py-0.2 bg-[#fbddca] text-[#26170c] text-[9px] font-extrabold rounded-full uppercase tracking-wider">
-                  Customer Portal
+                <span className="hidden xs:inline-block px-1.5 sm:px-2 py-0.2 bg-[#fbddca] text-[#26170c] text-[8px] sm:text-[9px] font-extrabold rounded-full uppercase tracking-wider flex-shrink-0">
+                  Portal
                 </span>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-[#4f453f] font-medium mt-0.5 truncate max-w-[180px] sm:max-w-[260px]">
+              <p className="text-[10px] sm:text-[11px] text-[#4f453f] font-medium mt-0.5 truncate">
                 {tagline}
               </p>
             </div>
           </div>
 
           {/* Right Customer Pill & Bag Trigger */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
             {/* Customer ID Badge */}
             <button
               onClick={() => setActiveTab('profile')}
-              className="px-2.5 sm:px-3 py-1.5 bg-[#f3ecea] hover:bg-[#e8e1df] rounded-xl border border-[#dec1af] flex items-center gap-1.5 text-xs font-bold text-[#26170c] transition-all cursor-pointer"
+              className="px-2 sm:px-3 py-1.5 bg-[#f3ecea] hover:bg-[#e8e1df] rounded-xl border border-[#dec1af] flex items-center gap-1 sm:gap-1.5 text-xs font-bold text-[#26170c] transition-all cursor-pointer"
               title="View Profile & Customer ID"
             >
-              <span className="w-5 h-5 rounded-full bg-[#26170c] text-white text-[10px] flex items-center justify-center font-bold">
+              <span className="w-5 h-5 rounded-full bg-[#26170c] text-white text-[10px] flex items-center justify-center font-bold flex-shrink-0">
                 {currentCustomer.name.charAt(0)}
               </span>
-              <span className="hidden sm:inline">{currentCustomer.name.split(' ')[0]}</span>
-              <span className="font-mono text-[10px] text-[#636451] font-bold">
-                ({currentCustomer.id})
+              <span className="hidden sm:inline truncate max-w-[80px]">{currentCustomer.name.split(' ')[0]}</span>
+              <span className="font-mono text-[9px] sm:text-[10px] text-[#636451] font-bold">
+                {currentCustomer.id}
               </span>
             </button>
 
             {/* Logout / Exit Button */}
             <button
               onClick={onCustomerLogout}
-              className="p-2 text-[#81756e] hover:text-[#93000a] hover:bg-[#ffdad6]/40 rounded-xl transition-all cursor-pointer"
+              className="p-1.5 sm:p-2 text-[#81756e] hover:text-[#93000a] hover:bg-[#ffdad6]/40 rounded-xl transition-all cursor-pointer flex-shrink-0"
               title="Sign Out"
             >
               <span className="material-symbols-outlined text-[18px]">logout</span>
@@ -298,12 +298,12 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
             <button
               id="customer-cart-button"
               onClick={() => setIsCartOpen(true)}
-              className="relative px-3.5 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md active:scale-95 transition-all cursor-pointer"
+              className="relative px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-md active:scale-95 transition-all cursor-pointer flex-shrink-0"
             >
-              <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
+              <span className="material-symbols-outlined text-[16px] sm:text-[18px]">shopping_bag</span>
               <span className="hidden xs:inline">Bag</span>
               {totalCartCount > 0 && (
-                <span className="bg-[#fbddca] text-[#26170c] px-2 py-0.2 rounded-full text-[11px] font-extrabold">
+                <span className="bg-[#fbddca] text-[#26170c] px-1.5 sm:px-2 py-0.2 rounded-full text-[10px] sm:text-[11px] font-extrabold">
                   {totalCartCount}
                 </span>
               )}
@@ -312,53 +312,53 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
         </div>
 
         {/* Portal Navigation Tabs */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar border-t border-[#f3ecea]">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar border-t border-[#f3ecea] w-full">
           <button
             onClick={() => setActiveTab('menu')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
               activeTab === 'menu'
                 ? 'bg-[#26170c] text-[#fbddca] shadow-xs'
                 : 'bg-white text-[#4f453f] hover:bg-[#f3ecea] border border-[#dec1af]/50'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">restaurant_menu</span>
-            <span>Menu Catalog</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">restaurant_menu</span>
+            <span>Menu</span>
           </button>
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
               activeTab === 'orders'
                 ? 'bg-[#26170c] text-[#fbddca] shadow-xs'
                 : 'bg-white text-[#4f453f] hover:bg-[#f3ecea] border border-[#dec1af]/50'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">receipt_long</span>
             <span>My Orders ({myOrders.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('rewards')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
               activeTab === 'rewards'
                 ? 'bg-[#26170c] text-[#fbddca] shadow-xs'
                 : 'bg-white text-[#4f453f] hover:bg-[#f3ecea] border border-[#dec1af]/50'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">stars</span>
-            <span>Digital Stamp Card</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">stars</span>
+            <span>Loyalty Stamp Card</span>
           </button>
 
           <button
             onClick={() => setActiveTab('profile')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
               activeTab === 'profile'
                 ? 'bg-[#26170c] text-[#fbddca] shadow-xs'
                 : 'bg-white text-[#4f453f] hover:bg-[#f3ecea] border border-[#dec1af]/50'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">person</span>
-            <span>My Profile & Address</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">person</span>
+            <span>Profile & Address</span>
           </button>
         </div>
       </header>
@@ -758,50 +758,52 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
 
         {/* TAB 3: STAMP REWARDS VIEW */}
         {activeTab === 'rewards' && (
-          <div className="space-y-6">
+          <div className="space-y-5 sm:space-y-6">
             {/* Digital Stamp Card */}
-            <div className="bg-[#26170c] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#dec1af]/30 space-y-5">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-[#dec1af]">
+            <div className="bg-[#26170c] text-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl border border-[#dec1af]/30 space-y-4 sm:space-y-5">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-[#dec1af]">
                     iLuvKeyks VIP Loyalty
                   </span>
-                  <h3 className="font-serif text-2xl font-bold mt-0.5">Digital Stamp Card</h3>
-                  <p className="text-xs text-[#dec1af]/80">Member: {currentCustomer.name} • {currentCustomer.id}</p>
+                  <h3 className="font-serif text-lg sm:text-2xl font-bold mt-0.5 truncate">Digital Stamp Card</h3>
+                  <p className="text-[11px] sm:text-xs text-[#dec1af]/80 truncate">
+                    Member: {currentCustomer.name} • {currentCustomer.id}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-[#dec1af] uppercase font-bold block">Reward Points</span>
-                  <span className="font-serif text-2xl font-extrabold text-[#fbddca]">
-                    {currentCustomer.points || 520} pts
+                <div className="text-right flex-shrink-0">
+                  <span className="text-[9px] sm:text-[10px] text-[#dec1af] uppercase font-bold block">Reward Points</span>
+                  <span className="font-serif text-xl sm:text-2xl font-extrabold text-[#fbddca]">
+                    {currentCustomer.points || 0} pts
                   </span>
                 </div>
               </div>
 
               {/* 10-Stamp Grid */}
               <div>
-                <p className="text-xs text-[#dec1af] mb-3">
+                <p className="text-[11px] sm:text-xs text-[#dec1af] mb-2.5 sm:mb-3">
                   Collect 10 stamps to redeem a <strong>FREE Specialty Coffee or Tub Cake slice</strong>!
                 </p>
-                <div className="grid grid-cols-5 gap-2.5 sm:gap-4 max-w-md mx-auto">
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-3.5 max-w-md mx-auto">
                   {stampsArray.map((isFilled, idx) => (
                     <div
                       key={idx}
-                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center border-2 transition-all ${
+                      className={`aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center border-2 transition-all p-1 ${
                         isFilled
                           ? 'bg-[#fbddca] border-[#fbddca] text-[#26170c] shadow-md scale-102'
                           : 'bg-white/5 border-white/20 text-white/40'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[24px]">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[24px]">
                         {idx === 9 ? 'cake' : 'local_cafe'}
                       </span>
-                      <span className="text-[10px] font-bold mt-0.5">#{idx + 1}</span>
+                      <span className="text-[8px] sm:text-[10px] font-bold mt-0.5">#{idx + 1}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="p-3 bg-white/10 rounded-2xl text-center text-xs text-[#dec1af]">
+              <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl sm:rounded-2xl text-center text-[11px] sm:text-xs text-[#dec1af]">
                 🎉 You have <strong>{currentStamps} of 10 stamps</strong>. Only {10 - currentStamps} more orders until your free reward!
               </div>
             </div>

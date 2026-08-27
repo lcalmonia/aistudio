@@ -20,6 +20,8 @@ import {
   StoreSettings,
   CustomerUser,
 } from './types';
+import { generateOrderId, generateOrderNumber } from './services/idGenerator';
+import { reportingService } from './services/reportingService';
 import {
   getStoredCustomers,
   saveCustomers,
@@ -112,11 +114,12 @@ export default function App() {
   const [isAddonModalOpen, setIsAddonModalOpen] = useState<boolean>(false);
   const [addonToEdit, setAddonToEdit] = useState<ProductAddon | null>(null);
 
-  // Live metrics state (in Philippine Peso)
-  const [cupsServed, setCupsServed] = useState<number>(242);
-  const dailyGoal = 300;
-  const [todaySales, setTodaySales] = useState<number>(18450.00);
-  const [newMembers] = useState<number>(customers.length);
+  // Live metrics calculation from real orders data
+  const [extraLoggedCups, setExtraLoggedCups] = useState<number>(0);
+  const todaySales = reportingService.calculateTotalSales(orders);
+  const cupsServed = reportingService.calculateCupsServed(orders) + extraLoggedCups;
+  const dailyGoal = 100;
+  const newMembers = customers.length;
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -294,7 +297,6 @@ export default function App() {
     );
 
     if (newStatus === 'Completed') {
-      setCupsServed((prev) => prev + 1);
       showNotification(`Order #${orderId} marked as Completed!`);
     } else if (newStatus === 'Ready') {
       showNotification(`Order #${orderId} is Ready for pickup/serving! 🛎️`);
@@ -305,49 +307,48 @@ export default function App() {
 
   const handleCreateOrder = (orderData: Partial<Order>) => {
     const newOrder: Order = {
-      id: `ord-${Date.now()}`,
-      orderNumber: String(Math.floor(1000 + Math.random() * 9000)),
-      customerId: orderData.customerId || 'CUST-00001',
-      customerName: orderData.customerName || 'Walk-in Customer',
-      customerPhone: orderData.customerPhone || '+63 (917) 000-0000',
+      id: generateOrderId(),
+      orderNumber: generateOrderNumber(),
+      customerId: orderData.customerId || currentCustomer?.id,
+      customerName: orderData.customerName || 'Walk-in Guest',
+      customerPhone: orderData.customerPhone,
       timeAgo: 'Just now',
       timestamp: Date.now(),
       status: 'New',
       items: orderData.items || [],
       total: orderData.total || 0,
+      subtotal: orderData.subtotal || orderData.total || 0,
       image:
-        orderData.items?.[0]?.name.toLowerCase().includes('matcha')
+        orderData.image ||
+        (orderData.items?.[0]?.name.toLowerCase().includes('matcha')
           ? 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=400&q=80'
-          : 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=400&q=80',
+          : 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=400&q=80'),
       notes: orderData.notes,
       orderType: orderData.orderType || 'Dine-In',
-      tableNumber: orderData.tableNumber || 'Table 1',
+      tableNumber: orderData.tableNumber || (orderData.orderType === 'Dine-In' ? 'Table 1' : undefined),
       paymentMethod: orderData.paymentMethod || 'Cash',
       isCustomerOrder: false,
     };
 
     setOrders((prev) => [newOrder, ...prev]);
-    setTodaySales((prev) => prev + newOrder.total);
-    setCupsServed((prev) => prev + (orderData.items?.reduce((sum, i) => sum + i.quantity, 0) || 1));
     showNotification(`New POS Ticket #${newOrder.orderNumber} placed for ₱${newOrder.total.toFixed(2)}`);
   };
 
   const handlePlaceCustomerOrder = (customerOrder: Order) => {
-    // Permanently link to customer ID
     const enrichedOrder: Order = {
       ...customerOrder,
-      customerId: currentCustomer?.id || 'CUST-00001',
+      id: customerOrder.id || generateOrderId(),
+      orderNumber: customerOrder.orderNumber || generateOrderNumber(),
+      customerId: currentCustomer?.id,
       customerName: customerOrder.customerName || currentCustomer?.name || 'Customer',
       customerEmail: currentCustomer?.email,
-      customerPhone: customerOrder.customerPhone || currentCustomer?.mobile || '+63 (917) 000-0000',
+      customerPhone: customerOrder.customerPhone || currentCustomer?.mobile,
       timestamp: Date.now(),
       isCustomerOrder: true,
     };
 
     setOrders((prev) => [enrichedOrder, ...prev]);
     setLastCustomerOrder(enrichedOrder);
-    setTodaySales((prev) => prev + enrichedOrder.total);
-    setCupsServed((prev) => prev + (enrichedOrder.items?.reduce((sum, i) => sum + i.quantity, 0) || 1));
 
     // Update customer stamp balance
     if (currentCustomer) {
@@ -508,9 +509,8 @@ export default function App() {
   };
 
   const handleLogBrew = () => {
-    setCupsServed((prev) => prev + 1);
-    setTodaySales((prev) => prev + 150);
-    showNotification('Quick Brew logged! +₱150.00');
+    setExtraLoggedCups((prev) => prev + 1);
+    showNotification('Quick Brew logged! +1 Cup to Daily Counter ☕');
   };
 
   return (

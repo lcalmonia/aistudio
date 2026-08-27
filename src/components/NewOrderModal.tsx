@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MenuItem, Order, OrderItem } from '../types';
+import { generateOrderId, generateOrderNumber } from '../services/idGenerator';
 
 interface NewOrderModalProps {
   isOpen: boolean;
@@ -88,7 +89,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     e.preventDefault();
     if (selectedItems.length === 0) return;
 
-    const orderNum = `ILK-${Math.floor(4200 + Math.random() * 200)}`;
+    const orderNum = generateOrderNumber();
     const items: OrderItem[] = selectedItems.map((s) => ({
       name: s.item.name,
       quantity: s.quantity,
@@ -98,7 +99,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     }));
 
     const newOrder: Order = {
-      id: `ord-${Date.now()}`,
+      id: generateOrderId(),
       orderNumber: orderNum,
       customerName: customerName.trim() || 'Dine-in Guest',
       timeAgo: 'Just now',
@@ -106,8 +107,8 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       status: 'New',
       items,
       total: calculateTotal(),
+      subtotal: calculateTotal(),
       image: selectedItems[0]?.item.image,
-      customerPhone: '+63 (917) 555-0192',
     };
 
     onCreateOrder(newOrder);

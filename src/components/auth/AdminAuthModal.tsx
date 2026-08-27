@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StoreSettings } from '../../types';
-import { saveAdminAuth } from '../../data/storage';
+import { authService } from '../../services/authService';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onSuccess,
   storeSettings,
 }) => {
-  const [pin, setPin] = useState('');
+  const [passcode, setPasscode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,33 +23,30 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
   const storeName = storeSettings?.storeName || 'iLuvKeyks';
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const cleanPin = pin.trim();
-    if (!cleanPin) {
-      setError('Please enter the Staff / Admin PIN or Password.');
+    const cleanPasscode = passcode.trim();
+    if (!cleanPasscode) {
+      setError('Please enter your staff or manager security passcode.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      // Valid pins / passwords: 1234, admin, admin123, 0000
-      if (['1234', 'admin', 'admin123', '0000', 'keyks2026'].includes(cleanPin.toLowerCase())) {
-        saveAdminAuth(true);
-        setLoading(false);
+    try {
+      const res = await authService.loginStaff(cleanPasscode, 'admin');
+      setLoading(false);
+      if (res.success && res.staff) {
         onSuccess();
+        onClose();
       } else {
-        setLoading(false);
-        setError('Invalid staff credentials. Default PIN: 1234');
+        setError(res.error || 'Authentication failed. Invalid staff passcode.');
       }
-    }, 200);
-  };
-
-  const handleQuickFill = () => {
-    setPin('1234');
-    setError(null);
+    } catch {
+      setLoading(false);
+      setError('An unexpected authentication error occurred.');
+    }
   };
 
   return (
@@ -88,7 +85,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         {/* Body */}
         <form onSubmit={handleLogin} className="p-5 sm:p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-[#ffdad6] text-[#93000a] text-xs font-medium rounded-xl border border-[#ba1a1a]/30 flex items-center gap-2">
+            <div className="p-3 bg-[#ffdad6] text-[#93000a] text-xs font-medium rounded-xl border border-[#ba1a1a]/30 flex items-center gap-2 animate-shake">
               <span className="material-symbols-outlined text-[18px]">error</span>
               <span>{error}</span>
             </div>
@@ -96,29 +93,20 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-[#4f453f] mb-1">
-              Staff Passcode or PIN
+              Staff Passcode or Security PIN <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <input
                 type="password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="Enter PIN (Default: 1234)"
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="Enter authorized staff passcode"
                 className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-sm text-[#26170c] font-mono tracking-wider text-center focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                 autoFocus
+                required
               />
             </div>
           </div>
-
-          {/* Quick PIN button */}
-          <button
-            type="button"
-            onClick={handleQuickFill}
-            className="w-full py-1.5 px-3 bg-[#e1e1c9] hover:bg-[#d8d8bc] text-[#636451] rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            <span className="material-symbols-outlined text-[14px]">key</span>
-            <span>Quick Fill Staff PIN (1234)</span>
-          </button>
 
           <div className="pt-2 flex gap-2.5">
             <button

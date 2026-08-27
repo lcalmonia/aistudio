@@ -1,55 +1,7 @@
 import { Order, MenuItem, InventoryItem, ProductAddon, PromoBundle, StoreSettings, CustomerUser } from '../types';
 
-export const INITIAL_CUSTOMERS: CustomerUser[] = [
-  {
-    id: 'CUST-00001',
-    name: 'Mary Grace Santos',
-    email: 'mary.grace@example.com',
-    mobile: '+63 917 555 4321',
-    password: 'password123',
-    address: 'Unit 402, Acacia Residences, Sampaloc, Manila',
-    createdAt: '2026-08-10',
-    status: 'active',
-    stamps: 7,
-    points: 520,
-  },
-  {
-    id: 'CUST-00002',
-    name: 'Jian Carlo Reyes',
-    email: 'jian.reyes@example.com',
-    mobile: '+63 920 888 1234',
-    password: 'password123',
-    address: '14 Mabini St, Ermita, Manila',
-    createdAt: '2026-08-14',
-    status: 'active',
-    stamps: 4,
-    points: 280,
-  },
-  {
-    id: 'CUST-00003',
-    name: 'Kristine Mendoza',
-    email: 'kristine.m@example.com',
-    mobile: '+63 908 777 6543',
-    password: 'password123',
-    address: '77 Katipunan Ave, Quezon City',
-    createdAt: '2026-08-18',
-    status: 'active',
-    stamps: 9,
-    points: 640,
-  },
-  {
-    id: 'CUST-00004',
-    name: 'Ramon Bautista',
-    email: 'ramon.b@example.com',
-    mobile: '+63 915 222 9988',
-    password: 'password123',
-    address: '22 España Blvd, Sampaloc, Manila',
-    createdAt: '2026-08-20',
-    status: 'active',
-    stamps: 3,
-    points: 190,
-  },
-];
+// Clean initial data: No fake/demo customers in production dataset
+export const INITIAL_CUSTOMERS: CustomerUser[] = [];
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   storeName: 'iLuvKeyks',
@@ -370,93 +322,8 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   }
 ];
 
-export const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ord-1',
-    orderNumber: 'ILK-5101',
-    customerId: 'CUST-00001',
-    customerName: 'Mary Grace Santos',
-    customerEmail: 'mary.grace@example.com',
-    timeAgo: 'Just now',
-    timestamp: Date.now() - 25000,
-    status: 'New',
-    orderType: 'Dine-In',
-    tableNumber: 'Table 4',
-    paymentMethod: 'GCash',
-    items: [
-      { name: 'Spanish Latte (Signature)', quantity: 2, customization: 'Iced 16oz, Less Sweet', price: 145.00, temperature: 'Iced' },
-      { name: 'Signature Ube Leche Flan Tub Cake', quantity: 1, customization: 'Chilled', price: 195.00 },
-    ],
-    total: 485.00,
-    subtotal: 485.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCEPK9an39rFEkfnp4LRaMqlPguV-s_RqdDV3FcNMZJuxAA2NG3s4Vj1YCqZGozzqYBUaORRDaOp1QySWD3zavJSY4WfpCoG_tOmX6LnCt7kbG-aSamCO4-gV_vKuAsnEqCQcBJQV1oJXYCXqiAz0xdScWn3LHH2FL9FY8Os11FNYgSA8OYNMaTpGUSs6lVsJ4RLjDLzmTHawjWGN39KIROIBlVnGpeNKU6y-nW8S2RGne8Y87fgfSG',
-    customerPhone: '+63 917 555 4321',
-    isCustomerOrder: true,
-  },
-  {
-    id: 'ord-2',
-    orderNumber: 'ILK-5099',
-    customerId: 'CUST-00002',
-    customerName: 'Jian Carlo Reyes',
-    customerEmail: 'jian.reyes@example.com',
-    timeAgo: '6m ago',
-    timestamp: Date.now() - 360000,
-    status: 'Brewing',
-    orderType: 'Delivery',
-    deliveryAddress: '14 Mabini St, Ermita, Manila',
-    paymentMethod: 'Maya',
-    deliveryFee: 49.00,
-    items: [
-      { name: 'Creamy Truffle Bacon Carbonara', quantity: 1, customization: 'Extra Parmesan', price: 210.00 },
-      { name: 'Blue Lagoon Sparkling Cooler', quantity: 1, customization: 'Regular Ice', price: 125.00, temperature: 'Iced' },
-    ],
-    subtotal: 335.00,
-    total: 384.00,
-    customerPhone: '+63 920 888 1234',
-    isCustomerOrder: true,
-  },
-  {
-    id: 'ord-3',
-    orderNumber: 'ILK-5095',
-    customerId: 'CUST-00003',
-    customerName: 'Kristine Mendoza',
-    customerEmail: 'kristine.m@example.com',
-    timeAgo: '12m ago',
-    timestamp: Date.now() - 720000,
-    status: 'Ready',
-    orderType: 'Takeout',
-    paymentMethod: 'GCash',
-    items: [
-      { name: 'Ceremonial Matcha Latte', quantity: 1, customization: 'Iced, Oat Milk Sub', price: 200.00, completed: true, temperature: 'Iced' },
-      { name: 'Flaky Butter Croissant', quantity: 2, customization: 'Warmed', price: 170.00, completed: true },
-    ],
-    subtotal: 370.00,
-    total: 370.00,
-    customerPhone: '+63 908 777 6543',
-    isCustomerOrder: true,
-  },
-  {
-    id: 'ord-4',
-    orderNumber: 'ILK-5092',
-    customerId: 'CUST-00004',
-    customerName: 'Ramon Bautista',
-    customerEmail: 'ramon.b@example.com',
-    timeAgo: '20m ago',
-    timestamp: Date.now() - 1200000,
-    status: 'Completed',
-    orderType: 'Dine-In',
-    tableNumber: 'Table 2',
-    paymentMethod: 'Cash',
-    items: [
-      { name: 'Classic Beef Tapa Rice Bowl', quantity: 1, customization: 'Egg Well Done', price: 195.00, completed: true },
-      { name: 'Caramel Macchiato', quantity: 1, customization: 'Hot 16oz', price: 155.00, completed: true, temperature: 'Hot' },
-    ],
-    subtotal: 350.00,
-    total: 350.00,
-    customerPhone: '+63 915 222 9988',
-    isCustomerOrder: true,
-  }
-];
+// Clean initial data: No fake orders or mock transactions in production dataset
+export const INITIAL_ORDERS: Order[] = [];
 
 export const DEFAULT_INVENTORY_CATEGORIES: string[] = [
   'Beans',

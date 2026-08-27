@@ -1,6 +1,30 @@
-export type OrderStatus = 'New' | 'Brewing' | 'Ready' | 'Completed' | 'Pending' | 'Preparing';
+export type OrderStatus = 'New' | 'Brewing' | 'Ready' | 'Completed' | 'Pending' | 'Preparing' | 'Cancelled';
 
 export type ProductTemperature = 'Hot' | 'Cold' | 'Both' | 'N/A';
+
+export type UserRole = 'customer' | 'staff' | 'admin' | 'super_admin';
+
+export type Permission =
+  | 'manage_customers'
+  | 'manage_orders'
+  | 'manage_menu'
+  | 'manage_pricing'
+  | 'manage_promotions'
+  | 'manage_inventory'
+  | 'view_reports'
+  | 'manage_settings'
+  | 'manage_staff'
+  | 'delete_records'
+  | 'configure_system';
+
+export interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+  lastLogin?: string;
+}
 
 export interface ProductSize {
   name: string;
@@ -61,7 +85,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   orderNumber: string;
-  customerId?: string; // Unique customer ID e.g. "CUST-00001"
+  customerId?: string; // Stable customer ID
   customerName: string;
   customerEmail?: string;
   timeAgo: string;
@@ -83,14 +107,14 @@ export interface Order {
 }
 
 export interface CustomerUser {
-  id: string; // e.g. "CUST-00001"
+  id: string; // e.g. "cust_8f293b"
   name: string;
   email: string;
   mobile: string;
-  password?: string;
   address: string;
   createdAt: string;
   status: 'active' | 'inactive';
+  role?: 'customer';
   stamps?: number;
   points?: number;
 }
@@ -110,7 +134,6 @@ export interface CustomerCartItem {
   isBundle?: boolean;
   bundleData?: PromoBundle;
 }
-
 
 export interface InventoryItem {
   id: string;
@@ -144,3 +167,30 @@ export interface StoreSettings {
   socialFb?: string;
   socialIg?: string;
 }
+
+export interface SalesSummary {
+  totalSales: number;
+  cupsServed: number;
+  totalOrdersCount: number;
+  averageOrderValue: number;
+  activeOrdersCount: number;
+  completedOrdersCount: number;
+  pendingOrdersCount: number;
+  cancelledOrdersCount: number;
+}
+
+export interface HourlySalesPoint {
+  time: string;
+  hour: number;
+  cups: number;
+  sales: number;
+}
+
+export interface TopSellingProduct {
+  name: string;
+  count: number;
+  percentage: number;
+  revenue: number;
+  formattedRevenue: string;
+}
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CustomerUser, StoreSettings } from '../../types';
-import { registerCustomer, authenticateCustomer, getStoredCustomers } from '../../data/storage';
+import { authService } from '../../services/authService';
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -36,11 +36,11 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   // Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [mobile, setMobile] = useState('+63 ');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
   const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('password123');
+  const [loginPassword, setLoginPassword] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,9 +48,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   if (!isOpen) return null;
 
   const storeName = storeSettings?.storeName || 'iLuvKeyks';
-  const demoCustomers = getStoredCustomers().slice(0, 3);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -63,7 +62,11 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       return;
     }
     if (!mobile.trim() || mobile.length < 8) {
-      setError('Please enter a valid mobile number (e.g. +63 917 123 4567).');
+      setError('Please enter a valid mobile number.');
+      return;
+    }
+    if (!password.trim() || password.length < 6) {
+      setError('Password must be at least 6 characters.');
       return;
     }
     if (!address.trim()) {
@@ -72,13 +75,13 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const res = registerCustomer({
-        name,
-        email,
-        mobile,
-        password: password || 'password123',
-        address,
+    try {
+      const res = await authService.registerCustomer({
+        name: name.trim(),
+        email: email.trim(),
+        mobile: mobile.trim(),
+        password: password.trim(),
+        address: address.trim(),
       });
 
       setLoading(false);
@@ -88,13 +91,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         } else if (onSuccess) {
           onSuccess(res.customer);
         }
+        onClose();
       } else {
         setError(res.error || 'Registration failed. Please check your details.');
       }
-    }, 300);
+    } catch {
+      setLoading(false);
+      setError('An unexpected error occurred. Please try again.');
+    }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -102,10 +109,14 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       setError('Please enter your registered email or mobile number.');
       return;
     }
+    if (!loginPassword.trim()) {
+      setError('Please enter your password.');
+      return;
+    }
 
     setLoading(true);
-    setTimeout(() => {
-      const res = authenticateCustomer(loginIdentifier, loginPassword);
+    try {
+      const res = await authService.loginCustomer(loginIdentifier.trim(), loginPassword.trim());
       setLoading(false);
       if (res.success && res.customer) {
         if (onLoginSuccess) {
@@ -113,100 +124,100 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         } else if (onSuccess) {
           onSuccess(res.customer);
         }
+        onClose();
       } else {
         setError(res.error || 'Invalid credentials. Please try again.');
       }
-    }, 250);
-  };
-
-  const handleQuickLogin = (demo: CustomerUser) => {
-    setError(null);
-    setLoading(true);
-    setTimeout(() => {
-      const res = authenticateCustomer(demo.email);
+    } catch {
       setLoading(false);
-      if (res.success && res.customer) {
-        if (onLoginSuccess) {
-          onLoginSuccess(res.customer);
-        } else if (onSuccess) {
-          onSuccess(res.customer);
-        }
-      }
-    }, 200);
+      setError('An unexpected error occurred. Please try again.');
+    }
   };
 
   return (
     <div
       id="customer-auth-modal"
-      className="fixed inset-0 z-[160] flex items-center justify-center p-3.5 sm:p-4 bg-black/65 backdrop-blur-xs animate-fadeIn overflow-y-auto"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
     >
       <div
-        className="bg-[#fff8f5] w-full max-w-md rounded-3xl shadow-2xl border border-[#dec1af]/70 overflow-hidden my-auto max-h-[94vh] flex flex-col text-[#26170c]"
+        className="bg-[#fff8f5] w-full max-w-md rounded-2xl shadow-2xl border border-[#dec1af] overflow-hidden flex flex-col max-h-[90vh] animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="bg-[#26170c] text-white p-5 sm:p-6 text-center relative">
+        {/* Header */}
+        <div className="bg-[#26170c] text-white p-5 flex items-center justify-between relative overflow-hidden">
+          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-[#dec1af]/10 blur-xl pointer-events-none" />
+          
+          <div className="flex items-center gap-3 z-10">
+            <div className="w-10 h-10 rounded-xl bg-[#dec1af] text-[#26170c] flex items-center justify-center font-serif font-bold text-lg shadow-sm">
+              <span className="material-symbols-outlined text-[22px]">local_cafe</span>
+            </div>
+            <div>
+              <h3 className="font-serif text-lg font-bold leading-tight">
+                {mode === 'login' ? `Sign In to ${storeName}` : `Join ${storeName} Rewards`}
+              </h3>
+              <p className="text-[11px] text-[#dec1af]">
+                {mode === 'login'
+                  ? 'Access your saved addresses, loyalty stamps & points'
+                  : 'Earn stamps, redeem free coffee & track your orders'}
+              </p>
+            </div>
+          </div>
+
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors"
-            aria-label="Close"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer z-10"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
-
-          <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-2 text-[#dec1af]">
-            <span className="material-symbols-outlined text-[26px]">local_cafe</span>
-          </div>
-
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#dec1af]">
-            {storeName} Coffee & Tea
-          </span>
-          <h3 className="font-serif text-xl sm:text-2xl font-bold mt-0.5">
-            {mode === 'login' ? 'Welcome Back!' : 'Create Customer Account'}
-          </h3>
-          <p className="text-xs text-[#dec1af]/85 mt-1 max-w-xs mx-auto leading-relaxed">
-            {promptMessage}
-          </p>
-
-          {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1 bg-white/10 rounded-2xl mt-4 border border-white/15">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setError(null);
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-[#fbddca] text-[#26170c] shadow-sm'
-                  : 'text-white/80 hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setError(null);
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                mode === 'register'
-                  ? 'bg-[#fbddca] text-[#26170c] shadow-sm'
-                  : 'text-white/80 hover:text-white'
-              }`}
-            >
-              Register Account
-            </button>
-          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+        {/* Modal Prompt Badge */}
+        {promptMessage && (
+          <div className="bg-[#fbddca]/40 px-4 py-2 border-b border-[#dec1af]/40 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[16px] text-[#5e604d]">info</span>
+            <span className="text-xs text-[#4f453f] font-medium">{promptMessage}</span>
+          </div>
+        )}
+
+        {/* Tab Switcher */}
+        <div className="flex border-b border-[#f3ecea] bg-white">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('login');
+              setError(null);
+            }}
+            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              mode === 'login'
+                ? 'text-[#26170c] border-b-2 border-[#26170c] bg-[#fff8f5]'
+                : 'text-[#81756e] hover:text-[#26170c]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">login</span>
+            <span>Sign In</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('register');
+              setError(null);
+            }}
+            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              mode === 'register'
+                ? 'text-[#26170c] border-b-2 border-[#26170c] bg-[#fff8f5]'
+                : 'text-[#81756e] hover:text-[#26170c]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">person_add</span>
+            <span>Create Account</span>
+          </button>
+        </div>
+
+        {/* Form Body */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {error && (
-            <div className="p-3 bg-[#ffdad6] text-[#93000a] text-xs font-medium rounded-xl border border-[#ba1a1a]/30 flex items-start gap-2 animate-shake">
-              <span className="material-symbols-outlined text-[18px] flex-shrink-0">error</span>
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start gap-2 animate-shake">
+              <span className="material-symbols-outlined text-[18px] flex-shrink-0 mt-0.5">error</span>
               <span>{error}</span>
             </div>
           )}
@@ -225,7 +236,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. mary.grace@example.com or 09175554321"
+                    placeholder="e.g. name@example.com or 09171234567"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                     required
                   />
@@ -236,18 +247,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-[#4f453f]">
-                    Password <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-[#81756e]">Default: password123</span>
-                </div>
+                <label className="block text-xs font-bold text-[#4f453f] mb-1">
+                  Password <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Enter your password"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                     required
                   />
@@ -260,7 +268,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-[#26170c] hover:bg-[#3d2b1f] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-2"
+                className="w-full py-3 bg-[#26170c] hover:bg-[#3d2b1f] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-4"
               >
                 {loading ? (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -271,36 +279,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   </>
                 )}
               </button>
-
-              {/* Quick Demo Accounts Helper */}
-              <div className="pt-3 border-t border-[#f3ecea]">
-                <span className="text-[11px] font-bold text-[#81756e] uppercase tracking-wider block mb-2 text-center">
-                  Quick 1-Click Demo Accounts
-                </span>
-                <div className="space-y-1.5">
-                  {demoCustomers.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => handleQuickLogin(c)}
-                      className="w-full p-2 bg-[#f9f2f0] hover:bg-[#dec1af]/30 border border-[#dec1af]/50 rounded-xl text-left flex items-center justify-between text-xs transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-[#26170c] text-white text-[10px] flex items-center justify-center font-bold">
-                          {c.name.charAt(0)}
-                        </span>
-                        <div>
-                          <p className="font-bold text-[#26170c] leading-tight">{c.name}</p>
-                          <p className="text-[10px] text-[#81756e]">{c.id} • {c.email}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-[#5e604d] group-hover:translate-x-0.5 transition-transform flex items-center">
-                        Select →
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </form>
           ) : (
             /* ============================================================= */
@@ -315,13 +293,13 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Juan Dela Cruz"
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+                  placeholder="e.g. Maria Cruz"
+                  className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4f453f] mb-1">
                     Email Address <span className="text-red-500">*</span>
@@ -330,11 +308,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="juan@example.com"
-                    className="w-full px-3 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+                    placeholder="maria@example.com"
+                    className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                     required
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-[#4f453f] mb-1">
                     Mobile Number <span className="text-red-500">*</span>
@@ -343,8 +322,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     type="tel"
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
-                    placeholder="+63 917 000 0000"
-                    className="w-full px-3 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+                    placeholder="+63 917 123 4567"
+                    className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                     required
                   />
                 </div>
@@ -358,29 +337,35 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Choose a secure password"
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+                  placeholder="At least 6 characters"
+                  className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#4f453f] mb-1">
-                  Complete Delivery Address <span className="text-red-500">*</span>
+                  Delivery / Home Address <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="House/Unit #, Street, Barangay, City, Postal Code"
-                  className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+                  placeholder="Unit/House No., Street, Barangay, City (used for cafe deliveries)"
+                  rows={2}
+                  className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                   required
                 />
               </div>
 
-              <div className="p-3 bg-[#e1e1c9]/50 rounded-xl border border-[#dec1af]/40 text-[11px] text-[#4f453f] flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-[#5e604d]">stars</span>
-                <span>Includes 1st Free Welcome Loyalty Stamp + 50 bonus reward points!</span>
+              {/* Loyalty Perks Callout */}
+              <div className="bg-[#dec1af]/20 p-3 rounded-xl border border-[#dec1af]/40 flex items-center gap-3">
+                <span className="material-symbols-outlined text-[24px] text-[#5e604d]">loyalty</span>
+                <div>
+                  <p className="text-xs font-bold text-[#26170c]">Instant Loyalty Perks</p>
+                  <p className="text-[10px] text-[#4f453f]">
+                    Get 50 bonus reward points + 1 stamp immediately upon signing up!
+                  </p>
+                </div>
               </div>
 
               <button
@@ -392,8 +377,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Complete Registration & Order</span>
-                    <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
+                    <span>Create Customer Account</span>
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
                   </>
                 )}
               </button>
@@ -401,37 +386,39 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           )}
         </div>
 
-        {/* Footer switch */}
-        <div className="p-3.5 bg-[#f9f2f0] border-t border-[#dec1af]/40 text-center text-xs text-[#4f453f]">
-          {mode === 'login' ? (
-            <span>
-              New to {storeName}?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('register');
-                  setError(null);
-                }}
-                className="font-bold text-[#26170c] hover:underline cursor-pointer ml-1"
-              >
-                Create an account
-              </button>
-            </span>
-          ) : (
-            <span>
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  setError(null);
-                }}
-                className="font-bold text-[#26170c] hover:underline cursor-pointer ml-1"
-              >
-                Sign In
-              </button>
-            </span>
-          )}
+        {/* Footer */}
+        <div className="px-5 py-3 bg-[#f9f2f0] border-t border-[#f3ecea] text-center">
+          <p className="text-[11px] text-[#81756e]">
+            {mode === 'login' ? (
+              <>
+                Don't have an account yet?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setError(null);
+                  }}
+                  className="font-bold text-[#26170c] hover:underline cursor-pointer"
+                >
+                  Create one here
+                </button>
+              </>
+            ) : (
+              <>
+                Already registered?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login');
+                    setError(null);
+                  }}
+                  className="font-bold text-[#26170c] hover:underline cursor-pointer"
+                >
+                  Sign in here
+                </button>
+              </>
+            )}
+          </p>
         </div>
       </div>
     </div>

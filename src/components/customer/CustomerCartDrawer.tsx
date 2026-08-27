@@ -128,7 +128,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({
     const newOrder: Order = {
       id: `ord-cust-${Date.now()}`,
       orderNumber: orderNum,
-      customerId: currentCustomer?.id || 'CUST-00001',
+      customerId: currentCustomer?.id,
       customerName: customerName.trim() || currentCustomer?.name || (fulfillmentType === 'Dine-In' ? `${tableNumber} Guest` : 'Customer'),
       customerEmail: currentCustomer?.email,
       timeAgo: 'Just now',
@@ -141,7 +141,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({
       deliveryFee,
       image: cartItems[0]?.menuItem?.image || 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=400&q=80',
       notes: orderNotes.trim() || undefined,
-      customerPhone: customerPhone.trim() || currentCustomer?.mobile || '+63 (917) 000-0000',
+      customerPhone: customerPhone.trim() || currentCustomer?.mobile || undefined,
       orderType: fulfillmentType,
       tableNumber: fulfillmentType === 'Dine-In' ? tableNumber : undefined,
       deliveryAddress: fulfillmentType === 'Delivery' ? (deliveryAddress || currentCustomer?.address) : undefined,
@@ -249,7 +249,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Sofia Santos"
+                      placeholder="e.g. Maria Cruz"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       className="w-full px-3 py-1.5 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af] font-medium focus:outline-none focus:ring-1 focus:ring-[#26170c]"
