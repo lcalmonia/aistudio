@@ -8,6 +8,7 @@ import {
   InventoryItem,
   StoreSettings,
   CustomerUser,
+  AdminPrincipal,
 } from './types';
 import {
   authService,
@@ -40,6 +41,7 @@ import { SettingsView } from './components/SettingsView';
 import { StatsView } from './components/StatsView';
 import { InventoryView } from './components/InventoryView';
 import { CustomerManagementView } from './components/admin/CustomerManagementView';
+import { AdminAccountManagementView } from './components/admin/AdminAccountManagementView';
 import { RewardsView } from './components/RewardsView';
 import { ProfileView } from './components/ProfileView';
 import { BottomNavBar } from './components/BottomNavBar';
@@ -47,6 +49,7 @@ import { NewOrderModal } from './components/NewOrderModal';
 import { EditProductModal } from './components/EditProductModal';
 import { EditBundleModal } from './components/EditBundleModal';
 import { EditAddonModal } from './components/EditAddonModal';
+import { adminAuthService } from './services/adminAuthService';
 
 export default function App() {
   // -------------------------------------------------------------
@@ -57,7 +60,9 @@ export default function App() {
   // Customer & Auth State
   const [customers, setCustomers] = useState<CustomerUser[]>(() => storageAdapter.getCustomers());
   const [currentCustomer, setCurrentCustomer] = useState<CustomerUser | null>(() => authService.getCurrentCustomer());
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => authService.isStaffAuthenticated());
+  const [adminPrincipal, setAdminPrincipal] = useState<AdminPrincipal | null>(null);
+  const [profilePictureVersion, setProfilePictureVersion] = useState(0);
+  const isAdminAuthenticated = adminPrincipal !== null;
 
   // Auth Modals State
   const [isCustomerAuthModalOpen, setIsCustomerAuthModalOpen] = useState<boolean>(false);
@@ -159,6 +164,21 @@ export default function App() {
     initServicesData();
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    adminAuthService
+      .getSession()
+      .then((session) => {
+        if (active) setAdminPrincipal(session);
+      })
+      .catch(() => {
+        if (active) setAdminPrincipal(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // -------------------------------------------------------------
   // Customer Auth Handlers
   // -------------------------------------------------------------
@@ -200,19 +220,44 @@ export default function App() {
   // -------------------------------------------------------------
   // Admin Auth Handlers
   // -------------------------------------------------------------
-  const handleAdminLoginSuccess = () => {
-    authService.setStaffAuthenticated(true);
-    setIsAdminAuthenticated(true);
+  const handleAdminLoginSuccess = (admin: AdminPrincipal) => {
+    setAdminPrincipal(admin);
     setIsAdminAuthModalOpen(false);
     setPortalMode('admin');
-    showNotification('Staff / Admin session authenticated.');
+    showNotification(`${admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'} session authenticated.`);
   };
 
-  const handleAdminLogout = () => {
-    authService.logoutStaff();
-    setIsAdminAuthenticated(false);
+  const handleAdminLogout = async () => {
+    try {
+      await adminAuthService.logout();
+    } catch {
+      showNotification('Unable to log out. Please try again.');
+      return;
+    }
+    setAdminPrincipal(null);
     setPortalMode('public');
-    showNotification('Staff / Admin logged out.');
+    setIsDrawerOpen(false);
+    showNotification('Admin logged out.');
+  };
+
+  const handleAdminSessionInvalidated = () => {
+    setAdminPrincipal(null);
+    setPortalMode('public');
+    setIsDrawerOpen(false);
+    showNotification('Password changed. Sign in again to continue.');
+  };
+
+  const handleProfileChanged = (hasProfilePicture: boolean) => {
+    setAdminPrincipal((current) =>
+      current
+        ? {
+            ...current,
+            hasProfilePicture,
+            profilePictureUrl: hasProfilePicture ? '/api/auth/profile-picture' : null,
+          }
+        : current,
+    );
+    setProfilePictureVersion((version) => version + 1);
   };
 
   // -------------------------------------------------------------
@@ -578,13 +623,14 @@ export default function App() {
       {/* ========================================================================= */}
       {/* 3. ADMIN & BARISTA MANAGEMENT PORTAL                                     */}
       {/* ========================================================================= */}
-      {portalMode === 'admin' && (
+      {portalMode === 'admin' && adminPrincipal && (
         <>
           {/* Admin Header */}
           <Header
             onOpenDrawer={() => setIsDrawerOpen(true)}
-            onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
+            onOpenCartOrPOS={() => setIsNewOrderModalOpen(true)}
             activeOrdersCount={reportingService.calculateActiveOrdersCount(orders)}
+            currentTab={currentTab}
             onSwitchToCustomerPortal={() => {
               if (currentCustomer) {
                 setPortalMode('customer');
@@ -593,8 +639,10 @@ export default function App() {
                 setIsCustomerAuthModalOpen(true);
               }
             }}
-            onSwitchToPublic={() => setPortalMode('public')}
             storeSettings={storeSettings}
+            admin={adminPrincipal}
+            profilePictureVersion={profilePictureVersion}
+            onLogout={() => void handleAdminLogout()}
           />
 
           {/* Navigation Drawer */}
@@ -616,6 +664,9 @@ export default function App() {
               }
             }}
             storeSettings={storeSettings}
+            admin={adminPrincipal}
+            profilePictureVersion={profilePictureVersion}
+            onLogout={() => void handleAdminLogout()}
           />
 
           {/* Main Admin Tab View Content */}
@@ -742,7 +793,20 @@ export default function App() {
 
             {/* Profile View */}
             {currentTab === 'profile' && (
-              <ProfileView onShowNotification={showNotification} />
+              <ProfileView
+                admin={adminPrincipal}
+                profilePictureVersion={profilePictureVersion}
+                onProfileChanged={handleProfileChanged}
+                onShowNotification={showNotification}
+              />
+            )}
+
+            {currentTab === 'admins' && (
+              <AdminAccountManagementView
+                principal={adminPrincipal}
+                onSessionInvalidated={handleAdminSessionInvalidated}
+                onShowNotification={showNotification}
+              />
             )}
           </main>
 

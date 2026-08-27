@@ -1,5 +1,5 @@
 import React from 'react';
-import { StoreSettings } from '../types';
+import { AdminPrincipal, StoreSettings } from '../types';
 
 interface HeaderProps {
   onOpenDrawer: () => void;
@@ -8,6 +8,9 @@ interface HeaderProps {
   currentTab: string;
   onSwitchToCustomerPortal?: () => void;
   storeSettings?: StoreSettings;
+  admin: AdminPrincipal;
+  profilePictureVersion: number;
+  onLogout: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +20,9 @@ export const Header: React.FC<HeaderProps> = ({
   currentTab,
   onSwitchToCustomerPortal,
   storeSettings,
+  admin,
+  profilePictureVersion,
+  onLogout,
 }) => {
   const storeName = storeSettings?.storeName || 'iLuvKeyks';
   const logoUrl = storeSettings?.logoUrl;
@@ -50,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
             {storeName}
           </h1>
           <span className="hidden xs:inline px-1.5 py-0.5 bg-[#26170c] text-white text-[9px] font-bold rounded">
-            ADMIN
+            {admin.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : 'ADMIN'}
           </span>
         </div>
       </div>
@@ -73,6 +79,31 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <button
+          onClick={() => onLogout()}
+          className="px-2.5 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+          title="Logout"
+        >
+          <span className="material-symbols-outlined text-[16px]">logout</span>
+          <span className="hidden sm:inline">Logout</span>
+        </button>
+
+        <button
+          onClick={onOpenDrawer}
+          className="w-9 h-9 rounded-full overflow-hidden bg-[#e1e1c9] text-[#26170c] border border-[#dec1af] flex items-center justify-center font-serif font-bold"
+          aria-label={`${admin.displayName} profile menu`}
+        >
+          {admin.hasProfilePicture && admin.profilePictureUrl ? (
+            <img
+              src={`${admin.profilePictureUrl}?v=${profilePictureVersion}`}
+              alt="Admin profile"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            admin.displayName.slice(0, 1).toUpperCase()
+          )}
+        </button>
+
+        <button
           id="cart-pos-button"
           onClick={onOpenCartOrPOS}
           className="relative text-[#26170c] hover:opacity-80 transition-opacity active:scale-95 duration-150 p-1.5 rounded-full hover:bg-[#f3ecea]"
@@ -89,5 +120,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-
-
