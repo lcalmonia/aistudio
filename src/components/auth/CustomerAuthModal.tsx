@@ -236,7 +236,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. name@example.com or 09171234567"
+                    placeholder="e.g. name@example.com or 09170000000"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                     required
                   />
@@ -322,7 +322,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     type="tel"
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
-                    placeholder="+63 917 123 4567"
+                    placeholder="+63 917 000 0000"
                     className="w-full px-3.5 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                     required
                   />

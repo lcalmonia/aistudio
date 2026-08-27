@@ -220,7 +220,7 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   };
 
   // Stamp card calculation (10 stamps per reward)
-  const currentStamps = currentCustomer.stamps || 7;
+  const currentStamps = currentCustomer.stamps || 0;
   const stampsArray = Array.from({ length: 10 }, (_, i) => i < currentStamps);
 
   return (

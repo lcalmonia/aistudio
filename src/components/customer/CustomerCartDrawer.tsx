@@ -28,7 +28,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({
   const [fulfillmentType, setFulfillmentType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
   const [customerName, setCustomerName] = useState(currentCustomer?.name || '');
   const [customerPhone, setCustomerPhone] = useState(currentCustomer?.mobile || '');
-  const [tableNumber, setTableNumber] = useState('Table 4');
+  const [tableNumber, setTableNumber] = useState('Table 1');
   const [deliveryAddress, setDeliveryAddress] = useState(currentCustomer?.address || '');
   const [orderNotes, setOrderNotes] = useState('');
 
