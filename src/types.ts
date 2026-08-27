@@ -4,6 +4,31 @@ export type ProductTemperature = 'Hot' | 'Cold' | 'Both' | 'N/A';
 
 export type UserRole = 'customer' | 'staff' | 'admin' | 'super_admin';
 
+export type AdminRole = 'SUPER_ADMIN' | 'ADMIN';
+
+export interface AdminPrincipal {
+  authenticated: true;
+  userId: string | null;
+  role: AdminRole;
+  username: string;
+  displayName: string;
+  hasProfilePicture: boolean;
+  profilePictureUrl: string | null;
+}
+
+export interface AdminAccount {
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'ADMIN';
+  active: boolean;
+  hasProfilePicture: boolean;
+  createdAt: string;
+  updatedAt: string;
+  canResetPassword: boolean;
+  canChangeStatus: boolean;
+}
+
 export type Permission =
   | 'manage_customers'
   | 'manage_orders'
@@ -193,4 +218,3 @@ export interface TopSellingProduct {
   revenue: number;
   formattedRevenue: string;
 }
-

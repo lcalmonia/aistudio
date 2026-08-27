@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { StoreSettings } from '../../types';
-import { authService } from '../../services/authService';
+import { AdminPrincipal, StoreSettings } from '../../types';
+import { adminAuthService } from '../../services/adminAuthService';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (admin: AdminPrincipal) => void;
   storeSettings?: StoreSettings;
 }
 
@@ -15,7 +15,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onSuccess,
   storeSettings,
 }) => {
-  const [passcode, setPasscode] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,25 +28,21 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    const cleanPasscode = passcode.trim();
-    if (!cleanPasscode) {
-      setError('Please enter your staff or manager security passcode.');
+    if (!username.trim() || !password) {
+      setError('Enter your administrator username and password.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await authService.loginStaff(cleanPasscode, 'admin');
+      const admin = await adminAuthService.login(username.trim(), password);
+      onSuccess(admin);
+      setPassword('');
+      onClose();
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Authentication failed.');
+    } finally {
       setLoading(false);
-      if (res.success && res.staff) {
-        onSuccess();
-        onClose();
-      } else {
-        setError(res.error || 'Authentication failed. Invalid staff passcode.');
-      }
-    } catch {
-      setLoading(false);
-      setError('An unexpected authentication error occurred.');
     }
   };
 
@@ -76,7 +73,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#dec1af]">
             Store Administration
           </span>
-          <h3 className="font-serif text-xl font-bold mt-0.5">Staff & Barista Portal</h3>
+          <h3 className="font-serif text-xl font-bold mt-0.5">Admin Portal</h3>
           <p className="text-xs text-[#dec1af]/80 mt-0.5">
             Authorized management & KDS terminal
           </p>
@@ -93,19 +90,35 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-[#4f453f] mb-1">
-              Staff Passcode or Security PIN <span className="text-red-500">*</span>
+              Username <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <input
-                type="password"
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter authorized staff passcode"
-                className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-sm text-[#26170c] font-mono tracking-wider text-center focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Administrator username"
+                autoComplete="username"
+                className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
                 autoFocus
                 required
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#4f453f] mb-1">
+              Password <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Administrator password"
+              autoComplete="current-password"
+              className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]"
+              required
+            />
           </div>
 
           <div className="pt-2 flex gap-2.5">
@@ -134,7 +147,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         </form>
 
         <div className="p-3 bg-[#f9f2f0] border-t border-[#f3ecea] text-center text-[11px] text-[#81756e]">
-          Protected {storeName} Barista and POS System
+          Protected {storeName} Administration System
         </div>
       </div>
     </div>

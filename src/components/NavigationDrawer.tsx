@@ -1,5 +1,5 @@
 import React from 'react';
-import { StoreSettings } from '../types';
+import { AdminPrincipal, StoreSettings } from '../types';
 
 interface NavigationDrawerProps {
   isOpen: boolean;
@@ -8,6 +8,9 @@ interface NavigationDrawerProps {
   onSelectTab: (tab: string) => void;
   onSwitchToCustomerPortal?: () => void;
   storeSettings?: StoreSettings;
+  admin: AdminPrincipal;
+  profilePictureVersion: number;
+  onLogout: () => void;
 }
 
 export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
@@ -17,10 +20,12 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
   onSelectTab,
   onSwitchToCustomerPortal,
   storeSettings,
+  admin,
+  profilePictureVersion,
+  onLogout,
 }) => {
   const storeName = storeSettings?.storeName || 'iLuvKeyks Coffee & Tea';
   const branchName = storeSettings?.branchName || 'Main Street Flagship';
-  const logoUrl = storeSettings?.logoUrl;
 
   return (
     <>
@@ -43,20 +48,16 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
         {/* Manager Profile Header */}
         <div className="flex flex-col items-start gap-3 mb-4 pt-4">
           <div className="relative flex items-center gap-3">
-            {logoUrl ? (
-              <div
-                className="w-14 h-14 rounded-2xl bg-cover bg-center border-2 border-[#dec1af] shadow-md flex-shrink-0"
-                style={{
-                  backgroundImage: `url('${logoUrl}')`,
-                }}
+            {admin.hasProfilePicture && admin.profilePictureUrl ? (
+              <img
+                src={`${admin.profilePictureUrl}?v=${profilePictureVersion}`}
+                alt="Admin profile"
+                className="w-14 h-14 rounded-full object-cover border-2 border-[#dec1af] shadow-md flex-shrink-0"
               />
             ) : (
-              <div
-                className="w-14 h-14 rounded-full bg-cover bg-center border-2 border-[#dec1af] shadow-md flex-shrink-0"
-                style={{
-                  backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuAG4Sv5jk1_QYa4DYdRGVDEk9jVKdqM6L0OmNooCyZDhiskjG9HmKNVymSWEHwWRBB3zcQshcS0AO0APyB8EaeDRaSJdIO-k8a-MeSlgIebZoURFObBg3l-brWk24_creLyxqVVufPbUVScUEQXPm7MBRBfQobhplJsCDuKg3Td1QvxOLmhq1F7FAjqTGOiDzD2UkdrEOyv8etAxVu5no2-83rFx0TFlfPEh_K-dNk0Bbaya1CmGywF')`,
-                }}
-              />
+              <div className="w-14 h-14 rounded-full bg-[#26170c] text-[#fbddca] border-2 border-[#dec1af] shadow-md flex items-center justify-center font-serif text-xl font-bold">
+                {admin.displayName.slice(0, 1).toUpperCase()}
+              </div>
             )}
             <span className="absolute bottom-0 left-10 w-3.5 h-3.5 bg-[#8fbc8f] border-2 border-white rounded-full"></span>
           </div>
@@ -64,13 +65,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="px-2 py-0.2 bg-[#26170c] text-white text-[10px] font-bold rounded">
-                Admin
+                {admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
               </span>
               <h3 className="font-serif text-[17px] font-bold text-[#26170c] truncate max-w-[180px]">
-                {storeName}
+                {admin.displayName}
               </h3>
             </div>
-            <p className="text-xs text-[#4f453f] font-medium truncate max-w-[200px] mt-0.5">{branchName}</p>
+            <p className="text-xs text-[#4f453f] font-medium truncate max-w-[200px] mt-0.5">@{admin.username} · {branchName}</p>
           </div>
         </div>
 
@@ -240,7 +241,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
             <span className="text-sm font-semibold">Analytics & Reports</span>
           </button>
 
-          {/* Profile / Shift Info */}
+          {/* Admin Profile */}
           <button
             onClick={() => {
               onSelectTab('profile');
@@ -252,18 +253,42 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
                 : 'text-[#4f453f] hover:bg-[#e8e1df]'
             }`}
           >
-            <span className="material-symbols-outlined text-[22px]">build</span>
-            <span className="text-sm font-semibold">Equipment & Machine</span>
+            <span className="material-symbols-outlined text-[22px]">account_circle</span>
+            <span className="text-sm font-semibold">Admin Profile</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectTab('admins');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'admins'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[22px]">admin_panel_settings</span>
+            <span className="text-sm font-semibold">Admin Accounts</span>
           </button>
         </div>
 
         {/* Footer info in drawer */}
         <div className="mt-auto pt-4 border-t border-[#d2c4bc]/50 text-xs text-[#81756e]">
           <p className="font-medium text-[#26170c] truncate">{storeName}</p>
-          <p className="text-[11px]">Admin & Barista Portal • PHP (₱)</p>
+          <p className="text-[11px]">Protected Admin Portal • PHP (₱)</p>
+          <button
+            onClick={() => {
+              onClose();
+              onLogout();
+            }}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#26170c] text-white text-xs font-bold"
+          >
+            <span className="material-symbols-outlined text-[17px]">logout</span>
+            Logout
+          </button>
         </div>
       </nav>
     </>
   );
 };
-
