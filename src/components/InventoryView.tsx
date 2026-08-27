@@ -118,11 +118,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
 
         <button
+          type="button"
           onClick={handleOpenAdd}
-          className="self-start sm:self-auto px-4 py-2.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+          aria-haspopup="dialog"
+          aria-controls="edit-inventory-modal"
+          className="w-full sm:w-auto min-h-11 self-stretch sm:self-auto px-4 py-2.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-sm font-bold rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#26170c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fff8f5]"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
-          <span>+ Add Inventory Item</span>
+          <span>Add New Stock</span>
         </button>
       </div>
 
