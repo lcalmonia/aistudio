@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Order,
   OrderStatus,
@@ -75,6 +75,7 @@ export default function App() {
   // Orders State
   const [orders, setOrders] = useState<Order[]>(() => storageAdapter.getOrders());
   const [lastCustomerOrder, setLastCustomerOrder] = useState<Order | null>(null);
+  const [isSyncingOrders, setIsSyncingOrders] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<string>('admin-menu');
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState<boolean>(false);
@@ -178,6 +179,52 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  // -------------------------------------------------------------
+  // Real-Time Cross-Device Order Synchronization Engine
+  // -------------------------------------------------------------
+  const refreshOrders = useCallback(async () => {
+    try {
+      setIsSyncingOrders(true);
+      const latestOrders = await orderService.listOrders();
+      setOrders(latestOrders);
+
+      // If customer has an active order tracking modal, update its status
+      setLastCustomerOrder((prev) => {
+        if (!prev) return null;
+        const matched = latestOrders.find((o) => o.id === prev.id || o.orderNumber === prev.orderNumber);
+        return matched || prev;
+      });
+    } catch (err) {
+      console.warn('[App] Background order sync error:', err);
+    } finally {
+      setIsSyncingOrders(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Poll every 5 seconds when tab is active
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshOrders();
+      }
+    }, 5000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        refreshOrders();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [refreshOrders]);
 
   // -------------------------------------------------------------
   // Customer Auth Handlers
@@ -762,6 +809,8 @@ export default function App() {
                 onUpdateOrderStatus={handleUpdateOrderStatus}
                 onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
                 onShowNotification={showNotification}
+                onRefreshOrders={refreshOrders}
+                isSyncing={isSyncingOrders}
               />
             )}
 

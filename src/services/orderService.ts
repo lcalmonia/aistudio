@@ -2,84 +2,230 @@ import { Order, OrderStatus } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateOrderId, generateOrderNumber } from './idGenerator';
 
+class OrderApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers,
+    },
+  });
+
+  const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
+  if (!response.ok) {
+    throw new OrderApiError(data.error || 'The order request could not be completed.', response.status);
+  }
+  return data;
+}
+
 export const orderService = {
-  async listOrders(): Promise<Order[]> {
-    return storageAdapter.getOrders();
+  /**
+   * Fetch all orders from central server with local storage fallback
+   */
+  async listOrders(options: {
+    customerId?: string;
+    orderId?: string;
+    orderNumber?: string;
+    status?: OrderStatus;
+  } = {}): Promise<Order[]> {
+    try {
+      const params = new URLSearchParams();
+      if (options.customerId) params.set('customerId', options.customerId);
+      if (options.orderId) params.set('orderId', options.orderId);
+      if (options.orderNumber) params.set('orderNumber', options.orderNumber);
+      if (options.status) params.set('status', options.status);
+
+      const qs = params.toString();
+      const url = `/api/orders${qs ? `?${qs}` : ''}`;
+      const response = await api<{ orders: Order[] }>(url, { method: 'GET' });
+
+      if (response && Array.isArray(response.orders)) {
+        // Sync local storage cache for offline reliability
+        if (!options.customerId && !options.orderId && !options.status) {
+          storageAdapter.setOrders(response.orders);
+        }
+        return response.orders;
+      }
+    } catch (err) {
+      console.warn('[OrderService] Server listOrders failed, using local storage fallback:', err);
+    }
+
+    // Fallback to local storage if network fails
+    let local = storageAdapter.getOrders();
+    if (options.customerId) {
+      local = local.filter((o) => o.customerId === options.customerId);
+    }
+    if (options.orderId) {
+      local = local.filter((o) => o.id === options.orderId);
+    }
+    if (options.orderNumber) {
+      local = local.filter((o) => o.orderNumber === options.orderNumber || o.orderNumber === `#${options.orderNumber}`);
+    }
+    if (options.status) {
+      local = local.filter((o) => o.status === options.status);
+    }
+    return local;
   },
 
+  /**
+   * Fetch a single order by ID or orderNumber
+   */
   async getOrder(id: string): Promise<Order | null> {
+    try {
+      const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(id)}`, { method: 'GET' });
+      if (response && response.order) {
+        return response.order;
+      }
+    } catch (err) {
+      console.warn(`[OrderService] Server getOrder(${id}) failed, trying local fallback:`, err);
+    }
+
     const orders = storageAdapter.getOrders();
-    return orders.find((o) => o.id === id || o.orderNumber === id) || null;
+    return orders.find((o) => o.id === id || o.orderNumber === id || o.orderNumber === `#${id}`) || null;
   },
 
+  /**
+   * Fetch customer specific orders
+   */
   async getCustomerOrders(customerId: string): Promise<Order[]> {
-    const orders = storageAdapter.getOrders();
-    return orders.filter((o) => o.customerId === customerId);
+    return this.listOrders({ customerId });
   },
 
+  /**
+   * Create a new order on the central server and persist locally
+   */
   async createOrder(orderInput: Partial<Order>): Promise<Order> {
-    const orders = storageAdapter.getOrders();
+    const rawItems = orderInput.items || [];
+    const sanitizedItems = rawItems.map((item) => ({
+      name: item.name,
+      quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+      customization: item.customization || undefined,
+      price: Math.max(0, Number(item.price) || 0),
+      completed: item.completed,
+      temperature: item.temperature,
+      size: item.size,
+    }));
 
-    const newOrder: Order = {
+    const payload = {
       id: orderInput.id || generateOrderId(),
       orderNumber: orderInput.orderNumber || generateOrderNumber(),
       customerId: orderInput.customerId,
       customerName: orderInput.customerName?.trim() || 'Guest Customer',
-      customerEmail: orderInput.customerEmail,
+      customerEmail: orderInput.customerEmail?.trim(),
       customerPhone: orderInput.customerPhone?.trim(),
-      timeAgo: 'Just now',
-      timestamp: Date.now(),
       status: orderInput.status || 'New',
-      items: orderInput.items || [],
+      items: sanitizedItems,
       total: orderInput.total || 0,
-      subtotal: orderInput.subtotal || orderInput.total || 0,
-      discount: orderInput.discount || 0,
-      deliveryFee: orderInput.deliveryFee || 0,
+      subtotal: orderInput.subtotal ?? orderInput.total ?? 0,
+      discount: orderInput.discount ?? 0,
+      deliveryFee: orderInput.deliveryFee ?? 0,
       image: orderInput.image,
       notes: orderInput.notes?.trim(),
       orderType: orderInput.orderType || 'Dine-In',
-      tableNumber: orderInput.tableNumber,
+      tableNumber: orderInput.tableNumber?.trim(),
       deliveryAddress: orderInput.deliveryAddress?.trim(),
       paymentMethod: orderInput.paymentMethod || 'Cash',
       isCustomerOrder: orderInput.isCustomerOrder ?? false,
+      timestamp: orderInput.timestamp || Date.now(),
+      timeAgo: orderInput.timeAgo || 'Just now',
     };
 
-    const updated = [newOrder, ...orders];
+    try {
+      const response = await api<{ order: Order }>('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (response && response.order) {
+        const saved = response.order;
+        // Merge into local storage cache
+        const local = storageAdapter.getOrders();
+        const updated = [saved, ...local.filter((o) => o.id !== saved.id && o.orderNumber !== saved.orderNumber)];
+        storageAdapter.setOrders(updated);
+        return saved;
+      }
+    } catch (err) {
+      console.warn('[OrderService] Server createOrder failed, persisting to local storage:', err);
+    }
+
+    // Fallback if offline
+    const fallbackOrder: Order = {
+      ...payload,
+      id: payload.id,
+      orderNumber: payload.orderNumber,
+      customerName: payload.customerName,
+      status: payload.status as OrderStatus,
+      items: payload.items,
+      total: payload.total,
+      timeAgo: payload.timeAgo,
+      timestamp: payload.timestamp,
+    };
+
+    const local = storageAdapter.getOrders();
+    const updated = [fallbackOrder, ...local.filter((o) => o.id !== fallbackOrder.id)];
     storageAdapter.setOrders(updated);
-    return newOrder;
+    return fallbackOrder;
   },
 
+  /**
+   * Update order status on the central server
+   */
   async updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {
-    const orders = storageAdapter.getOrders();
-    const index = orders.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
+    try {
+      const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+
+      if (response && response.order) {
+        const updated = response.order;
+        const local = storageAdapter.getOrders();
+        const updatedList = local.map((o) => (o.id === updated.id || o.orderNumber === updated.orderNumber ? updated : o));
+        storageAdapter.setOrders(updatedList);
+        return updated;
+      }
+    } catch (err) {
+      console.warn(`[OrderService] Server updateOrderStatus(${orderId}, ${status}) failed, applying locally:`, err);
+    }
+
+    // Fallback if offline
+    const local = storageAdapter.getOrders();
+    const index = local.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
     if (index === -1) return null;
 
     const updatedOrder: Order = {
-      ...orders[index],
+      ...local[index],
       status,
+      updatedAt: new Date().toISOString(),
+      completedAt: status === 'Completed' ? new Date().toISOString() : local[index].completedAt,
+      cancelledAt: status === 'Cancelled' ? new Date().toISOString() : local[index].cancelledAt,
     };
 
-    orders[index] = updatedOrder;
-    storageAdapter.setOrders(orders);
+    local[index] = updatedOrder;
+    storageAdapter.setOrders(local);
     return updatedOrder;
   },
 
+  /**
+   * Cancel an order on the server
+   */
   async cancelOrder(orderId: string, reason?: string): Promise<Order | null> {
-    const orders = storageAdapter.getOrders();
-    const index = orders.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
-    if (index === -1) return null;
-
-    const updatedOrder: Order = {
-      ...orders[index],
-      status: 'Cancelled',
-      notes: reason ? `${orders[index].notes || ''} [Cancelled: ${reason}]`.trim() : orders[index].notes,
-    };
-
-    orders[index] = updatedOrder;
-    storageAdapter.setOrders(orders);
-    return updatedOrder;
+    return this.updateOrderStatus(orderId, 'Cancelled');
   },
 
+  /**
+   * Delete or archive order
+   */
   async deleteOrder(orderId: string): Promise<boolean> {
     const orders = storageAdapter.getOrders();
     const filtered = orders.filter((o) => o.id !== orderId && o.orderNumber !== orderId);
@@ -87,6 +233,9 @@ export const orderService = {
     return true;
   },
 
+  /**
+   * Save orders batch to local storage cache
+   */
   async saveOrders(orders: Order[]): Promise<Order[]> {
     storageAdapter.setOrders(orders);
     return orders;

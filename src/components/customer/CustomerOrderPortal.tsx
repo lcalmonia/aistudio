@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   MenuItem,
   ProductAddon,
@@ -67,6 +67,19 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);
+
+  useEffect(() => {
+    if (lastCustomerOrder) {
+      const updated = orders.find(
+        (o) => o.id === lastCustomerOrder.id || o.orderNumber === lastCustomerOrder.orderNumber
+      );
+      if (updated) {
+        setActiveTrackingOrder(updated);
+      } else {
+        setActiveTrackingOrder(lastCustomerOrder);
+      }
+    }
+  }, [orders, lastCustomerOrder]);
 
   // Profile Edit State
   const [editName, setEditName] = useState(currentCustomer.name);

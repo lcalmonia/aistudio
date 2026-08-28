@@ -7,6 +7,8 @@ interface ActiveOrdersViewProps {
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus) => void;
   onOpenNewOrder: () => void;
   onShowNotification: (msg: string) => void;
+  onRefreshOrders?: () => void;
+  isSyncing?: boolean;
 }
 
 export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
@@ -14,6 +16,8 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
   onUpdateOrderStatus,
   onOpenNewOrder,
   onShowNotification,
+  onRefreshOrders,
+  isSyncing = false,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'New' | 'Brewing' | 'Ready' | 'Completed'>('All');
   const [activeMenuOrderId, setActiveMenuOrderId] = useState<string | null>(null);
@@ -68,9 +72,25 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
           <h2 className="font-serif text-2xl sm:text-[28px] font-bold text-[#26170c] tracking-tight">
             Active Orders
           </h2>
-          <span className="text-[11px] sm:text-xs font-semibold px-2.5 py-1 bg-[#e1e1c9] text-[#636451] rounded-full whitespace-nowrap">
-            Live Barista View
-          </span>
+          <div className="flex items-center gap-2">
+            {onRefreshOrders && (
+              <button
+                type="button"
+                onClick={onRefreshOrders}
+                disabled={isSyncing}
+                title="Sync orders from server"
+                className="flex items-center justify-center p-1.5 rounded-full text-[#636451] hover:bg-[#e1e1c9] transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${isSyncing ? 'animate-spin' : ''}`}>
+                  sync
+                </span>
+              </button>
+            )}
+            <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold px-2.5 py-1 bg-[#e1e1c9] text-[#636451] rounded-full whitespace-nowrap">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Live Server
+            </span>
+          </div>
         </div>
 
         {/* Scrollable Filter Chips */}
