@@ -1,4 +1,7 @@
+import { LoyaltyTransaction } from '../types';
 import { customerService } from './customerService';
+import { storageAdapter } from './storageAdapter';
+import { generateEntityId } from './idGenerator';
 
 export const loyaltyService = {
   async getCustomerLoyalty(customerId: string): Promise<{ stamps: number; points: number } | null> {
@@ -10,17 +13,37 @@ export const loyaltyService = {
     };
   },
 
-  async addPoints(customerId: string, pointsEarned: number): Promise<number | null> {
+  async addPoints(
+    customerId: string,
+    pointsEarned: number,
+    referenceOrderId?: string,
+    reason: string = 'Order loyalty reward'
+  ): Promise<number | null> {
     const customer = await customerService.getCustomer(customerId);
     if (!customer) return null;
     const newPoints = (customer.points || 0) + pointsEarned;
     await customerService.updateCustomer(customerId, { points: newPoints });
+
+    // Record traceable loyalty transaction
+    storageAdapter.addLoyaltyTransaction({
+      id: generateEntityId('loy'),
+      customerId,
+      type: 'earn_points',
+      amount: pointsEarned,
+      referenceOrderId,
+      reason,
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+    });
+
     return newPoints;
   },
 
   async addStamp(
     customerId: string,
-    maxStamps: number = 10
+    maxStamps: number = 10,
+    referenceOrderId?: string,
+    reason: string = 'Order loyalty stamp'
   ): Promise<{ stamps: number; unlockedReward: boolean } | null> {
     const customer = await customerService.getCustomer(customerId);
     if (!customer) return null;
@@ -28,12 +51,26 @@ export const loyaltyService = {
     const nextStamps = (currentStamps % maxStamps) + 1;
     const unlockedReward = nextStamps === maxStamps;
     await customerService.updateCustomer(customerId, { stamps: nextStamps });
+
+    // Record traceable loyalty transaction
+    storageAdapter.addLoyaltyTransaction({
+      id: generateEntityId('loy'),
+      customerId,
+      type: 'earn_stamps',
+      amount: 1,
+      referenceOrderId,
+      reason: unlockedReward ? `${reason} (Reward Unlocked!)` : reason,
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+    });
+
     return { stamps: nextStamps, unlockedReward };
   },
 
   async redeemPoints(
     customerId: string,
-    pointsCost: number
+    pointsCost: number,
+    reason: string = 'Reward discount redemption'
   ): Promise<{ success: boolean; remainingPoints?: number; error?: string }> {
     const customer = await customerService.getCustomer(customerId);
     if (!customer) return { success: false, error: 'Customer not found.' };
@@ -43,7 +80,27 @@ export const loyaltyService = {
     }
     const remaining = currentPoints - pointsCost;
     await customerService.updateCustomer(customerId, { points: remaining });
+
+    // Record traceable redemption
+    storageAdapter.addLoyaltyTransaction({
+      id: generateEntityId('loy'),
+      customerId,
+      type: 'redeem_points',
+      amount: pointsCost,
+      reason,
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+    });
+
     return { success: true, remainingPoints: remaining };
+  },
+
+  async listTransactions(customerId?: string): Promise<LoyaltyTransaction[]> {
+    const txs = storageAdapter.getLoyaltyTransactions();
+    if (customerId) {
+      return txs.filter((t) => t.customerId === customerId);
+    }
+    return txs;
   },
 
   /**

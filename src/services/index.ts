@@ -13,3 +13,4 @@ export * from './settingsService';
 export * from './loyaltyService';
 export * from './auxiliaryServices';
 export * from './reportingService';
+export * from './routeService';

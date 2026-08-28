@@ -2,24 +2,33 @@ import React, { useState, useMemo } from 'react';
 import { MenuItem, ProductAddon, PromoBundle, ProductTemperature } from '../types';
 
 interface AdminMenuViewProps {
-  menuItems: MenuItem[];
-  addons: ProductAddon[];
-  promoBundles: PromoBundle[];
+  menuItems?: MenuItem[];
+  addons?: ProductAddon[];
+  promoBundles?: PromoBundle[];
   categories?: string[];
-  onAddProduct: () => void;
-  onEditProduct: (product: MenuItem) => void;
-  onDeleteProduct: (productId: string) => void;
-  onToggleProductStock: (productId: string) => void;
-  onAddBundle: () => void;
-  onEditBundle: (bundle: PromoBundle) => void;
-  onDeleteBundle: (bundleId: string) => void;
-  onToggleBundleStock: (bundleId: string) => void;
-  onAddAddon: () => void;
-  onEditAddon: (addon: ProductAddon) => void;
-  onDeleteAddon: (addonId: string) => void;
-  onToggleAddonStock: (addonId: string) => void;
+  onAddProduct?: () => void;
+  onOpenAddProduct?: () => void;
+  onEditProduct?: (product: MenuItem) => void;
+  onOpenEditProduct?: (product: MenuItem) => void;
+  onDeleteProduct?: (productId: string) => void;
+  onToggleProductStock?: (productId: string) => void;
+  onToggleAvailability?: (productId: string) => void;
+  onAddBundle?: () => void;
+  onOpenAddBundle?: () => void;
+  onEditBundle?: (bundle: PromoBundle) => void;
+  onOpenEditBundle?: (bundle: PromoBundle) => void;
+  onDeleteBundle?: (bundleId: string) => void;
+  onToggleBundleStock?: (bundleId: string) => void;
+  onAddAddon?: () => void;
+  onOpenAddAddon?: () => void;
+  onEditAddon?: (addon: ProductAddon) => void;
+  onOpenEditAddon?: (addon: ProductAddon) => void;
+  onDeleteAddon?: (addonId: string) => void;
+  onToggleAddonStock?: (addonId: string) => void;
   onSaveCategory?: (newCategory: string, oldCategory?: string) => void;
   onDeleteCategory?: (category: string) => void;
+  onShowNotification?: (msg: string) => void;
+  onSwitchToCustomerPortal?: () => void;
 }
 
 export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
@@ -28,20 +37,36 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   promoBundles = [],
   categories = [],
   onAddProduct,
+  onOpenAddProduct,
   onEditProduct,
-  onDeleteProduct,
+  onOpenEditProduct,
+  onDeleteProduct = (_productId: string) => {},
   onToggleProductStock,
+  onToggleAvailability,
   onAddBundle,
+  onOpenAddBundle,
   onEditBundle,
-  onDeleteBundle,
+  onOpenEditBundle,
+  onDeleteBundle = (_bundleId: string) => {},
   onToggleBundleStock,
   onAddAddon,
+  onOpenAddAddon,
   onEditAddon,
-  onDeleteAddon,
-  onToggleAddonStock,
+  onOpenEditAddon,
+  onDeleteAddon = (_addonId: string) => {},
+  onToggleAddonStock = (_addonId: string) => {},
   onSaveCategory,
   onDeleteCategory,
 }) => {
+  // Defensive fallbacks for aliased handlers
+  const handleAddProduct = onAddProduct || onOpenAddProduct || (() => {});
+  const handleEditProduct = onEditProduct || onOpenEditProduct || (() => {});
+  const handleToggleProduct = onToggleProductStock || onToggleAvailability || (() => {});
+  const handleAddBundle = onAddBundle || onOpenAddBundle || (() => {});
+  const handleEditBundle = onEditBundle || onOpenEditBundle || (() => {});
+  const handleToggleBundle = onToggleBundleStock || onToggleAvailability || (() => {});
+  const handleAddAddon = onAddAddon || onOpenAddAddon || (() => {});
+  const handleEditAddon = onEditAddon || onOpenEditAddon || (() => {});
   // Navigation sub-tabs within Menu Admin
   const [adminTab, setAdminTab] = useState<'products' | 'bundles' | 'addons' | 'preview'>('products');
 
@@ -262,7 +287,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               {/* Action Buttons */}
               <div className="flex gap-2 w-full sm:w-auto justify-end">
                 <button
-                  onClick={onAddProduct}
+                  onClick={handleAddProduct}
                   className="flex-1 sm:flex-initial px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>
@@ -467,7 +492,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                   <div className="p-2.5 sm:p-3 bg-[#fff8f5] flex justify-between items-center gap-1.5 flex-wrap">
                     {/* Stock Switch */}
                     <button
-                      onClick={() => onToggleProductStock(product.id)}
+                      onClick={() => handleToggleProduct(product.id)}
                       className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 ${
                         product.available
                           ? 'bg-[#e1e1c9] text-[#636451] hover:bg-[#d5d5b8]'
@@ -494,7 +519,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                       </button>
 
                       <button
-                        onClick={() => onEditProduct(product)}
+                        onClick={() => handleEditProduct(product)}
                         className="px-2.5 sm:px-3 py-1 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-xs cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[15px] sm:text-[16px]">edit</span>
@@ -528,7 +553,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                 No menu items match your search or filter settings. Try adjusting your filters or click below to add a new product.
               </p>
               <button
-                onClick={onAddProduct}
+                onClick={handleAddProduct}
                 className="mt-2 px-4 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f]"
               >
                 + Add New Product
@@ -551,7 +576,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               </p>
             </div>
             <button
-              onClick={onAddBundle}
+              onClick={handleAddBundle}
               className="w-full sm:w-auto px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">add_circle</span>
@@ -630,7 +655,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
 
                 <div className="p-2.5 sm:p-3 bg-[#f9f2f0] border-t border-[#e8e1df] flex flex-wrap justify-between items-center gap-2">
                   <button
-                    onClick={() => onToggleBundleStock(bundle.id)}
+                    onClick={() => handleToggleBundle(bundle.id)}
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
                       bundle.available ? 'bg-[#e1e1c9] text-[#636451]' : 'bg-[#ffdad6] text-[#ba1a1a]'
                     }`}
@@ -640,7 +665,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
 
                   <div className="flex gap-1.5">
                     <button
-                      onClick={() => onEditBundle(bundle)}
+                      onClick={() => handleEditBundle(bundle)}
                       className="px-3 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-lg hover:bg-[#3d2b1f] flex items-center gap-1 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span>
@@ -675,7 +700,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               </p>
             </div>
             <button
-              onClick={onAddAddon}
+              onClick={handleAddAddon}
               className="w-full sm:w-auto px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">add_circle</span>
@@ -739,7 +764,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                           </span>
                         </button>
                         <button
-                          onClick={() => onEditAddon(addon)}
+                          onClick={() => handleEditAddon(addon)}
                           className="p-1 text-[#4f453f] hover:bg-[#f3ecea] rounded-md cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[16px]">edit</span>
@@ -989,7 +1014,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                   Preview renders accurately across POS, Barista iPad KDS, and mobile guest menu.
                 </p>
                 <button
-                  onClick={() => onEditProduct(previewProduct)}
+                  onClick={() => handleEditProduct(previewProduct)}
                   className="px-3 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-lg hover:bg-[#3d2b1f] flex items-center gap-1 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">edit</span>

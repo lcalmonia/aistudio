@@ -49,6 +49,10 @@ export interface StaffUser {
   role: UserRole;
   active: boolean;
   lastLogin?: string;
+  avatar?: string;
+  phone?: string;
+  shiftSchedule?: string;
+  title?: string;
 }
 
 export interface ProductSize {
@@ -115,6 +119,10 @@ export interface Order {
   customerEmail?: string;
   timeAgo: string;
   timestamp: number;
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+  cancelledAt?: string;
   status: OrderStatus;
   items: OrderItem[];
   total: number;
@@ -138,7 +146,9 @@ export interface CustomerUser {
   mobile: string;
   address: string;
   createdAt: string;
+  updatedAt?: string;
   status: 'active' | 'inactive';
+  accountType?: 'Personal' | 'Business';
   role?: 'customer';
   stamps?: number;
   points?: number;
@@ -170,8 +180,38 @@ export interface InventoryItem {
   minThreshold: number;
   costPerUnit?: number;
   supplier?: string;
+  description?: string;
+  sku?: string;
   notes?: string;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   lastRestocked?: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  inventoryItemId: string;
+  itemName: string;
+  type: 'addition' | 'deduction' | 'adjustment' | 'restock' | 'waste';
+  quantity: number;
+  previousQuantity: number;
+  resultingQuantity: number;
+  reason?: string;
+  timestamp: number;
+  createdAt: string;
+  staffName?: string;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  customerId: string;
+  type: 'earn_stamps' | 'earn_points' | 'redeem_stamps' | 'redeem_points' | 'welcome_bonus' | 'adjustment';
+  amount: number;
+  referenceOrderId?: string;
+  reason: string;
+  timestamp: number;
+  createdAt: string;
 }
 
 export interface StoreSettings {

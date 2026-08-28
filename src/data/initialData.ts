@@ -1,4 +1,40 @@
-import { Order, MenuItem, InventoryItem, ProductAddon, PromoBundle, StoreSettings, CustomerUser } from '../types';
+import { Order, MenuItem, InventoryItem, ProductAddon, PromoBundle, StoreSettings, CustomerUser, StaffUser } from '../types';
+
+export const INITIAL_STAFF_USERS: StaffUser[] = [
+  {
+    id: 'super_admin_1',
+    name: 'Super Admin',
+    email: 'owner@iluvkeyks.ph',
+    role: 'super_admin',
+    active: true,
+    phone: '+63 (917) 823-4567',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    title: 'Store Owner & Founder',
+    shiftSchedule: 'Executive / All Hours',
+  },
+  {
+    id: 'admin_1',
+    name: 'Store Manager',
+    email: 'manager@iluvkeyks.ph',
+    role: 'admin',
+    active: true,
+    phone: '+63 (917) 111-2233',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    title: 'Operations Manager',
+    shiftSchedule: '06:00 - 14:00 (Morning Shift)',
+  },
+  {
+    id: 'staff_1',
+    name: 'Lead Barista',
+    email: 'barista@iluvkeyks.ph',
+    role: 'staff',
+    active: true,
+    phone: '+63 (917) 555-8899',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
+    title: 'Senior Barista & QA',
+    shiftSchedule: '14:00 - 22:00 (Closing Shift)',
+  },
+];
 
 // Clean initial data: No fake/demo customers in production dataset
 export const INITIAL_CUSTOMERS: CustomerUser[] = [];

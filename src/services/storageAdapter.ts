@@ -14,6 +14,8 @@ import {
   ProductAddon,
   PromoBundle,
   InventoryItem,
+  InventoryMovement,
+  LoyaltyTransaction,
   StoreSettings,
   StaffUser,
 } from '../types';
@@ -25,13 +27,17 @@ import {
   INITIAL_ADDONS,
   INITIAL_PROMO_BUNDLES,
   INVENTORY_ITEMS,
+  DEFAULT_INVENTORY_CATEGORIES,
   DEFAULT_STORE_SETTINGS,
+  INITIAL_STAFF_USERS,
 } from '../data/initialData';
 
 const KEYS = {
   CUSTOMERS: 'iluvkeyks_customers_v2',
   CURRENT_CUSTOMER: 'iluvkeyks_current_customer_v2',
   STAFF_SESSION: 'iluvkeyks_staff_session_v2',
+  STAFF_USERS: 'iluvkeyks_staff_users_v2',
+  STAFF_CREDENTIALS: 'iluvkeyks_staff_cred_v2',
   CUSTOMER_CREDENTIALS: 'iluvkeyks_cust_cred_v2',
   ORDERS: 'iluvkeyks_orders_v2',
   MENU_ITEMS: 'iluvkeyks_menu_items_v2',
@@ -39,6 +45,9 @@ const KEYS = {
   ADDONS: 'iluvkeyks_addons_v2',
   BUNDLES: 'iluvkeyks_bundles_v2',
   INVENTORY: 'iluvkeyks_inventory_v2',
+  INVENTORY_CATEGORIES: 'iluvkeyks_inv_cats_v2',
+  INVENTORY_MOVEMENTS: 'iluvkeyks_inv_mov_v2',
+  LOYALTY_TRANSACTIONS: 'iluvkeyks_loyalty_tx_v2',
   SETTINGS: 'iluvkeyks_settings_v2',
 } as const;
 
@@ -94,7 +103,7 @@ export const storageAdapter = {
     safeSetItem(KEYS.CUSTOMER_CREDENTIALS, creds);
   },
 
-  // Staff Session
+  // Staff Session & Admin Accounts
   getStaffSession: (): StaffUser | null => safeGetItem<StaffUser | null>(KEYS.STAFF_SESSION, null),
   setStaffSession: (staff: StaffUser | null): void => {
     if (staff) {
@@ -102,6 +111,24 @@ export const storageAdapter = {
     } else {
       safeRemoveItem(KEYS.STAFF_SESSION);
     }
+  },
+
+  getStaffUsers: (): StaffUser[] => safeGetItem<StaffUser[]>(KEYS.STAFF_USERS, INITIAL_STAFF_USERS),
+  setStaffUsers: (staffUsers: StaffUser[]): void => safeSetItem(KEYS.STAFF_USERS, staffUsers),
+
+  getStaffCredentials: (): Record<string, string> => safeGetItem<Record<string, string>>(KEYS.STAFF_CREDENTIALS, {
+    'super_admin_1': 'superadmin123',
+    'admin_1': 'admin123',
+    'staff_1': 'staff123',
+  }),
+  setStaffCredential: (staffId: string, passcodeOrHash: string): void => {
+    const creds = safeGetItem<Record<string, string>>(KEYS.STAFF_CREDENTIALS, {
+      'super_admin_1': 'superadmin123',
+      'admin_1': 'admin123',
+      'staff_1': 'staff123',
+    });
+    creds[staffId] = passcodeOrHash;
+    safeSetItem(KEYS.STAFF_CREDENTIALS, creds);
   },
 
   // Orders
@@ -127,6 +154,26 @@ export const storageAdapter = {
   // Inventory
   getInventory: (): InventoryItem[] => safeGetItem<InventoryItem[]>(KEYS.INVENTORY, INVENTORY_ITEMS),
   setInventory: (inventory: InventoryItem[]): void => safeSetItem(KEYS.INVENTORY, inventory),
+
+  // Inventory Categories (Data-driven and admin expandable)
+  getInventoryCategories: (): string[] => safeGetItem<string[]>(KEYS.INVENTORY_CATEGORIES, DEFAULT_INVENTORY_CATEGORIES),
+  setInventoryCategories: (categories: string[]): void => safeSetItem(KEYS.INVENTORY_CATEGORIES, categories),
+
+  // Inventory Movements (Stock audit trail)
+  getInventoryMovements: (): InventoryMovement[] => safeGetItem<InventoryMovement[]>(KEYS.INVENTORY_MOVEMENTS, []),
+  setInventoryMovements: (movements: InventoryMovement[]): void => safeSetItem(KEYS.INVENTORY_MOVEMENTS, movements),
+  addInventoryMovement: (movement: InventoryMovement): void => {
+    const movements = safeGetItem<InventoryMovement[]>(KEYS.INVENTORY_MOVEMENTS, []);
+    safeSetItem(KEYS.INVENTORY_MOVEMENTS, [movement, ...movements]);
+  },
+
+  // Loyalty Transactions (Points and stamps audit trail)
+  getLoyaltyTransactions: (): LoyaltyTransaction[] => safeGetItem<LoyaltyTransaction[]>(KEYS.LOYALTY_TRANSACTIONS, []),
+  setLoyaltyTransactions: (transactions: LoyaltyTransaction[]): void => safeSetItem(KEYS.LOYALTY_TRANSACTIONS, transactions),
+  addLoyaltyTransaction: (transaction: LoyaltyTransaction): void => {
+    const transactions = safeGetItem<LoyaltyTransaction[]>(KEYS.LOYALTY_TRANSACTIONS, []);
+    safeSetItem(KEYS.LOYALTY_TRANSACTIONS, [transaction, ...transactions]);
+  },
 
   // Store Settings
   getStoreSettings: (): StoreSettings => safeGetItem<StoreSettings>(KEYS.SETTINGS, DEFAULT_STORE_SETTINGS),

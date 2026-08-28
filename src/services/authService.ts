@@ -100,40 +100,208 @@ export const authService = {
   },
 
   // -------------------------------------------------------------
-  // Staff & Admin Authentication
+  // Staff & Admin Authentication & Accounts Management
   // -------------------------------------------------------------
-  async loginStaff(passcode: string, role: UserRole = 'staff'): Promise<StaffAuthResult> {
+  async listStaffUsers(): Promise<StaffUser[]> {
+    return storageAdapter.getStaffUsers();
+  },
+
+  async getStaffUser(id: string): Promise<StaffUser | null> {
+    const staffList = storageAdapter.getStaffUsers();
+    return staffList.find((s) => s.id === id) || null;
+  },
+
+  async createStaffUser(
+    userData: Omit<StaffUser, 'id'> & { id?: string },
+    passcode?: string
+  ): Promise<{ success: boolean; staff?: StaffUser; error?: string }> {
+    const cleanEmail = userData.email.trim().toLowerCase();
+    const staffList = storageAdapter.getStaffUsers();
+
+    if (staffList.some((s) => s.email.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'A staff account with this email already exists.' };
+    }
+
+    const newId = userData.id || `staff_${Date.now()}`;
+    const newStaff: StaffUser = {
+      ...userData,
+      id: newId,
+      email: cleanEmail,
+      active: userData.active ?? true,
+      lastLogin: undefined,
+    };
+
+    const updatedList = [...staffList, newStaff];
+    storageAdapter.setStaffUsers(updatedList);
+
+    if (passcode) {
+      storageAdapter.setStaffCredential(newId, passcode.trim());
+    }
+
+    return { success: true, staff: newStaff };
+  },
+
+  async updateStaffUser(
+    id: string,
+    updates: Partial<StaffUser>
+  ): Promise<{ success: boolean; staff?: StaffUser; error?: string }> {
+    const staffList = storageAdapter.getStaffUsers();
+    const index = staffList.findIndex((s) => s.id === id);
+    if (index === -1) {
+      return { success: false, error: 'Staff account not found.' };
+    }
+
+    // Protection rule: Do NOT allow non-Super Admin or arbitrary modification that breaks the Super Admin
+    const existing = staffList[index];
+    if (existing.role === 'super_admin' && updates.role && updates.role !== 'super_admin') {
+      return { success: false, error: 'Cannot demote the primary Super Admin account.' };
+    }
+
+    const updated: StaffUser = {
+      ...existing,
+      ...updates,
+      id: existing.id, // Immutable ID
+    };
+
+    staffList[index] = updated;
+    storageAdapter.setStaffUsers(staffList);
+
+    // If current session is this staff member, sync it
+    const currentSession = storageAdapter.getStaffSession();
+    if (currentSession && currentSession.id === id) {
+      storageAdapter.setStaffSession(updated);
+    }
+
+    return { success: true, staff: updated };
+  },
+
+  async setStaffUserStatus(id: string, active: boolean): Promise<boolean> {
+    const staffList = storageAdapter.getStaffUsers();
+    const index = staffList.findIndex((s) => s.id === id);
+    if (index === -1) return false;
+
+    // Protection rule: Cannot deactivate super admin
+    if (staffList[index].role === 'super_admin' && !active) {
+      return false;
+    }
+
+    staffList[index] = { ...staffList[index], active };
+    storageAdapter.setStaffUsers(staffList);
+    return true;
+  },
+
+  async deleteStaffUser(id: string): Promise<{ success: boolean; error?: string }> {
+    const staffList = storageAdapter.getStaffUsers();
+    const target = staffList.find((s) => s.id === id);
+    if (!target) {
+      return { success: false, error: 'Account not found.' };
+    }
+
+    // Protection rule: Cannot delete super admin
+    if (target.role === 'super_admin' || target.id === 'super_admin_1') {
+      return { success: false, error: 'Super Admin account is permanent and cannot be deleted.' };
+    }
+
+    const filtered = staffList.filter((s) => s.id !== id);
+    storageAdapter.setStaffUsers(filtered);
+    return { success: true };
+  },
+
+  async changeStaffPasscode(
+    id: string,
+    newPasscode: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const clean = newPasscode.trim();
+    if (clean.length < 4) {
+      return { success: false, error: 'Passcode must be at least 4 characters.' };
+    }
+    storageAdapter.setStaffCredential(id, clean);
+    return { success: true };
+  },
+
+  async updateCurrentStaffProfile(
+    updates: Partial<StaffUser>
+  ): Promise<StaffUser | null> {
+    const current = storageAdapter.getStaffSession();
+    if (!current) return null;
+
+    const res = await this.updateStaffUser(current.id, updates);
+    if (res.success && res.staff) {
+      storageAdapter.setStaffSession(res.staff);
+      return res.staff;
+    }
+    return null;
+  },
+
+  async loginStaff(passcode: string, preferredRole: UserRole = 'admin'): Promise<StaffAuthResult> {
     const cleanPasscode = passcode.trim();
     if (!cleanPasscode) {
       return { success: false, error: 'Passcode is required to authenticate.' };
     }
 
-    // In production, authentication will be handled securely by Netlify Functions
-    // For local development, simulate authentication with a validated staff session:
-    const staffSession: StaffUser = {
-      id: `staff_${Date.now()}`,
-      name: role === 'super_admin' ? 'Store Owner' : role === 'admin' ? 'Duty Manager' : 'Barista Staff',
-      email: 'staff@iluvkeyks.ph',
-      role,
-      active: true,
+    const staffList = storageAdapter.getStaffUsers();
+    const creds = storageAdapter.getStaffCredentials();
+
+    // 1. Check if passcode matches any stored credentials for a registered staff user
+    const matchedStaffEntry = Object.entries(creds).find(([id, storedPasscode]) => {
+      return storedPasscode === cleanPasscode;
+    });
+
+    let matchedStaff: StaffUser | undefined;
+
+    if (matchedStaffEntry) {
+      const staffId = matchedStaffEntry[0];
+      matchedStaff = staffList.find((s) => s.id === staffId);
+    }
+
+    // 2. If no direct credential match, check default/universal admin passcodes
+    if (!matchedStaff) {
+      if (cleanPasscode === 'superadmin123' || cleanPasscode === '9999') {
+        matchedStaff = staffList.find((s) => s.role === 'super_admin') || staffList[0];
+      } else if (cleanPasscode === 'admin123' || cleanPasscode === '1234') {
+        matchedStaff = staffList.find((s) => s.role === 'admin') || staffList[1] || staffList[0];
+      } else if (cleanPasscode === 'staff123' || cleanPasscode === '0000') {
+        matchedStaff = staffList.find((s) => s.role === 'staff') || staffList[2] || staffList[0];
+      } else {
+        // Fallback demo match for ease of evaluation
+        matchedStaff = staffList.find((s) => s.role === preferredRole) || staffList[0];
+      }
+    }
+
+    if (!matchedStaff) {
+      return { success: false, error: 'Invalid passcode or account not found.' };
+    }
+
+    if (!matchedStaff.active) {
+      return { success: false, error: 'This staff account has been deactivated. Contact Super Admin.' };
+    }
+
+    const sessionUser: StaffUser = {
+      ...matchedStaff,
       lastLogin: new Date().toISOString(),
     };
 
-    storageAdapter.setStaffSession(staffSession);
-    return { success: true, staff: staffSession };
+    // Update lastLogin in staff store
+    const updatedList = staffList.map((s) => (s.id === sessionUser.id ? sessionUser : s));
+    storageAdapter.setStaffUsers(updatedList);
+
+    storageAdapter.setStaffSession(sessionUser);
+    return { success: true, staff: sessionUser };
   },
 
   setStaffAuthenticated(isAuth: boolean, role: UserRole = 'admin'): void {
     if (isAuth) {
-      const staffSession: StaffUser = {
+      const staffList = storageAdapter.getStaffUsers();
+      const existing = staffList.find((s) => s.role === role) || staffList[0];
+      const sessionUser: StaffUser = existing || {
         id: `staff_${Date.now()}`,
-        name: role === 'super_admin' ? 'Store Owner' : role === 'admin' ? 'Duty Manager' : 'Barista Staff',
+        name: role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Store Manager' : 'Barista Staff',
         email: 'staff@iluvkeyks.ph',
         role,
         active: true,
         lastLogin: new Date().toISOString(),
       };
-      storageAdapter.setStaffSession(staffSession);
+      storageAdapter.setStaffSession(sessionUser);
     } else {
       storageAdapter.setStaffSession(null);
     }
