@@ -80,6 +80,7 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(() => storageAdapter.getOrders());
   const [lastCustomerOrder, setLastCustomerOrder] = useState<Order | null>(null);
   const [isSyncingOrders, setIsSyncingOrders] = useState<boolean>(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<string>(() => {
     const route = parseRouteFromPath();
     return route.adminTab;
@@ -253,13 +254,17 @@ export default function App() {
     }
   }, []);
 
+  // Poll every 1 second only while the Admin Orders view is active and the tab is visible
+  const shouldPollOrders = portalMode === 'admin' && adminPrincipal && (currentTab === 'orders' || currentTab === 'menu');
+
   useEffect(() => {
-    // Poll every 5 seconds when tab is active
+    if (!shouldPollOrders) return;
+
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         refreshOrders();
       }
-    }, 5000);
+    }, 1000);
 
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
@@ -275,7 +280,7 @@ export default function App() {
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [refreshOrders]);
+  }, [refreshOrders, shouldPollOrders]);
 
   // -------------------------------------------------------------
   // Customer Auth Handlers
@@ -443,6 +448,9 @@ export default function App() {
   };
 
   const handleCreateOrder = async (orderData: Partial<Order>) => {
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+    try {
     const created = await orderService.createOrder({
       ...orderData,
       customerId: orderData.customerId || currentCustomer?.id,
@@ -456,9 +464,15 @@ export default function App() {
 
     setOrders((prev) => [created, ...prev.filter((o) => o.id !== created.id)]);
     showNotification(`New POS Ticket #${created.orderNumber} placed for ₱${created.total.toFixed(2)}`);
+    } finally {
+      setIsSubmittingOrder(false);
+    }
   };
 
   const handlePlaceCustomerOrder = async (customerOrder: Order) => {
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+    try {
     const created = await orderService.createOrder({
       ...customerOrder,
       customerId: currentCustomer?.id,
@@ -488,6 +502,9 @@ export default function App() {
     }
 
     showNotification(`🎉 Order #${created.orderNumber} placed successfully! Barista notified.`);
+    } finally {
+      setIsSubmittingOrder(false);
+    }
   };
 
   // -------------------------------------------------------------
