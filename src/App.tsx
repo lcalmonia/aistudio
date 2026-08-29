@@ -233,7 +233,7 @@ export default function App() {
   }, [portalMode, currentTab, adminPrincipal]);
 
   // -------------------------------------------------------------
-  // Real-Time Cross-Device Order Synchronization Engine
+  // Real-Time Cross-Device Order & Catalog Synchronization Engine
   // -------------------------------------------------------------
   const refreshOrders = useCallback(async () => {
     try {
@@ -251,6 +251,29 @@ export default function App() {
       console.warn('[App] Background order sync error:', err);
     } finally {
       setIsSyncingOrders(false);
+    }
+  }, []);
+
+  const refreshCatalogAndInventory = useCallback(async () => {
+    try {
+      const [mItems, cats, ads, bundles, invItems, invCats, sets] = await Promise.all([
+        menuService.listMenuItems(),
+        categoryService.listCategories(),
+        addonService.listAddons(),
+        promoService.listPromoBundles(),
+        inventoryService.listInventory(),
+        inventoryService.listCategories(),
+        settingsService.getStoreSettings(),
+      ]);
+      setMenuItems(mItems);
+      setCategories(cats);
+      setAddons(ads);
+      setPromoBundles(bundles);
+      setInventoryItems(invItems);
+      setInventoryCategories(invCats);
+      setStoreSettings(sets);
+    } catch (err) {
+      console.warn('[App] Background catalog/inventory sync error:', err);
     }
   }, []);
 
@@ -281,6 +304,30 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
   }, [refreshOrders, shouldPollOrders]);
+
+  // Poll catalog and inventory every 6 seconds or on window focus
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshCatalogAndInventory();
+      }
+    }, 6000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        refreshCatalogAndInventory();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [refreshCatalogAndInventory]);
 
   // -------------------------------------------------------------
   // Customer Auth Handlers
@@ -395,20 +442,21 @@ export default function App() {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
 
-    if (oldCategory && oldCategory !== trimmed) {
-      await categoryService.renameCategory(oldCategory, trimmed);
-      // Update menu items in category
-      const updatedMenu = menuItems.map((item) =>
-        item.category === oldCategory ? { ...item, category: trimmed } : item
-      );
-      await menuService.saveMenuItems(updatedMenu);
-      setCategories(await categoryService.listCategories());
-      setMenuItems(updatedMenu);
-      showNotification(`Category renamed to "${trimmed}" across all items.`);
-    } else if (!categories.includes(trimmed)) {
-      const updatedCats = await categoryService.addCategory(trimmed);
-      setCategories(updatedCats);
-      showNotification(`New category "${trimmed}" added to menu catalog! 🎉`);
+    try {
+      if (oldCategory && oldCategory !== trimmed) {
+        const updatedCats = await categoryService.renameCategory(oldCategory, trimmed);
+        const updatedMenu = await menuService.listMenuItems();
+        setCategories(updatedCats);
+        setMenuItems(updatedMenu);
+        showNotification(`Category renamed to "${trimmed}" across all items.`);
+      } else if (!categories.includes(trimmed)) {
+        const updatedCats = await categoryService.addCategory(trimmed);
+        setCategories(updatedCats);
+        showNotification(`New category "${trimmed}" added to menu catalog! 🎉`);
+      }
+    } catch (err: any) {
+      console.error('[Category] Save error:', err);
+      showNotification(`⚠️ Category update failed: ${err?.message || 'Could not sync with server'}`);
     }
   };
 
@@ -417,16 +465,18 @@ export default function App() {
       showNotification('At least one category must remain.');
       return;
     }
-    const remaining = categories.filter((c) => c !== categoryToDelete);
-    const fallback = remaining[0] || 'Coffee';
-    await categoryService.deleteCategory(categoryToDelete);
-    const updatedMenu = menuItems.map((item) =>
-      item.category === categoryToDelete ? { ...item, category: fallback } : item
-    );
-    await menuService.saveMenuItems(updatedMenu);
-    setCategories(remaining);
-    setMenuItems(updatedMenu);
-    showNotification(`Category "${categoryToDelete}" deleted. Products moved to "${fallback}".`);
+    try {
+      const remaining = categories.filter((c) => c !== categoryToDelete);
+      const fallback = remaining[0] || 'Coffee';
+      const updatedCats = await categoryService.deleteCategory(categoryToDelete, fallback);
+      const updatedMenu = await menuService.listMenuItems();
+      setCategories(updatedCats);
+      setMenuItems(updatedMenu);
+      showNotification(`Category "${categoryToDelete}" deleted. Products moved to "${fallback}".`);
+    } catch (err: any) {
+      console.error('[Category] Delete error:', err);
+      showNotification(`⚠️ Category deletion failed: ${err?.message || 'Could not sync with server'}`);
+    }
   };
 
   // -------------------------------------------------------------
@@ -521,28 +571,43 @@ export default function App() {
   };
 
   const handleSaveProduct = async (product: MenuItem) => {
-    if (productToEdit) {
-      await menuService.updateMenuItem(product.id, product);
-      showNotification(`"${product.name}" updated successfully!`);
-    } else {
-      await menuService.createMenuItem(product);
-      showNotification(`"${product.name}" added to menu catalog! ☕`);
+    try {
+      if (productToEdit) {
+        await menuService.updateMenuItem(product.id, product);
+        showNotification(`"${product.name}" updated successfully!`);
+      } else {
+        await menuService.createMenuItem(product);
+        showNotification(`"${product.name}" added to menu catalog! ☕`);
+      }
+      setMenuItems(await menuService.listMenuItems());
+    } catch (err: any) {
+      console.error('[Product] Save error:', err);
+      showNotification(`⚠️ Failed to save product: ${err?.message || 'Server error'}`);
     }
-    setMenuItems(await menuService.listMenuItems());
   };
 
   const handleDeleteProduct = async (productId: string) => {
     const itemToDelete = menuItems.find((i) => i.id === productId);
-    await menuService.deleteMenuItem(productId);
-    setMenuItems(await menuService.listMenuItems());
-    showNotification(`"${itemToDelete?.name || 'Item'}" removed from catalog.`);
+    try {
+      await menuService.deleteMenuItem(productId);
+      setMenuItems(await menuService.listMenuItems());
+      showNotification(`"${itemToDelete?.name || 'Item'}" removed from catalog.`);
+    } catch (err: any) {
+      console.error('[Product] Delete error:', err);
+      showNotification(`⚠️ Failed to delete product: ${err?.message || 'Server error'}`);
+    }
   };
 
   const handleToggleProductAvailability = async (productId: string) => {
-    const updated = await menuService.toggleAvailability(productId);
-    if (updated) {
-      setMenuItems(await menuService.listMenuItems());
-      showNotification(`"${updated.name}" is now ${updated.available !== false ? 'Available' : 'Sold Out'}.`);
+    try {
+      const updated = await menuService.toggleAvailability(productId);
+      if (updated) {
+        setMenuItems(await menuService.listMenuItems());
+        showNotification(`"${updated.name}" is now ${updated.available !== false ? 'Available' : 'Sold Out'}.`);
+      }
+    } catch (err: any) {
+      console.error('[Product] Toggle availability error:', err);
+      showNotification(`⚠️ Failed to update availability: ${err?.message || 'Server error'}`);
     }
   };
 
@@ -560,20 +625,30 @@ export default function App() {
   };
 
   const handleSaveBundle = async (bundle: PromoBundle) => {
-    if (bundleToEdit) {
-      await promoService.updatePromoBundle(bundle.id, bundle);
-      showNotification(`Bundle "${bundle.name}" updated!`);
-    } else {
-      await promoService.createPromoBundle(bundle);
-      showNotification(`New Combo Bundle "${bundle.name}" published! 🎉`);
+    try {
+      if (bundleToEdit) {
+        await promoService.updatePromoBundle(bundle.id, bundle);
+        showNotification(`Bundle "${bundle.name}" updated!`);
+      } else {
+        await promoService.createPromoBundle(bundle);
+        showNotification(`New Combo Bundle "${bundle.name}" published! 🎉`);
+      }
+      setPromoBundles(await promoService.listPromoBundles());
+    } catch (err: any) {
+      console.error('[Bundle] Save error:', err);
+      showNotification(`⚠️ Failed to save combo bundle: ${err?.message || 'Server error'}`);
     }
-    setPromoBundles(await promoService.listPromoBundles());
   };
 
   const handleDeleteBundle = async (bundleId: string) => {
-    await promoService.deletePromoBundle(bundleId);
-    setPromoBundles(await promoService.listPromoBundles());
-    showNotification('Combo Bundle removed.');
+    try {
+      await promoService.deletePromoBundle(bundleId);
+      setPromoBundles(await promoService.listPromoBundles());
+      showNotification('Combo Bundle removed.');
+    } catch (err: any) {
+      console.error('[Bundle] Delete error:', err);
+      showNotification(`⚠️ Failed to remove bundle: ${err?.message || 'Server error'}`);
+    }
   };
 
   // -------------------------------------------------------------
@@ -590,27 +665,42 @@ export default function App() {
   };
 
   const handleSaveAddon = async (addon: ProductAddon) => {
-    if (addonToEdit) {
-      await addonService.updateAddon(addon.id, addon);
-      showNotification(`Modifier "${addon.name}" updated!`);
-    } else {
-      await addonService.createAddon(addon);
-      showNotification(`New Modifier "${addon.name}" added!`);
+    try {
+      if (addonToEdit) {
+        await addonService.updateAddon(addon.id, addon);
+        showNotification(`Modifier "${addon.name}" updated!`);
+      } else {
+        await addonService.createAddon(addon);
+        showNotification(`New Modifier "${addon.name}" added!`);
+      }
+      setAddons(await addonService.listAddons());
+    } catch (err: any) {
+      console.error('[Addon] Save error:', err);
+      showNotification(`⚠️ Failed to save modifier: ${err?.message || 'Server error'}`);
     }
-    setAddons(await addonService.listAddons());
   };
 
   const handleDeleteAddon = async (addonId: string) => {
-    await addonService.deleteAddon(addonId);
-    setAddons(await addonService.listAddons());
-    showNotification('Modifier deleted.');
+    try {
+      await addonService.deleteAddon(addonId);
+      setAddons(await addonService.listAddons());
+      showNotification('Modifier deleted.');
+    } catch (err: any) {
+      console.error('[Addon] Delete error:', err);
+      showNotification(`⚠️ Failed to delete modifier: ${err?.message || 'Server error'}`);
+    }
   };
 
   const handleToggleAddonStock = async (addonId: string) => {
-    const updated = await addonService.toggleStock(addonId);
-    if (updated) {
-      setAddons(await addonService.listAddons());
-      showNotification(`Modifier "${updated.name}" is now ${updated.available !== false ? 'In Stock' : 'Out of Stock'}.`);
+    try {
+      const updated = await addonService.toggleStock(addonId);
+      if (updated) {
+        setAddons(await addonService.listAddons());
+        showNotification(`Modifier "${updated.name}" is now ${updated.available !== false ? 'In Stock' : 'Out of Stock'}.`);
+      }
+    } catch (err: any) {
+      console.error('[Addon] Toggle stock error:', err);
+      showNotification(`⚠️ Failed to toggle modifier stock: ${err?.message || 'Server error'}`);
     }
   };
 
@@ -618,36 +708,56 @@ export default function App() {
   // Store Settings Handlers
   // -------------------------------------------------------------
   const handleSaveStoreSettings = async (newSettings: StoreSettings) => {
-    await settingsService.updateStoreSettings(newSettings);
-    setStoreSettings(newSettings);
-    showNotification('Store profile & branding settings applied successfully! ✨');
+    try {
+      await settingsService.updateStoreSettings(newSettings);
+      setStoreSettings(newSettings);
+      showNotification('Store profile & branding settings applied successfully! ✨');
+    } catch (err: any) {
+      console.error('[Settings] Save error:', err);
+      showNotification(`⚠️ Failed to save settings: ${err?.message || 'Server error'}`);
+    }
   };
 
   // -------------------------------------------------------------
   // Inventory Handlers
   // -------------------------------------------------------------
   const handleSaveInventoryItem = async (item: InventoryItem) => {
-    const exists = inventoryItems.some((i) => i.id === item.id);
-    if (exists) {
-      await inventoryService.updateInventoryItem(item.id, item);
-      showNotification(`Inventory item "${item.name}" updated.`);
-    } else {
-      await inventoryService.createInventoryItem(item);
-      showNotification(`New inventory item "${item.name}" added.`);
+    try {
+      const exists = inventoryItems.some((i) => i.id === item.id);
+      if (exists) {
+        await inventoryService.updateInventoryItem(item.id, item);
+        showNotification(`Inventory item "${item.name}" updated.`);
+      } else {
+        await inventoryService.createInventoryItem(item);
+        showNotification(`New inventory item "${item.name}" added.`);
+      }
+      setInventoryItems(await inventoryService.listInventory());
+    } catch (err: any) {
+      console.error('[Inventory] Save error:', err);
+      showNotification(`⚠️ Failed to save inventory item: ${err?.message || 'Server error'}`);
     }
-    setInventoryItems(await inventoryService.listInventory());
   };
 
   const handleDeleteInventoryItem = async (itemId: string) => {
-    await inventoryService.deleteInventoryItem(itemId);
-    setInventoryItems(await inventoryService.listInventory());
-    showNotification('Inventory item removed.');
+    try {
+      await inventoryService.deleteInventoryItem(itemId);
+      setInventoryItems(await inventoryService.listInventory());
+      showNotification('Inventory item removed.');
+    } catch (err: any) {
+      console.error('[Inventory] Delete error:', err);
+      showNotification(`⚠️ Failed to delete inventory item: ${err?.message || 'Server error'}`);
+    }
   };
 
   const handleAddInventoryCategory = async (category: string) => {
-    const updated = await inventoryService.addCategory(category);
-    setInventoryCategories(updated);
-    showNotification(`Inventory category "${category}" added.`);
+    try {
+      const updated = await inventoryService.addCategory(category);
+      setInventoryCategories(updated);
+      showNotification(`Inventory category "${category}" added.`);
+    } catch (err: any) {
+      console.error('[Inventory] Add category error:', err);
+      showNotification(`⚠️ Failed to add inventory category: ${err?.message || 'Server error'}`);
+    }
   };
 
   const handleLogBrew = () => {

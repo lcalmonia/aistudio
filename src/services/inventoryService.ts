@@ -2,24 +2,30 @@ import { InventoryItem, InventoryMovement } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
 
-class InventoryApiError extends Error {
+export class InventoryApiError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
   ) {
     super(message);
+    this.name = 'InventoryApiError';
   }
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+    });
+  } catch (netErr: any) {
+    throw new InventoryApiError(netErr?.message || 'Network error communicating with server.');
+  }
 
   const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
   if (!response.ok) {
@@ -42,7 +48,7 @@ export const inventoryService = {
   async listInventory(options?: { includeInactive?: boolean }): Promise<InventoryItem[]> {
     try {
       const response = await api<{ items: InventoryItem[] }>('/api/inventory', { method: 'GET' });
-      if (response && Array.isArray(response.items) && response.items.length > 0) {
+      if (response && Array.isArray(response.items)) {
         storageAdapter.setInventory(response.items);
         if (options?.includeInactive) {
           return response.items;
@@ -50,7 +56,11 @@ export const inventoryService = {
         return response.items.filter((item) => item.active !== false);
       }
     } catch (err) {
-      console.warn('[InventoryService] Server listInventory failed, using local storage fallback:', err);
+      if (err instanceof InventoryApiError) {
+        console.warn(`[InventoryService] Server listInventory error (${err.status}):`, err.message);
+      } else {
+        console.warn('[InventoryService] Server listInventory network failure, using local storage fallback:', err);
+      }
     }
 
     const items = storageAdapter.getInventory();
@@ -73,6 +83,9 @@ export const inventoryService = {
         return response.item;
       }
     } catch (err) {
+      if (err instanceof InventoryApiError && err.status === 404) {
+        return null;
+      }
       console.warn(`[InventoryService] Server getInventoryItem(${id}) failed, trying local storage:`, err);
     }
 
@@ -114,119 +127,65 @@ export const inventoryService = {
       lastRestocked: stockVal > 0 ? new Date().toISOString().split('T')[0] : undefined,
     };
 
-    try {
-      const response = await api<{ item: InventoryItem }>('/api/inventory', {
-        method: 'POST',
-        body: JSON.stringify(newItem),
-      });
-      if (response && response.item) {
-        const items = storageAdapter.getInventory().filter((i) => i.id !== response.item.id);
-        storageAdapter.setInventory([response.item, ...items]);
-        return response.item;
-      }
-    } catch (err) {
-      console.warn('[InventoryService] Server createInventoryItem failed, using local fallback:', err);
+    const response = await api<{ item: InventoryItem }>('/api/inventory', {
+      method: 'POST',
+      body: JSON.stringify(newItem),
+    });
+    if (response && response.item) {
+      const items = storageAdapter.getInventory().filter((i) => i.id !== response.item.id);
+      storageAdapter.setInventory([response.item, ...items]);
+      return response.item;
     }
 
-    const items = storageAdapter.getInventory();
-    const updated = [...items, newItem];
-    storageAdapter.setInventory(updated);
-
-    if (stockVal > 0) {
-      storageAdapter.addInventoryMovement({
-        id: generateEntityId('mov'),
-        inventoryItemId: newItem.id,
-        itemName: newItem.name,
-        type: 'addition',
-        quantity: stockVal,
-        previousQuantity: 0,
-        resultingQuantity: stockVal,
-        reason: 'Initial stock registration',
-        timestamp: Date.now(),
-        createdAt: nowIso,
-      });
-    }
-
-    return newItem;
+    throw new InventoryApiError('Failed to create inventory item on server.');
   },
 
   async updateInventoryItem(
     id: string,
     updates: Partial<InventoryItem>
   ): Promise<InventoryItem | null> {
-    try {
-      const response = await api<{ item: InventoryItem }>(`/api/inventory/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates),
-      });
-      if (response && response.item) {
-        const items = storageAdapter.getInventory();
-        const index = items.findIndex((i) => i.id === id);
-        if (index !== -1) {
-          items[index] = response.item;
-          storageAdapter.setInventory(items);
-        }
-        return response.item;
+    const response = await api<{ item: InventoryItem }>(`/api/inventory/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    if (response && response.item) {
+      const items = storageAdapter.getInventory();
+      const index = items.findIndex((i) => i.id === id);
+      if (index !== -1) {
+        items[index] = response.item;
+        storageAdapter.setInventory(items);
+      } else {
+        storageAdapter.setInventory([response.item, ...items]);
       }
-    } catch (err) {
-      console.warn(`[InventoryService] Server updateInventoryItem(${id}) failed, using local fallback:`, err);
+      return response.item;
     }
 
-    const items = storageAdapter.getInventory();
-    const index = items.findIndex((i) => i.id === id);
-    if (index === -1) return null;
-
-    const current = items[index];
-    const newStock = updates.stock !== undefined ? Math.max(0, Number(updates.stock) || 0) : current.stock;
-    const newThreshold = updates.minThreshold !== undefined ? Math.max(0, Number(updates.minThreshold) || 0) : current.minThreshold;
-    const nowIso = new Date().toISOString();
-
-    const updated: InventoryItem = {
-      ...current,
-      ...updates,
-      stock: newStock,
-      minThreshold: newThreshold,
-      status: this.calculateDynamicStatus(newStock, newThreshold),
-      active: updates.active !== undefined ? updates.active : (current.active !== false),
-      updatedAt: nowIso,
-    };
-
-    items[index] = updated;
-    storageAdapter.setInventory(items);
-    return updated;
+    throw new InventoryApiError('Failed to update inventory item on server.');
   },
 
   async deactivateInventoryItem(id: string): Promise<boolean> {
-    try {
-      await api<{ item: InventoryItem }>(`/api/inventory/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ active: false }),
-      });
-    } catch (err) {
-      console.warn(`[InventoryService] Server deactivateInventoryItem(${id}) failed, using local fallback:`, err);
-    }
+    await api<{ item: InventoryItem }>(`/api/inventory/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: false }),
+    });
 
     const items = storageAdapter.getInventory();
     const index = items.findIndex((i) => i.id === id);
-    if (index === -1) return false;
-
-    items[index] = {
-      ...items[index],
-      active: false,
-      updatedAt: new Date().toISOString(),
-    };
-    storageAdapter.setInventory(items);
+    if (index !== -1) {
+      items[index] = {
+        ...items[index],
+        active: false,
+        updatedAt: new Date().toISOString(),
+      };
+      storageAdapter.setInventory(items);
+    }
     return true;
   },
 
   async deleteInventoryItem(id: string): Promise<boolean> {
-    try {
-      await api<{ success: boolean }>(`/api/inventory/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-    } catch (err) {
-      console.warn(`[InventoryService] Server deleteInventoryItem(${id}) failed, using local fallback:`, err);
-    }
+    await api<{ success: boolean }>(`/api/inventory/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
 
     const items = storageAdapter.getInventory();
     storageAdapter.setInventory(items.filter((i) => i.id !== id));
@@ -251,65 +210,28 @@ export const inventoryService = {
     const movementType: 'addition' | 'deduction' | 'adjustment' = delta > 0 ? 'addition' : delta < 0 ? 'deduction' : 'adjustment';
     const absQty = Math.abs(delta);
 
-    try {
-      const response = await api<{ item: InventoryItem }>(`/api/inventory/${encodeURIComponent(id)}/stock`, {
-        method: 'POST',
-        body: JSON.stringify({
-          type: movementType,
-          quantity: absQty,
-          reason,
-          staffName,
-        }),
-      });
-      if (response && response.item) {
-        const items = storageAdapter.getInventory();
-        const index = items.findIndex((i) => i.id === id);
-        if (index !== -1) {
-          items[index] = response.item;
-          storageAdapter.setInventory(items);
-        }
-        return response.item;
+    const response = await api<{ item: InventoryItem }>(`/api/inventory/${encodeURIComponent(id)}/stock`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: movementType,
+        quantity: absQty,
+        reason,
+        staffName,
+      }),
+    });
+    if (response && response.item) {
+      const items = storageAdapter.getInventory();
+      const index = items.findIndex((i) => i.id === id);
+      if (index !== -1) {
+        items[index] = response.item;
+        storageAdapter.setInventory(items);
+      } else {
+        storageAdapter.setInventory([response.item, ...items]);
       }
-    } catch (err) {
-      console.warn(`[InventoryService] Server recordStockMovement(${id}) failed, using local fallback:`, err);
+      return response.item;
     }
 
-    const items = storageAdapter.getInventory();
-    const index = items.findIndex((i) => i.id === id);
-    if (index === -1) return null;
-
-    const current = items[index];
-    const prevStock = current.stock;
-    const newStock = Math.max(0, parseFloat((current.stock + delta).toFixed(2)));
-    const actualDelta = newStock - prevStock;
-    const nowIso = new Date().toISOString();
-
-    const updated: InventoryItem = {
-      ...current,
-      stock: newStock,
-      status: this.calculateDynamicStatus(newStock, current.minThreshold),
-      updatedAt: nowIso,
-      lastRestocked: delta > 0 ? new Date().toISOString().split('T')[0] : current.lastRestocked,
-    };
-
-    items[index] = updated;
-    storageAdapter.setInventory(items);
-
-    storageAdapter.addInventoryMovement({
-      id: generateEntityId('mov'),
-      inventoryItemId: current.id,
-      itemName: current.name,
-      type: movementType,
-      quantity: Math.abs(actualDelta),
-      previousQuantity: prevStock,
-      resultingQuantity: newStock,
-      reason: reason || (delta > 0 ? 'Restock / Delivery' : 'Bar usage / adjustment'),
-      timestamp: Date.now(),
-      createdAt: nowIso,
-      staffName,
-    });
-
-    return updated;
+    throw new InventoryApiError('Failed to record stock movement on server.');
   },
 
   async getLowStockItems(): Promise<InventoryItem[]> {
@@ -323,40 +245,34 @@ export const inventoryService = {
   async listCategories(): Promise<string[]> {
     try {
       const response = await api<{ categories: string[] }>('/api/inventory/categories', { method: 'GET' });
-      if (response && Array.isArray(response.categories) && response.categories.length > 0) {
+      if (response && Array.isArray(response.categories)) {
         storageAdapter.setInventoryCategories(response.categories);
         return response.categories;
       }
     } catch (err) {
-      console.warn('[InventoryService] Server listCategories failed, using local storage fallback:', err);
+      if (err instanceof InventoryApiError) {
+        console.warn(`[InventoryService] Server listCategories error (${err.status}):`, err.message);
+      } else {
+        console.warn('[InventoryService] Server listCategories network failure, using local storage fallback:', err);
+      }
     }
     return storageAdapter.getInventoryCategories();
   },
 
   async addCategory(category: string): Promise<string[]> {
     const trimmed = category.trim();
-    if (!trimmed) return storageAdapter.getInventoryCategories();
+    if (!trimmed) return this.listCategories();
 
-    try {
-      const response = await api<{ categories: string[] }>('/api/inventory/categories', {
-        method: 'POST',
-        body: JSON.stringify({ category: trimmed }),
-      });
-      if (response && Array.isArray(response.categories)) {
-        storageAdapter.setInventoryCategories(response.categories);
-        return response.categories;
-      }
-    } catch (err) {
-      console.warn('[InventoryService] Server addCategory failed, using local fallback:', err);
+    const response = await api<{ categories: string[] }>('/api/inventory/categories', {
+      method: 'POST',
+      body: JSON.stringify({ category: trimmed }),
+    });
+    if (response && Array.isArray(response.categories)) {
+      storageAdapter.setInventoryCategories(response.categories);
+      return response.categories;
     }
 
-    const categories = storageAdapter.getInventoryCategories();
-    if (!categories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-      const updated = [...categories, trimmed];
-      storageAdapter.setInventoryCategories(updated);
-      return updated;
-    }
-    return categories;
+    throw new InventoryApiError('Failed to add inventory category on server.');
   },
 
   async listMovements(inventoryItemId?: string): Promise<InventoryMovement[]> {

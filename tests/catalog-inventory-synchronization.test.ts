@@ -14,7 +14,12 @@ import {
 import {
   mapStoreSettingsRecord,
 } from '../netlify/functions/_shared/settings.mts';
-import { inventoryService } from '../src/services/inventoryService';
+import { inventoryService, InventoryApiError } from '../src/services/inventoryService';
+import { menuService, MenuApiError } from '../src/services/menuService';
+import { categoryService, CategoryApiError } from '../src/services/categoryService';
+import { addonService, AddonApiError } from '../src/services/addonService';
+import { promoService, PromoApiError } from '../src/services/promoService';
+import { settingsService, SettingsApiError } from '../src/services/settingsService';
 
 test('Catalog: mapCategoryRecord formats categories properly', () => {
   assert.equal(mapCategoryRecord({ name: 'Specialty Coffee' }), 'Specialty Coffee');
@@ -255,3 +260,180 @@ test('Settings: mapStoreSettingsRecord preserves store configuration with safe d
   assert.equal(settings.socialIg, '@iluvkeyks');
   assert.equal(settings.deliveryFee, 49);
 });
+
+test('Error Handling: menuService throws MenuApiError on 500 server error', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'Database connection failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      async () => {
+        await menuService.createMenuItem({
+          id: 'test-item',
+          name: 'Test Coffee',
+          price: 150,
+          category: 'Coffee',
+          description: 'A rich espresso roast',
+          image: 'https://example.com/test.jpg',
+          available: true,
+          temperature: 'Hot',
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof MenuApiError);
+        assert.equal(err.status, 500);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Error Handling: categoryService throws CategoryApiError on 401 unauthorized', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'Admin session required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      async () => {
+        await categoryService.addCategory('New Seasonal');
+      },
+      (err: any) => {
+        assert.ok(err instanceof CategoryApiError);
+        assert.equal(err.status, 401);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Error Handling: addonService throws AddonApiError on network failure', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new TypeError('Failed to fetch');
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await addonService.updateAddon('addon-1', {
+          id: 'addon-1',
+          name: 'Oat Milk',
+          price: 40,
+          category: 'Milk',
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof AddonApiError);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Error Handling: promoService throws PromoApiError on API error', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'Promo not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      async () => {
+        await promoService.deletePromoBundle('bundle-nonexistent');
+      },
+      (err: any) => {
+        assert.ok(err instanceof PromoApiError);
+        assert.equal(err.status, 404);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Error Handling: inventoryService throws InventoryApiError on API failure', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'Stock validation failed' }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      async () => {
+        await inventoryService.updateInventoryItem('inv-1', {
+          id: 'inv-1',
+          name: 'Beans',
+          category: 'Coffee',
+          stock: -5,
+          unit: 'kg',
+          status: 'Critical',
+          minThreshold: 5,
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof InventoryApiError);
+        assert.equal(err.status, 422);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Error Handling: settingsService throws SettingsApiError on API failure', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'Settings update forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    await assert.rejects(
+      async () => {
+        await settingsService.updateStoreSettings({
+          storeName: 'Updated Name',
+          tagline: 'Freshly Baked',
+          logoUrl: 'https://example.com/logo.png',
+          branchName: 'Main',
+          phoneNumber: '+63 917 123 4567',
+          email: 'test@example.com',
+          address: '123 Test St',
+          currencySymbol: '₱',
+          deliveryFee: 50,
+          freeDeliveryThreshold: 500,
+          openHours: '8am-8pm',
+          receiptFooter: 'Thank you',
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof SettingsApiError);
+        assert.equal(err.status, 403);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+

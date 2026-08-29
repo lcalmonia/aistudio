@@ -2,24 +2,30 @@ import { PromoBundle } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
 
-class PromoApiError extends Error {
+export class PromoApiError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
   ) {
     super(message);
+    this.name = 'PromoApiError';
   }
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+    });
+  } catch (netErr: any) {
+    throw new PromoApiError(netErr?.message || 'Network error communicating with server.');
+  }
 
   const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
   if (!response.ok) {
@@ -32,12 +38,16 @@ export const promoService = {
   async listPromoBundles(): Promise<PromoBundle[]> {
     try {
       const response = await api<{ bundles: PromoBundle[] }>('/api/bundles', { method: 'GET' });
-      if (response && Array.isArray(response.bundles) && response.bundles.length > 0) {
+      if (response && Array.isArray(response.bundles)) {
         storageAdapter.setPromoBundles(response.bundles);
         return response.bundles;
       }
     } catch (err) {
-      console.warn('[PromoService] Server listPromoBundles failed, using local storage fallback:', err);
+      if (err instanceof PromoApiError) {
+        console.warn(`[PromoService] Server listPromoBundles error (${err.status}):`, err.message);
+      } else {
+        console.warn('[PromoService] Server listPromoBundles network failure, using local storage fallback:', err);
+      }
     }
     return storageAdapter.getPromoBundles();
   },
@@ -49,6 +59,9 @@ export const promoService = {
         return response.bundle;
       }
     } catch (err) {
+      if (err instanceof PromoApiError && err.status === 404) {
+        return null;
+      }
       console.warn(`[PromoService] Server getPromoBundle(${id}) failed, trying local storage:`, err);
     }
     const bundles = storageAdapter.getPromoBundles();
@@ -68,65 +81,46 @@ export const promoService = {
       id: bundle.id || generateEntityId('bundle'),
     };
 
-    try {
-      const response = await api<{ bundle: PromoBundle }>('/api/bundles', {
-        method: 'POST',
-        body: JSON.stringify(newBundle),
-      });
-      if (response && response.bundle) {
-        const bundles = storageAdapter.getPromoBundles().filter((b) => b.id !== response.bundle.id);
-        storageAdapter.setPromoBundles([response.bundle, ...bundles]);
-        return response.bundle;
-      }
-    } catch (err) {
-      console.warn('[PromoService] Server createPromoBundle failed, using local fallback:', err);
+    const response = await api<{ bundle: PromoBundle }>('/api/bundles', {
+      method: 'POST',
+      body: JSON.stringify(newBundle),
+    });
+    if (response && response.bundle) {
+      const bundles = storageAdapter.getPromoBundles().filter((b) => b.id !== response.bundle.id);
+      storageAdapter.setPromoBundles([response.bundle, ...bundles]);
+      return response.bundle;
     }
 
-    const bundles = storageAdapter.getPromoBundles();
-    const updated = [...bundles, newBundle];
-    storageAdapter.setPromoBundles(updated);
-    return newBundle;
+    throw new PromoApiError('Failed to create combo bundle on server.');
   },
 
   async updatePromoBundle(
     id: string,
     updates: Partial<PromoBundle>
   ): Promise<PromoBundle | null> {
-    try {
-      const response = await api<{ bundle: PromoBundle }>(`/api/bundles/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates),
-      });
-      if (response && response.bundle) {
-        const bundles = storageAdapter.getPromoBundles();
-        const index = bundles.findIndex((b) => b.id === id);
-        if (index !== -1) {
-          bundles[index] = response.bundle;
-          storageAdapter.setPromoBundles(bundles);
-        }
-        return response.bundle;
+    const response = await api<{ bundle: PromoBundle }>(`/api/bundles/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    if (response && response.bundle) {
+      const bundles = storageAdapter.getPromoBundles();
+      const index = bundles.findIndex((b) => b.id === id);
+      if (index !== -1) {
+        bundles[index] = response.bundle;
+        storageAdapter.setPromoBundles(bundles);
+      } else {
+        storageAdapter.setPromoBundles([response.bundle, ...bundles]);
       }
-    } catch (err) {
-      console.warn(`[PromoService] Server updatePromoBundle(${id}) failed, using local fallback:`, err);
+      return response.bundle;
     }
 
-    const bundles = storageAdapter.getPromoBundles();
-    const index = bundles.findIndex((b) => b.id === id);
-    if (index === -1) return null;
-    const updated = { ...bundles[index], ...updates };
-    bundles[index] = updated;
-    storageAdapter.setPromoBundles(bundles);
-    return updated;
+    throw new PromoApiError('Failed to update combo bundle on server.');
   },
 
   async deletePromoBundle(id: string): Promise<boolean> {
-    try {
-      await api<{ success: boolean }>(`/api/bundles/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-    } catch (err) {
-      console.warn(`[PromoService] Server deletePromoBundle(${id}) failed, using local fallback:`, err);
-    }
+    await api<{ success: boolean }>(`/api/bundles/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
 
     const bundles = storageAdapter.getPromoBundles();
     storageAdapter.setPromoBundles(bundles.filter((b) => b.id !== id));
@@ -135,27 +129,25 @@ export const promoService = {
 
   async toggleStock(id: string): Promise<PromoBundle | null> {
     const bundles = storageAdapter.getPromoBundles();
-    const index = bundles.findIndex((b) => b.id === id);
-    if (index === -1) return null;
-    const updated = { ...bundles[index], available: !bundles[index].available };
+    const current = bundles.find((b) => b.id === id);
+    const targetAvailability = current ? !current.available : true;
 
-    try {
-      const response = await api<{ bundle: PromoBundle }>(`/api/bundles/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ available: updated.available }),
-      });
-      if (response && response.bundle) {
+    const response = await api<{ bundle: PromoBundle }>(`/api/bundles/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ available: targetAvailability }),
+    });
+    if (response && response.bundle) {
+      const index = bundles.findIndex((b) => b.id === id);
+      if (index !== -1) {
         bundles[index] = response.bundle;
         storageAdapter.setPromoBundles(bundles);
-        return response.bundle;
+      } else {
+        storageAdapter.setPromoBundles([response.bundle, ...bundles]);
       }
-    } catch (err) {
-      console.warn(`[PromoService] Server toggleStock(${id}) failed, using local fallback:`, err);
+      return response.bundle;
     }
 
-    bundles[index] = updated;
-    storageAdapter.setPromoBundles(bundles);
-    return updated;
+    throw new PromoApiError('Failed to toggle combo bundle availability on server.');
   },
 };
 
