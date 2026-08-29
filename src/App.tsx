@@ -50,12 +50,16 @@ import { EditProductModal } from './components/EditProductModal';
 import { EditBundleModal } from './components/EditBundleModal';
 import { EditAddonModal } from './components/EditAddonModal';
 import { adminAuthService } from './services/adminAuthService';
+import { parseRouteFromPath, syncBrowserUrl } from './services/routeService';
 
 export default function App() {
   // -------------------------------------------------------------
   // Portal Mode: 'public' | 'customer' | 'admin'
   // -------------------------------------------------------------
-  const [portalMode, setPortalMode] = useState<'public' | 'customer' | 'admin'>('public');
+  const [portalMode, setPortalMode] = useState<'public' | 'customer' | 'admin'>(() => {
+    const route = parseRouteFromPath();
+    return route.portalMode;
+  });
 
   // Customer & Auth State
   const [customers, setCustomers] = useState<CustomerUser[]>(() => storageAdapter.getCustomers());
@@ -76,7 +80,10 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(() => storageAdapter.getOrders());
   const [lastCustomerOrder, setLastCustomerOrder] = useState<Order | null>(null);
   const [isSyncingOrders, setIsSyncingOrders] = useState<boolean>(false);
-  const [currentTab, setCurrentTab] = useState<string>('admin-menu');
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    const route = parseRouteFromPath();
+    return route.adminTab;
+  });
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -170,15 +177,59 @@ export default function App() {
     adminAuthService
       .getSession()
       .then((session) => {
-        if (active) setAdminPrincipal(session);
+        if (!active) return;
+        setAdminPrincipal(session);
+        const route = parseRouteFromPath();
+        if (route.portalMode === 'admin' && session) {
+          setPortalMode('admin');
+          setCurrentTab(route.adminTab);
+        } else if (route.portalMode === 'admin' && !session) {
+          setIsAdminAuthModalOpen(true);
+        }
       })
       .catch(() => {
-        if (active) setAdminPrincipal(null);
+        if (!active) return;
+        setAdminPrincipal(null);
+        const route = parseRouteFromPath();
+        if (route.portalMode === 'admin') {
+          setIsAdminAuthModalOpen(true);
+        }
       });
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const route = parseRouteFromPath();
+      if (route.portalMode === 'admin') {
+        if (adminPrincipal) {
+          setPortalMode('admin');
+          setCurrentTab(route.adminTab);
+        } else {
+          setPortalMode('public');
+          setIsAdminAuthModalOpen(true);
+        }
+      } else if (route.portalMode === 'customer') {
+        setPortalMode(currentCustomer ? 'customer' : 'public');
+      } else {
+        setPortalMode('public');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [adminPrincipal, currentCustomer]);
+
+  useEffect(() => {
+    if (portalMode === 'admin' && adminPrincipal) {
+      syncBrowserUrl('admin', currentTab);
+    } else if (portalMode === 'customer') {
+      syncBrowserUrl('customer');
+    } else if (portalMode === 'public') {
+      syncBrowserUrl('public', undefined, true);
+    }
+  }, [portalMode, currentTab, adminPrincipal]);
 
   // -------------------------------------------------------------
   // Real-Time Cross-Device Order Synchronization Engine

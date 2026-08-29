@@ -172,7 +172,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   };
 
   return (
-    <div className="pb-24 pt-2 px-3 sm:px-4 max-w-5xl mx-auto space-y-4">
+    <div className="pb-28 pt-20 px-3 sm:px-4 max-w-5xl mx-auto space-y-4">
       {/* Top Admin Banner */}
       <div className="bg-[#26170c] text-[#f9f2f0] p-3.5 sm:p-5 rounded-2xl shadow-md border border-[#3d2b1f] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>

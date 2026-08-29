@@ -100,7 +100,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   return (
-    <div className="pt-2 px-4 sm:px-6 max-w-4xl mx-auto pb-32">
+    <div className="pt-20 px-4 sm:px-6 max-w-4xl mx-auto pb-32">
       {/* Top Title & Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
