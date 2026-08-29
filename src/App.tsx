@@ -644,11 +644,10 @@ export default function App() {
     showNotification('Inventory item removed.');
   };
 
-  const handleAddInventoryCategory = (category: string) => {
-    if (!inventoryCategories.includes(category)) {
-      setInventoryCategories((prev) => [...prev, category]);
-      showNotification(`Inventory category "${category}" added.`);
-    }
+  const handleAddInventoryCategory = async (category: string) => {
+    const updated = await inventoryService.addCategory(category);
+    setInventoryCategories(updated);
+    showNotification(`Inventory category "${category}" added.`);
   };
 
   const handleLogBrew = () => {
