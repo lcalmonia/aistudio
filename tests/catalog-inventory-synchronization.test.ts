@@ -437,3 +437,54 @@ test('Error Handling: settingsService throws SettingsApiError on API failure', a
   }
 });
 
+test('Settings: updateStoreSettings persists settings to API and returns updated shape', async () => {
+  const originalFetch = globalThis.fetch;
+  const mockSavedSettings = {
+    storeName: 'iLuvKeyks Coffee & Tea',
+    tagline: 'Coffee, Tea & Tub Cakes',
+    logoUrl: '',
+    branchName: 'Manila Flagship',
+    phoneNumber: '+63 917 123 4567',
+    email: 'hello@iluvkeyks.ph',
+    address: '123 Sweet Street, Sampaloc, Manila',
+    currencySymbol: '₱',
+    deliveryFee: 49,
+    freeDeliveryThreshold: 500,
+    openHours: '7:00 AM - 10:00 PM Daily',
+    receiptFooter: 'Thank you for supporting your local cafe!',
+    wifiSsid: 'iLuvKeyks-Guest',
+    wifiPassword: 'coffeeandcakes',
+    socialFb: 'facebook.com/iluvkeyks',
+    socialIg: '@iluvkeyks.ph',
+  };
+
+  let capturedPath = '';
+  let capturedBody: any = null;
+
+  globalThis.fetch = async (url: any, init: any) => {
+    capturedPath = url.toString();
+    capturedBody = init?.body ? JSON.parse(init.body) : {};
+    return new Response(
+      JSON.stringify({
+        success: true,
+        settings: mockSavedSettings,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  };
+
+  try {
+    const result = await settingsService.updateStoreSettings(mockSavedSettings);
+    assert.equal(capturedPath, '/api/settings');
+    assert.equal(capturedBody?.storeName, 'iLuvKeyks Coffee & Tea');
+    assert.equal(result.storeName, 'iLuvKeyks Coffee & Tea');
+    assert.equal(result.deliveryFee, 49);
+    assert.equal(result.wifiSsid, 'iLuvKeyks-Guest');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+

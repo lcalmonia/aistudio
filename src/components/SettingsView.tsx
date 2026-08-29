@@ -3,8 +3,8 @@ import { StoreSettings } from '../types';
 
 interface SettingsViewProps {
   settings: StoreSettings;
-  onSaveSettings: (newSettings: StoreSettings) => void;
-  onResetSettings?: () => void;
+  onSaveSettings: (newSettings: StoreSettings) => Promise<boolean | void> | void;
+  onResetSettings?: () => Promise<StoreSettings | void> | void;
   onShowNotification: (msg: string) => void;
   onSwitchToCustomerPortal?: () => void;
 }
@@ -16,17 +16,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onShowNotification,
   onSwitchToCustomerPortal,
 }) => {
-  const [formData, setFormData] = useState<StoreSettings>({ ...settings });
+  const [formData, setFormData] = useState<StoreSettings>(() => ({ ...settings }));
+  const [baseSettings, setBaseSettings] = useState<StoreSettings>(() => ({ ...settings }));
   const [activeTab, setActiveTab] = useState<'branding' | 'location' | 'ordering' | 'preview'>('branding');
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync state when settings prop updates
-  useEffect(() => {
-    setFormData({ ...settings });
-  }, [settings]);
-
-  // Check if any fields were actually modified
-  const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
+  // Check if any fields were actually modified compared to saved base settings
+  const hasChanges = JSON.stringify(formData) !== JSON.stringify(baseSettings);
 
   const handleInputChange = (field: keyof StoreSettings, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -63,23 +60,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onShowNotification('Logo cleared. Click Save to apply.');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasChanges) return;
+    if (!hasChanges || isSaving) return;
 
     if (!formData.storeName.trim()) {
       onShowNotification('Store Name cannot be empty.');
       return;
     }
-    onSaveSettings(formData);
+
+    try {
+      setIsSaving(true);
+      await onSaveSettings(formData);
+      // Upon successful save, update baseSettings to clear dirty state
+      setBaseSettings({ ...formData });
+    } catch (err) {
+      console.error('[SettingsView] Error persisting settings:', err);
+      // Keep formData intact - unsaved edits are never lost
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (window.confirm('Reset all store settings to original defaults?')) {
       if (onResetSettings) {
-        onResetSettings();
+        try {
+          const resetRes = await onResetSettings();
+          if (resetRes) {
+            setFormData({ ...resetRes });
+            setBaseSettings({ ...resetRes });
+          }
+        } catch (err) {
+          console.error('[SettingsView] Reset error:', err);
+        }
       } else {
-        setFormData({ ...settings });
+        setFormData({ ...baseSettings });
       }
     }
   };
@@ -640,17 +656,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             <button
               type="submit"
-              disabled={!hasChanges}
+              disabled={!hasChanges || isSaving}
               className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-                hasChanges
+                hasChanges && !isSaving
                   ? 'bg-[#8fbc8f] hover:bg-[#7ea67e] text-[#1c331c] shadow-sm active:scale-95 cursor-pointer'
                   : 'bg-[#4f453f]/60 text-[#a89f99] opacity-60 cursor-not-allowed'
               }`}
             >
               <span className="material-symbols-outlined text-[16px]">
-                {hasChanges ? 'check_circle' : 'done'}
+                {isSaving ? 'sync' : hasChanges ? 'check_circle' : 'done'}
               </span>
-              <span>Save & Apply Live</span>
+              <span>{isSaving ? 'Saving & Applying...' : 'Save & Apply Live'}</span>
             </button>
           </div>
         </div>
