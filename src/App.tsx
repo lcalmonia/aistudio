@@ -256,13 +256,14 @@ export default function App() {
 
   const refreshCatalogAndInventory = useCallback(async () => {
     try {
-      const [mItems, cats, ads, bundles, invItems, invCats] = await Promise.all([
+      const [mItems, cats, ads, bundles, invItems, invCats, sets] = await Promise.all([
         menuService.listMenuItems(),
         categoryService.listCategories(),
         addonService.listAddons(),
         promoService.listPromoBundles(),
         inventoryService.listInventory(),
         inventoryService.listCategories(),
+        settingsService.getStoreSettings(),
       ]);
       setMenuItems(mItems);
       setCategories(cats);
@@ -270,8 +271,9 @@ export default function App() {
       setPromoBundles(bundles);
       setInventoryItems(invItems);
       setInventoryCategories(invCats);
+      setStoreSettings(sets);
     } catch (err) {
-      console.warn('[App] Background catalog/inventory sync error:', err);
+      console.warn('[App] Background catalog/inventory/settings sync error:', err);
     }
   }, []);
 

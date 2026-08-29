@@ -25,6 +25,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Check if any fields were actually modified compared to saved base settings
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(baseSettings);
 
+  // Live cross-device synchronization:
+  // If the form is clean (hasChanges === false), safely update baseSettings and formData from latest server props.
+  // If the user has active unsaved edits (hasChanges === true), do NOT touch formData.
+  useEffect(() => {
+    if (!hasChanges) {
+      setBaseSettings({ ...settings });
+      setFormData({ ...settings });
+    }
+  }, [settings, hasChanges]);
+
   const handleInputChange = (field: keyof StoreSettings, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };

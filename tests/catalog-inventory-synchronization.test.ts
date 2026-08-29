@@ -488,3 +488,49 @@ test('Settings: updateStoreSettings persists settings to API and returns updated
   }
 });
 
+test('Settings: getStoreSettings retrieves authoritative configuration from API', async () => {
+  const originalFetch = globalThis.fetch;
+  const mockRemoteSettings = {
+    storeName: 'iLuvKeyks Modern Bakery',
+    tagline: 'Baking happiness daily',
+    logoUrl: '',
+    branchName: 'Uptown Branch',
+    phoneNumber: '+63 917 999 8888',
+    email: 'uptown@iluvkeyks.ph',
+    address: '456 Commercial Arcade, Manila',
+    currencySymbol: '₱',
+    deliveryFee: 65,
+    freeDeliveryThreshold: 750,
+    openHours: '6:00 AM - 11:00 PM',
+    receiptFooter: 'See you again soon!',
+    wifiSsid: 'Keyks-Wifi',
+    wifiPassword: 'uptownpassword',
+    socialFb: 'facebook.com/iluvkeyks',
+    socialIg: '@iluvkeyks.ph',
+  };
+
+  globalThis.fetch = async (url: any) => {
+    assert.equal(url.toString(), '/api/settings');
+    return new Response(
+      JSON.stringify({
+        success: true,
+        settings: mockRemoteSettings,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  };
+
+  try {
+    const fetched = await settingsService.getStoreSettings();
+    assert.equal(fetched.storeName, 'iLuvKeyks Modern Bakery');
+    assert.equal(fetched.deliveryFee, 65);
+    assert.equal(fetched.freeDeliveryThreshold, 750);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
