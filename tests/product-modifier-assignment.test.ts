@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { mapMenuItemRecord } from '../netlify/functions/_shared/catalog.mjs';
 import { createInitialProductDraft, isProductDraftDirty, ProductFormDraft } from '../src/utils/productDraft';
 import { MenuItem, ModifierCategory } from '../src/types';
@@ -36,9 +37,9 @@ describe('Phase 7A: Product Modifier Group Assignment', () => {
     };
 
     const mapped = mapMenuItemRecord(dbRow);
-    expect(mapped.modifierCategoryIds).toEqual(['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot']);
-    expect(mapped.name).toBe('Spanish Latte');
-    expect(mapped.addons).toEqual(['addon-shot', 'addon-oat']);
+    assert.deepEqual(mapped.modifierCategoryIds, ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot']);
+    assert.equal(mapped.name, 'Spanish Latte');
+    assert.deepEqual(mapped.addons, ['addon-shot', 'addon-oat']);
   });
 
   it('handles products without modifier_category_ids or empty array', () => {
@@ -63,7 +64,7 @@ describe('Phase 7A: Product Modifier Group Assignment', () => {
     };
 
     const mapped = mapMenuItemRecord(dbRowNoMod);
-    expect(mapped.modifierCategoryIds).toEqual([]);
+    assert.deepEqual(mapped.modifierCategoryIds, []);
   });
 
   it('initializes product form draft with explicit modifierCategoryIds when present', () => {
@@ -80,7 +81,7 @@ describe('Phase 7A: Product Modifier Group Assignment', () => {
     };
 
     const draft = createInitialProductDraft(product, 'Coffee', sampleCategories);
-    expect(draft.selectedModifierCategoryIds).toEqual(['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot']);
+    assert.deepEqual(draft.selectedModifierCategoryIds, ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot']);
   });
 
   it('allows different products to have completely distinct modifier assignments', () => {
@@ -124,15 +125,15 @@ describe('Phase 7A: Product Modifier Group Assignment', () => {
     const draftB = createInitialProductDraft(productB, 'Coffee', sampleCategories);
     const draftC = createInitialProductDraft(productC, 'Pastries', sampleCategories);
 
-    expect(draftA.selectedModifierCategoryIds).toContain('modcat-temp');
-    expect(draftA.selectedModifierCategoryIds).toContain('modcat-sweetness');
-    expect(draftA.selectedModifierCategoryIds).toContain('modcat-ice');
+    assert.ok(draftA.selectedModifierCategoryIds.includes('modcat-temp'));
+    assert.ok(draftA.selectedModifierCategoryIds.includes('modcat-sweetness'));
+    assert.ok(draftA.selectedModifierCategoryIds.includes('modcat-ice'));
 
-    expect(draftB.selectedModifierCategoryIds).toContain('modcat-temp');
-    expect(draftB.selectedModifierCategoryIds).not.toContain('modcat-sweetness');
-    expect(draftB.selectedModifierCategoryIds).not.toContain('modcat-ice');
+    assert.ok(draftB.selectedModifierCategoryIds.includes('modcat-temp'));
+    assert.ok(!draftB.selectedModifierCategoryIds.includes('modcat-sweetness'));
+    assert.ok(!draftB.selectedModifierCategoryIds.includes('modcat-ice'));
 
-    expect(draftC.selectedModifierCategoryIds).toEqual([]);
+    assert.deepEqual(draftC.selectedModifierCategoryIds, []);
   });
 
   it('marks draft as dirty when user modifies modifier category assignment', () => {
@@ -152,20 +153,20 @@ describe('Phase 7A: Product Modifier Group Assignment', () => {
     
     // Unchanged draft is clean
     const unchangedDraft: ProductFormDraft = { ...baseDraft };
-    expect(isProductDraftDirty(unchangedDraft, baseDraft)).toBe(false);
+    assert.equal(isProductDraftDirty(unchangedDraft, baseDraft), false);
 
     // User toggles Ice preference ON
     const editedDraft: ProductFormDraft = {
       ...baseDraft,
       selectedModifierCategoryIds: ['modcat-temp', 'modcat-sweetness', 'modcat-ice'],
     };
-    expect(isProductDraftDirty(editedDraft, baseDraft)).toBe(true);
+    assert.equal(isProductDraftDirty(editedDraft, baseDraft), true);
 
     // User clears all modifier categories
     const clearedDraft: ProductFormDraft = {
       ...baseDraft,
       selectedModifierCategoryIds: [],
     };
-    expect(isProductDraftDirty(clearedDraft, baseDraft)).toBe(true);
+    assert.equal(isProductDraftDirty(clearedDraft, baseDraft), true);
   });
 });

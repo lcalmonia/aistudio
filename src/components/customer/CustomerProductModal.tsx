@@ -5,28 +5,13 @@ interface CustomerProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: MenuItem | null;
-  addonsList: ProductAddon[];
+  addonsList?: ProductAddon[];
   modifierCategories?: ModifierCategory[];
   onAddToCart: (cartItem: CustomerCartItem) => void;
 }
 
-const SWEETNESS_OPTIONS = [
-  { label: '100% Regular', value: '100%' },
-  { label: '75% Less Sweet', value: '75%' },
-  { label: '50% Half Sweet', value: '50%' },
-  { label: '25% Mild', value: '25%' },
-  { label: '0% No Sugar', value: '0%' },
-];
-
-const ICE_OPTIONS = [
-  { label: 'Regular Ice', value: 'Regular Ice' },
-  { label: 'Less Ice', value: 'Less Ice' },
-  { label: 'Extra Ice', value: 'Extra Ice' },
-  { label: 'No Ice', value: 'No Ice' },
-];
-
-interface ModifierGroup {
-  categoryInfo?: ModifierCategory;
+interface DynamicModifierGroup {
+  category: ModifierCategory;
   items: ProductAddon[];
   isSingleChoice: boolean;
   isRequired: boolean;
@@ -40,26 +25,41 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   modifierCategories = [],
   onAddToCart,
 }) => {
-  const safeAddonsList = addonsList || [];
-  const safeCategories = modifierCategories || [];
+  const safeAddonsList = useMemo(() => addonsList || [], [addonsList]);
+  const safeCategories = useMemo(() => modifierCategories || [], [modifierCategories]);
 
   // Determine initial temperature
-  const defaultTemp: 'Hot' | 'Iced' | 'N/A' =
-    !product || product.temperature === 'N/A'
-      ? 'N/A'
-      : product.temperature === 'Cold'
-      ? 'Iced'
-      : 'Hot';
+  const defaultTemp: 'Hot' | 'Iced' | 'N/A' = useMemo(() => {
+    if (!product || product.temperature === 'N/A') return 'N/A';
+    if (product.temperature === 'Cold') return 'Iced';
+    return 'Hot';
+  }, [product]);
 
   const [selectedTemperature, setSelectedTemperature] = useState<'Hot' | 'Iced' | 'N/A'>(defaultTemp);
   const [selectedSize, setSelectedSize] = useState<ProductSize | null>(null);
-  const [sweetnessLevel, setSweetnessLevel] = useState<string>('100%');
-  const [iceLevel, setIceLevel] = useState<string>('Regular Ice');
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
   const [singleChoiceSelections, setSingleChoiceSelections] = useState<Record<string, string>>({});
   const [specialInstructions, setSpecialInstructions] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Check if temperature option is enabled for this product
+  const isTemperatureOptionEnabled = useMemo(() => {
+    if (!product || product.temperature !== 'Both') return false;
+    if (Array.isArray(product.modifierCategoryIds)) {
+      return product.modifierCategoryIds.some((id) => {
+        const cat = safeCategories.find((c) => c.id === id || c.name.toLowerCase() === id.toLowerCase());
+        return (
+          id === 'modcat-temp' ||
+          id === 'modcat-temperature' ||
+          id.toLowerCase() === 'temperature' ||
+          cat?.id === 'modcat-temp' ||
+          cat?.name.toLowerCase() === 'temperature'
+        );
+      });
+    }
+    return true;
+  }, [product, safeCategories]);
 
   // Compute available sizes for the current temperature
   const availableSizes = useMemo(() => {
@@ -86,7 +86,119 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
     });
   }, [product, selectedTemperature]);
 
-  // Reset and initialize when product or open state changes
+  // Dynamic Modifier Groups computation based on product.modifierCategoryIds and safeCategories
+  const { dynamicModifierGroups, standaloneAddonItems } = useMemo(() => {
+    if (!product) {
+      return { dynamicModifierGroups: [], standaloneAddonItems: [] };
+    }
+
+    const assignedCatIds = Array.isArray(product.modifierCategoryIds)
+      ? product.modifierCategoryIds
+      : null;
+
+    // Filter categories assigned to this product (excluding Temperature which is rendered as a top-level choice)
+    const activeAssignedCategories = safeCategories.filter((cat) => {
+      if (cat.active === false) return false;
+      const isTempCat =
+        cat.id === 'modcat-temp' ||
+        cat.id === 'modcat-temperature' ||
+        cat.name.toLowerCase() === 'temperature';
+      if (isTempCat) return false;
+
+      // Category assignment check
+      if (assignedCatIds !== null) {
+        const isDirectlyAssigned = assignedCatIds.some(
+          (id) =>
+            id === cat.id ||
+            id.toLowerCase() === cat.name.toLowerCase() ||
+            (cat.id === 'modcat-sweetness' && (id === 'modcat-sweetness' || id.toLowerCase() === 'sweetness level')) ||
+            (cat.id === 'modcat-ice' && (id === 'modcat-ice' || id.toLowerCase() === 'ice preference'))
+        );
+        if (!isDirectlyAssigned) return false;
+      } else {
+        // Fallback if modifierCategoryIds not defined: check product category scoping
+        if (cat.applicableCategories && cat.applicableCategories.length > 0) {
+          if (!cat.applicableCategories.includes(product.category)) return false;
+        }
+      }
+
+      // Check temperature compatibility for the category
+      if (selectedTemperature === 'Hot' && cat.applicableTemperature === 'Cold') return false;
+      if (selectedTemperature === 'Iced' && cat.applicableTemperature === 'Hot') return false;
+
+      return true;
+    });
+
+    // Sort categories by sortOrder
+    activeAssignedCategories.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    const groups: DynamicModifierGroup[] = [];
+    const usedAddonIds = new Set<string>();
+
+    activeAssignedCategories.forEach((cat) => {
+      // Find addons matching this category
+      const matchingItems = safeAddonsList.filter((addon) => {
+        if (!addon || !addon.available) return false;
+
+        const matchesCat =
+          addon.category.toLowerCase() === cat.name.toLowerCase() ||
+          addon.category === cat.id;
+        if (!matchesCat) return false;
+
+        // Temperature compatibility check for addon item
+        if (addon.applicableTemperature === 'Hot' && selectedTemperature === 'Iced') return false;
+        if (addon.applicableTemperature === 'Cold' && selectedTemperature === 'Hot') return false;
+
+        // Product assigned addons whitelist check for addon items if applicable
+        if (
+          cat.itemType === 'addon' &&
+          product.addons &&
+          product.addons.length > 0 &&
+          !product.addons.includes(addon.id)
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+
+      // Sort items by sortOrder or price
+      matchingItems.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+      if (matchingItems.length > 0) {
+        matchingItems.forEach((item) => usedAddonIds.add(item.id));
+        groups.push({
+          category: cat,
+          items: matchingItems,
+          isSingleChoice: cat.selectionType === 'single' || cat.itemType === 'modifier',
+          isRequired: Boolean(cat.required),
+        });
+      }
+    });
+
+    // Check if there are any standalone product-assigned add-ons not in groups
+    const standaloneAddons: ProductAddon[] = [];
+    if (product.addons && product.addons.length > 0) {
+      product.addons.forEach((addonId) => {
+        if (!usedAddonIds.has(addonId)) {
+          const found = safeAddonsList.find((a) => a.id === addonId && a.available !== false);
+          if (found) {
+            // Check temp compatibility
+            if (found.applicableTemperature === 'Hot' && selectedTemperature === 'Iced') return;
+            if (found.applicableTemperature === 'Cold' && selectedTemperature === 'Hot') return;
+            standaloneAddons.push(found);
+          }
+        }
+      });
+    }
+
+    return {
+      dynamicModifierGroups: groups,
+      standaloneAddonItems: standaloneAddons,
+    };
+  }, [product, safeCategories, safeAddonsList, selectedTemperature]);
+
+  // Reset and initialize selections when product opens or changes
   useEffect(() => {
     if (product && isOpen) {
       const initialTemp =
@@ -101,23 +213,48 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
       const initSizes = product.sizes || [];
       const validForInitial = initSizes.filter((s) => {
         if (!s.availableTemperatures || s.availableTemperatures.length === 0) return true;
-        if (initialTemp === 'Hot') return s.availableTemperatures.includes('Hot') || s.availableTemperatures.includes('Both');
-        if (initialTemp === 'Iced') return s.availableTemperatures.includes('Cold') || s.availableTemperatures.includes('Both');
+        if (initialTemp === 'Hot')
+          return s.availableTemperatures.includes('Hot') || s.availableTemperatures.includes('Both');
+        if (initialTemp === 'Iced')
+          return s.availableTemperatures.includes('Cold') || s.availableTemperatures.includes('Both');
         return true;
       });
       setSelectedSize(validForInitial[0] || (initSizes.length > 0 ? initSizes[0] : null));
 
-      setSweetnessLevel('100%');
-      setIceLevel('Regular Ice');
+      // Initialize default single choices (e.g. 100% sweetness, regular ice, or first required item)
+      const initialSingleChoices: Record<string, string> = {};
+      dynamicModifierGroups.forEach((group) => {
+        if (group.isSingleChoice && group.items.length > 0) {
+          // If category is Sweetness Level, default to 100% item or first item
+          if (group.category.name.toLowerCase().includes('sweetness')) {
+            const standardSweet = group.items.find(
+              (i) => i.name.includes('100%') || i.id.includes('100')
+            );
+            initialSingleChoices[group.category.id] = standardSweet
+              ? standardSweet.id
+              : group.items[0].id;
+          } else if (group.category.name.toLowerCase().includes('ice') && initialTemp === 'Iced') {
+            const standardIce = group.items.find(
+              (i) => i.name.toLowerCase().includes('regular') || i.id.includes('reg')
+            );
+            initialSingleChoices[group.category.id] = standardIce
+              ? standardIce.id
+              : group.items[0].id;
+          } else if (group.isRequired) {
+            initialSingleChoices[group.category.id] = group.items[0].id;
+          }
+        }
+      });
+
+      setSingleChoiceSelections(initialSingleChoices);
       setSelectedAddonIds([]);
-      setSingleChoiceSelections({});
       setSpecialInstructions('');
       setQuantity(1);
       setValidationError(null);
     }
   }, [product, isOpen]);
 
-  // Update selected size when temperature changes if current size is no longer valid
+  // Adjust selections when temperature changes
   useEffect(() => {
     if (availableSizes.length > 0) {
       const currentStillValid = availableSizes.some((s) => s.name === selectedSize?.name);
@@ -127,116 +264,25 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
     } else {
       setSelectedSize(null);
     }
-  }, [selectedTemperature, availableSizes, selectedSize]);
 
-  // Check if beverage categories or modifier categories support sweetness/ice
-  const isBeverage =
-    Boolean(product) &&
-    product!.temperature !== 'N/A' &&
-    !['Pasta', 'Pastries', 'Cakes on Tub', 'Rice Meals', 'Pika-Pika', 'Cakes'].includes(product!.category);
-  const isColdDrink = selectedTemperature === 'Iced';
-
-  const isTemperatureOptionEnabled =
-    product?.temperature === 'Both' &&
-    (!Array.isArray(product.modifierCategoryIds) ||
-      product.modifierCategoryIds.some(
-        (id) => id === 'modcat-temp' || id === 'modcat-temperature' || id.toLowerCase() === 'temperature'
-      ));
-
-  const isSweetnessEnabled = Array.isArray(product?.modifierCategoryIds)
-    ? product.modifierCategoryIds.some(
-        (id) => id === 'modcat-sweetness' || id.toLowerCase().includes('sweetness')
-      )
-    : isBeverage;
-
-  const isIceEnabled = Array.isArray(product?.modifierCategoryIds)
-    ? isColdDrink &&
-      product.modifierCategoryIds.some(
-        (id) => id === 'modcat-ice' || id.toLowerCase().includes('ice')
-      )
-    : isBeverage && isColdDrink;
-
-  // Filter applicable add-ons and modifiers for this product and temperature
-  const relevantAddons = useMemo(() => {
-    if (!product) return [];
-    return safeAddonsList.filter((addon) => {
-      if (!addon || !addon.available) return false;
-
-      // Check product-level assigned modifier categories if explicitly configured
-      if (Array.isArray(product.modifierCategoryIds)) {
-        const catConfig = safeCategories.find(
-          (c) => c.name.toLowerCase() === addon.category.toLowerCase()
-        );
-        const matchesCategory = product.modifierCategoryIds.some(
-          (id) =>
-            id === addon.category ||
-            id.toLowerCase() === addon.category.toLowerCase() ||
-            (catConfig && id === catConfig.id)
-        );
-        if (!matchesCategory) return false;
-      }
-
-      // Product assigned addons whitelist check
-      if (product.addons && product.addons.length > 0) {
-        if (!product.addons.includes(addon.id)) return false;
-      }
-
-      // Check product category applicability if configured
-      if (addon.applicableCategories && addon.applicableCategories.length > 0) {
-        if (!addon.applicableCategories.includes(product.category)) return false;
-      }
-
-      // Check temperature applicability
-      if (addon.applicableTemperature === 'All') return true;
-      if (addon.applicableTemperature === 'Both' && selectedTemperature !== 'N/A') return true;
-      if (addon.applicableTemperature === 'Hot' && selectedTemperature === 'Hot') return true;
-      if (addon.applicableTemperature === 'Cold' && selectedTemperature === 'Iced') return true;
-      if (addon.applicableTemperature === 'Both') return true;
-
-      return true;
-    });
-  }, [safeAddonsList, product, selectedTemperature, safeCategories]);
-
-  // Group items by category and separate Modifiers from Add-ons
-  const { modifierGroups, addonItems } = useMemo(() => {
-    const modGroups: Record<string, ModifierGroup> = {};
-
-    const extraAddons: ProductAddon[] = [];
-
-    relevantAddons.forEach((addon) => {
-      const catConfig = safeCategories.find(
-        (c) => c.name.toLowerCase() === addon.category.toLowerCase()
+    // Auto-select regular ice if switching to iced and ice category is present and empty
+    if (selectedTemperature === 'Iced') {
+      const iceGroup = dynamicModifierGroups.find((g) =>
+        g.category.name.toLowerCase().includes('ice')
       );
-
-      const isModifier =
-        addon.itemType === 'modifier' ||
-        catConfig?.itemType === 'modifier' ||
-        addon.selectionType === 'single' ||
-        catConfig?.selectionType === 'single';
-
-      if (isModifier) {
-        const catName = addon.category || 'Options';
-        if (!modGroups[catName]) {
-          modGroups[catName] = {
-            categoryInfo: catConfig,
-            items: [],
-            isSingleChoice: addon.selectionType === 'single' || catConfig?.selectionType === 'single',
-            isRequired: Boolean(addon.required || catConfig?.required),
-          };
-        }
-        modGroups[catName].items.push(addon);
-      } else {
-        extraAddons.push(addon);
+      if (iceGroup && !singleChoiceSelections[iceGroup.category.id] && iceGroup.items.length > 0) {
+        const standardIce = iceGroup.items.find(
+          (i) => i.name.toLowerCase().includes('regular') || i.id.includes('reg')
+        );
+        setSingleChoiceSelections((prev) => ({
+          ...prev,
+          [iceGroup.category.id]: standardIce ? standardIce.id : iceGroup.items[0].id,
+        }));
       }
-    });
+    }
+  }, [selectedTemperature, availableSizes, selectedSize, dynamicModifierGroups]);
 
-    return {
-      modifierGroups: modGroups,
-      addonItems: extraAddons,
-    };
-  }, [relevantAddons, safeCategories]);
-
-  // Toggle multi-select add-ons
+  // Toggle multi-select items in a group or standalone add-ons
   const toggleAddon = (id: string) => {
     setValidationError(null);
     setSelectedAddonIds((prev) =>
@@ -244,21 +290,20 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
     );
   };
 
-  // Select single-choice modifier
-  const selectSingleChoice = (categoryName: string, addonId: string) => {
+  // Select single-choice modifier in a group
+  const selectSingleChoice = (categoryId: string, addonId: string, isRequired: boolean) => {
     setValidationError(null);
     setSingleChoiceSelections((prev) => {
-      if (prev[categoryName] === addonId) {
+      if (prev[categoryId] === addonId) {
         // Deselect if not required
-        const group = modifierGroups[categoryName];
-        if (group?.isRequired) return prev;
+        if (isRequired) return prev;
         const next = { ...prev };
-        delete next[categoryName];
+        delete next[categoryId];
         return next;
       }
       return {
         ...prev,
-        [categoryName]: addonId,
+        [categoryId]: addonId,
       };
     });
   };
@@ -267,45 +312,78 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   const basePrice = product?.price || 0;
   const sizePriceDelta = selectedSize?.priceDelta || 0;
 
-  const multiAddonsPrice = selectedAddonIds.reduce((sum, id) => {
-    const found = safeAddonsList.find((a) => a.id === id);
-    return sum + (found ? found.price : 0);
-  }, 0);
+  // Active chosen modifier and add-on items
+  const activeChosenAddonObjects = useMemo(() => {
+    const chosenIds: string[] = [...selectedAddonIds];
 
-  const singleModifiersPrice = Object.values(singleChoiceSelections).reduce((sum, id) => {
-    const found = safeAddonsList.find((a) => a.id === id);
-    return sum + (found ? found.price : 0);
-  }, 0);
+    dynamicModifierGroups.forEach((group) => {
+      if (group.isSingleChoice) {
+        const selectedId = singleChoiceSelections[group.category.id];
+        if (selectedId && group.items.some((i) => i.id === selectedId)) {
+          chosenIds.push(selectedId);
+        }
+      }
+    });
 
-  const unitPrice = basePrice + sizePriceDelta + multiAddonsPrice + singleModifiersPrice;
+    return safeAddonsList.filter((a) => a && chosenIds.includes(a.id));
+  }, [selectedAddonIds, singleChoiceSelections, dynamicModifierGroups, safeAddonsList]);
+
+  const modifiersAndAddonsPrice = activeChosenAddonObjects.reduce(
+    (sum, item) => sum + (item.price || 0),
+    0
+  );
+
+  const unitPrice = basePrice + sizePriceDelta + modifiersAndAddonsPrice;
   const totalPrice = unitPrice * quantity;
 
   // Validate and handle Add to Bag
   const handleAdd = () => {
     if (!product) return;
+
     // Check required modifier groups
-    for (const [catName, group] of Object.entries(modifierGroups) as [string, ModifierGroup][]) {
-      if (group.isRequired && !singleChoiceSelections[catName]) {
-        setValidationError(`Please select an option for "${catName}".`);
-        return;
+    for (const group of dynamicModifierGroups) {
+      if (group.isRequired) {
+        if (group.isSingleChoice) {
+          const selectedId = singleChoiceSelections[group.category.id];
+          const hasValidSelection = selectedId && group.items.some((i) => i.id === selectedId);
+          if (!hasValidSelection) {
+            setValidationError(`Please select an option for "${group.category.name}".`);
+            return;
+          }
+        } else {
+          const groupItemIds = group.items.map((i) => i.id);
+          const hasSelectedInGroup = selectedAddonIds.some((id) => groupItemIds.includes(id));
+          if (!hasSelectedInGroup) {
+            setValidationError(`Please select at least one option for "${group.category.name}".`);
+            return;
+          }
+        }
       }
     }
 
-    const allChosenIds = [
-      ...selectedAddonIds,
-      ...Object.values(singleChoiceSelections),
-    ];
-
-    const chosenAddons = safeAddonsList.filter((a) => a && allChosenIds.includes(a.id));
+    // Extract sweetness and ice text for backward compatibility with KDS/Order formatting
+    const sweetnessAddon = activeChosenAddonObjects.find(
+      (a) =>
+        a.category.toLowerCase() === 'sweetness level' ||
+        a.category.toLowerCase() === 'sweetness'
+    );
+    const iceAddon =
+      selectedTemperature === 'Iced'
+        ? activeChosenAddonObjects.find(
+            (a) =>
+              a.category.toLowerCase() === 'ice preference' ||
+              a.category.toLowerCase() === 'ice'
+          )
+        : undefined;
 
     const cartItem: CustomerCartItem = {
       id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       menuItem: product,
       selectedTemperature,
       selectedSize: selectedSize || undefined,
-      sweetnessLevel: isBeverage ? sweetnessLevel : undefined,
-      iceLevel: isBeverage && isColdDrink ? iceLevel : undefined,
-      selectedAddons: chosenAddons,
+      sweetnessLevel: sweetnessAddon ? sweetnessAddon.name : undefined,
+      iceLevel: iceAddon ? iceAddon.name : undefined,
+      selectedAddons: activeChosenAddonObjects,
       specialInstructions: specialInstructions.trim() || undefined,
       quantity,
       unitPrice,
@@ -383,7 +461,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
             </div>
           )}
 
-          {/* Temperature Choice (If Both and enabled) */}
+          {/* Dynamic Temperature Option (Rendered ONLY if enabled for this product) */}
           {isTemperatureOptionEnabled && (
             <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea]">
               <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f] mb-2">
@@ -399,7 +477,9 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
                       : 'bg-[#fff8f5] text-[#4f453f] border-[#dec1af] hover:bg-[#f3ecea]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px] text-amber-400">local_fire_department</span>
+                  <span className="material-symbols-outlined text-[16px] text-amber-400">
+                    local_fire_department
+                  </span>
                   <span>Hot Brewed</span>
                 </button>
                 <button
@@ -411,7 +491,9 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
                       : 'bg-[#fff8f5] text-[#4f453f] border-[#dec1af] hover:bg-[#f3ecea]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px] text-sky-400">ac_unit</span>
+                  <span className="material-symbols-outlined text-[16px] text-sky-400">
+                    ac_unit
+                  </span>
                   <span>Iced & Chilled</span>
                 </button>
               </div>
@@ -447,7 +529,9 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
                     >
                       <span className="text-xs font-bold">{s.name}</span>
                       <div className="flex justify-between items-baseline mt-1 text-[11px]">
-                        <span className={isSelected ? 'text-[#dec1af]' : 'text-[#81756e]'}>{s.volume}</span>
+                        <span className={isSelected ? 'text-[#dec1af]' : 'text-[#81756e]'}>
+                          {s.volume}
+                        </span>
                         <span className="font-bold">
                           {s.priceDelta > 0 ? `+₱${s.priceDelta}` : 'Default'}
                         </span>
@@ -459,132 +543,112 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
             </div>
           )}
 
-          {/* Sweetness Level */}
-          {isSweetnessEnabled && (
-            <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea]">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
-                  Sweetness Level
-                </label>
-                <span className="text-xs font-bold text-[#26170c]">{sweetnessLevel}</span>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                {SWEETNESS_OPTIONS.map((opt) => {
-                  const isSelected = sweetnessLevel === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setSweetnessLevel(opt.value)}
-                      className={`py-2 px-1 text-[11px] font-bold rounded-xl border transition-all text-center cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#26170c] text-white border-[#26170c]'
-                          : 'bg-[#fff8f5] text-[#4f453f] border-[#dec1af] hover:bg-[#f3ecea]'
-                      }`}
-                    >
-                      {opt.value}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* DYNAMIC MODIFIER GROUPS (Rendered dynamically based on assigned modifier categories) */}
+          {dynamicModifierGroups.map((group) => {
+            const isSingle = group.isSingleChoice;
+            return (
+              <div
+                key={group.category.id}
+                className="bg-white p-3.5 rounded-2xl border border-[#f3ecea] space-y-2"
+              >
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
+                    {group.category.name}
+                    {group.isRequired ? (
+                      <span className="text-[#ba1a1a] ml-1">* (Required)</span>
+                    ) : (
+                      <span className="text-[#81756e] font-normal ml-1">(Optional)</span>
+                    )}
+                  </label>
+                  <span className="text-[10px] font-semibold text-[#81756e]">
+                    {isSingle ? 'Choose 1' : 'Multiple Selection'}
+                  </span>
+                </div>
 
-          {/* Ice Level */}
-          {isIceEnabled && (
-            <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea]">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
-                  Ice Preference
-                </label>
-                <span className="text-xs font-bold text-[#26170c]">{iceLevel}</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {ICE_OPTIONS.map((opt) => {
-                  const isSelected = iceLevel === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setIceLevel(opt.value)}
-                      className={`py-2 px-2 text-[11px] font-bold rounded-xl border transition-all text-center cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#26170c] text-white border-[#26170c]'
-                          : 'bg-[#fff8f5] text-[#4f453f] border-[#dec1af] hover:bg-[#f3ecea]'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {group.items.map((item) => {
+                    const isSelected = isSingle
+                      ? singleChoiceSelections[group.category.id] === item.id
+                      : selectedAddonIds.includes(item.id);
 
-          {/* SECTION 1: MODIFIERS (Single choice, preparation choices, flavor options) */}
-          {(Object.entries(modifierGroups) as [string, ModifierGroup][]).map(([catName, group]) => (
-            <div key={catName} className="bg-white p-3.5 rounded-2xl border border-[#f3ecea] space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
-                  {catName}
-                  {group.isRequired ? (
-                    <span className="text-[#ba1a1a] ml-1">* (Required)</span>
-                  ) : (
-                    <span className="text-[#81756e] font-normal ml-1">(Optional)</span>
-                  )}
-                </label>
-                <span className="text-[10px] font-semibold text-[#81756e]">
-                  {group.isSingleChoice ? 'Choose 1' : 'Multiple Selection'}
-                </span>
-              </div>
+                    const handleClick = () => {
+                      if (isSingle) {
+                        selectSingleChoice(group.category.id, item.id, group.isRequired);
+                      } else {
+                        toggleAddon(item.id);
+                      }
+                    };
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {group.items.map((mod) => {
-                  const isSelected = singleChoiceSelections[catName] === mod.id;
-                  return (
-                    <button
-                      key={mod.id}
-                      type="button"
-                      onClick={() => selectSingleChoice(catName, mod.id)}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                        isSelected
-                          ? 'bg-[#26170c] text-white border-[#26170c] shadow-xs'
-                          : 'bg-[#fff8f5] text-[#4f453f] border-[#dec1af] hover:bg-[#f3ecea]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                            isSelected ? 'border-white bg-white' : 'border-[#81756e]'
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={handleClick}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                          isSelected
+                            ? 'bg-[#26170c] text-white border-[#26170c] shadow-xs'
+                            : 'bg-[#fff8f5] text-[#4f453f] border-[#dec1af] hover:bg-[#f3ecea]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {isSingle ? (
+                            <div
+                              className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'border-white bg-white' : 'border-[#81756e]'
+                              }`}
+                            >
+                              {isSelected && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#26170c]" />
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+                                isSelected
+                                  ? 'bg-white text-[#26170c] border-white'
+                                  : 'border-[#81756e]'
+                              }`}
+                            >
+                              {isSelected && (
+                                <span className="material-symbols-outlined text-[12px] font-bold">
+                                  check
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <span className="text-xs font-bold truncate">{item.name}</span>
+                        </div>
+                        <span
+                          className={`text-xs font-bold flex-shrink-0 ${
+                            isSelected ? 'text-[#dec1af]' : 'text-[#636451]'
                           }`}
                         >
-                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#26170c]" />}
-                        </div>
-                        <span className="text-xs font-bold truncate">{mod.name}</span>
-                      </div>
-                      <span className={`text-xs font-bold flex-shrink-0 ${isSelected ? 'text-[#dec1af]' : 'text-[#636451]'}`}>
-                        {mod.price > 0 ? `+₱${mod.price.toFixed(2)}` : 'Included'}
-                      </span>
-                    </button>
-                  );
-                })}
+                          {item.price > 0 ? `+₱${item.price.toFixed(2)}` : 'Included'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {/* SECTION 2: ADD-ONS (Optional Extras, Milks, Syrups, Toppings) */}
-          {addonItems.length > 0 && (
+          {/* STANDALONE ADD-ONS & EXTRAS (Optional extras directly in product.addons if any) */}
+          {standaloneAddonItems.length > 0 && (
             <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea] space-y-2">
               <div className="flex justify-between items-center">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
                   Add-ons & Extras (Optional)
                 </label>
                 <span className="text-[10px] text-[#81756e] font-semibold">
-                  {selectedAddonIds.length} chosen
+                  {selectedAddonIds.filter((id) =>
+                    standaloneAddonItems.some((s) => s.id === id)
+                  ).length}{' '}
+                  chosen
                 </span>
               </div>
               <div className="space-y-1.5">
-                {addonItems.map((addon) => {
+                {standaloneAddonItems.map((addon) => {
                   const isChecked = selectedAddonIds.includes(addon.id);
                   return (
                     <label
