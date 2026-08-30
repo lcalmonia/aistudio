@@ -1,4 +1,4 @@
-import { MenuItem, ProductSize, ProductTemperature } from '../types';
+import { MenuItem, ModifierCategory, ProductSize, ProductTemperature } from '../types';
 
 export const PRESET_CAFE_PHOTOS = [
   {
@@ -64,14 +64,29 @@ export interface ProductFormDraft {
   tagInput: string;
   allergenInput: string;
   selectedAddonIds: string[];
+  selectedModifierCategoryIds: string[];
   sizes: ProductSize[];
 }
 
 export function createInitialProductDraft(
   product?: MenuItem | null,
-  defaultCategory: string = 'Coffee'
+  defaultCategory: string = 'Coffee',
+  allModifierCategories?: ModifierCategory[]
 ): ProductFormDraft {
   if (product) {
+    let initialModCatIds: string[];
+    if (Array.isArray(product.modifierCategoryIds)) {
+      initialModCatIds = [...product.modifierCategoryIds];
+    } else if (allModifierCategories && allModifierCategories.length > 0) {
+      const prodCategory = product.category || defaultCategory;
+      // Default to categories matching applicability if not explicitly configured yet
+      initialModCatIds = allModifierCategories
+        .filter((mc) => !mc.applicableCategories || mc.applicableCategories.length === 0 || mc.applicableCategories.includes(prodCategory))
+        .map((mc) => mc.id);
+    } else {
+      initialModCatIds = ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot', 'modcat-milk', 'modcat-syrup'];
+    }
+
     return {
       name: product.name || '',
       category: product.category || defaultCategory,
@@ -85,6 +100,7 @@ export function createInitialProductDraft(
       tagInput: product.tags?.join(', ') || '',
       allergenInput: product.allergens?.join(', ') || '',
       selectedAddonIds: product.addons || ['addon-oat', 'addon-shot', 'addon-vanilla-cream'],
+      selectedModifierCategoryIds: initialModCatIds,
       sizes:
         product.sizes && product.sizes.length > 0
           ? product.sizes
@@ -94,6 +110,12 @@ export function createInitialProductDraft(
             ],
     };
   }
+
+  const defaultCategoryModCatIds = allModifierCategories && allModifierCategories.length > 0
+    ? allModifierCategories
+        .filter((mc) => !mc.applicableCategories || mc.applicableCategories.length === 0 || mc.applicableCategories.includes(defaultCategory))
+        .map((mc) => mc.id)
+    : ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot'];
 
   return {
     name: '',
@@ -108,6 +130,7 @@ export function createInitialProductDraft(
     tagInput: 'Best Seller',
     allergenInput: '',
     selectedAddonIds: ['addon-oat', 'addon-shot', 'addon-vanilla-cream'],
+    selectedModifierCategoryIds: defaultCategoryModCatIds,
     sizes: [
       { name: 'Regular', volume: '16oz', priceDelta: 0.0, availableTemperatures: ['Hot', 'Cold', 'Both'] },
       { name: 'Large', volume: '22oz', priceDelta: 20.0, availableTemperatures: ['Hot', 'Cold', 'Both'] },

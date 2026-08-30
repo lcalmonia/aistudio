@@ -75,6 +75,16 @@ export const DEFAULT_CATEGORIES: string[] = [
 
 export const DEFAULT_MODIFIER_CATEGORIES: ModifierCategory[] = [
   {
+    id: 'modcat-temp',
+    name: 'Temperature',
+    itemType: 'modifier',
+    required: true,
+    selectionType: 'single',
+    applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series'],
+    sortOrder: 0,
+    active: true,
+  },
+  {
     id: 'modcat-rice',
     name: 'Rice Meal Options',
     itemType: 'modifier',
@@ -267,6 +277,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Small 12oz', volume: '12oz', priceDelta: -15.00, availableTemperatures: ['Hot', 'Cold'] },
     ],
     addons: ['addon-shot', 'addon-oat', 'addon-vanilla-cream', 'addon-light-ice'],
+    modifierCategoryIds: ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot', 'modcat-milk', 'modcat-syrup'],
     allergens: ['Dairy'],
     calories: 210
   },
@@ -287,6 +298,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Small 12oz', volume: '12oz', priceDelta: -15.00, availableTemperatures: ['Hot', 'Cold'] },
     ],
     addons: ['addon-shot', 'addon-oat', 'addon-caramel', 'addon-whip'],
+    modifierCategoryIds: ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-shot', 'modcat-milk', 'modcat-syrup', 'modcat-topping'],
     allergens: ['Dairy'],
     calories: 240
   },
@@ -307,6 +319,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Large 22oz', volume: '22oz', priceDelta: 20.00 },
     ],
     addons: ['addon-nata', 'addon-pearls', 'addon-cream-cheese'],
+    modifierCategoryIds: ['modcat-sweetness', 'modcat-ice', 'modcat-milk', 'modcat-topping'],
     allergens: ['Dairy'],
     calories: 180
   },
@@ -317,7 +330,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     category: 'Coolers/Mocktails',
     price: 125.00,
     image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
-    description: 'Fizzy citrus curaçao cooler with calamansi zest, sparkling soda water, and mint leaves.',
+    description: 'Fizzy citrus curaçao cooler with practical zest, sparkling soda water, and mint leaves.',
     tags: ['Thirst Quencher', 'Mocktail'],
     available: true,
     temperature: 'Cold',
@@ -326,6 +339,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Large 22oz', volume: '22oz', priceDelta: 15.00 },
     ],
     addons: ['addon-nata', 'addon-light-ice'],
+    modifierCategoryIds: ['modcat-sweetness', 'modcat-ice', 'modcat-topping'],
     allergens: [],
     calories: 90
   },
@@ -346,6 +360,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Large 22oz', volume: '22oz', priceDelta: 25.00 },
     ],
     addons: ['addon-oat', 'addon-vanilla-cream', 'addon-cream-cheese'],
+    modifierCategoryIds: ['modcat-temp', 'modcat-sweetness', 'modcat-ice', 'modcat-milk', 'modcat-topping'],
     allergens: ['Dairy'],
     calories: 160
   },
@@ -366,6 +381,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Large 22oz', volume: '22oz', priceDelta: 25.00 },
     ],
     addons: ['addon-whip', 'addon-pearls'],
+    modifierCategoryIds: ['modcat-sweetness', 'modcat-topping'],
     allergens: ['Dairy', 'Gluten'],
     calories: 340
   },
@@ -385,6 +401,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
       { name: 'Large 22oz', volume: '22oz', priceDelta: 25.00 },
     ],
     addons: ['addon-shot', 'addon-whip'],
+    modifierCategoryIds: ['modcat-sweetness', 'modcat-shot', 'modcat-topping'],
     allergens: ['Dairy'],
     calories: 380
   },
@@ -399,6 +416,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     tags: ['Freshly Baked'],
     available: true,
     temperature: 'N/A',
+    modifierCategoryIds: [],
     allergens: ['Wheat', 'Dairy', 'Eggs'],
     calories: 240
   },
@@ -414,6 +432,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     popular: true,
     available: true,
     temperature: 'N/A',
+    modifierCategoryIds: [],
     allergens: ['Dairy', 'Eggs', 'Wheat'],
     calories: 420
   },
@@ -429,6 +448,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     popular: true,
     available: true,
     temperature: 'N/A',
+    modifierCategoryIds: [],
     allergens: ['Wheat', 'Dairy', 'Pork'],
     calories: 520
   },
@@ -443,6 +463,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     tags: ['Great for Sharing', 'Snacks'],
     available: true,
     temperature: 'N/A',
+    modifierCategoryIds: ['modcat-pika'],
     allergens: ['Dairy', 'Beef'],
     calories: 460
   },
@@ -457,6 +478,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     tags: ['Decadent'],
     available: true,
     temperature: 'N/A',
+    modifierCategoryIds: [],
     allergens: ['Wheat', 'Dairy', 'Eggs'],
     calories: 380
   },
@@ -472,6 +494,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     popular: true,
     available: true,
     temperature: 'N/A',
+    modifierCategoryIds: ['modcat-rice'],
     allergens: ['Soy', 'Eggs', 'Beef'],
     calories: 580
   }

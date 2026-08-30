@@ -63,6 +63,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [tagInput, setTagInput] = useState<string>(baseDraft.tagInput);
   const [allergenInput, setAllergenInput] = useState<string>(baseDraft.allergenInput);
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(baseDraft.selectedAddonIds);
+  const [selectedModifierCategoryIds, setSelectedModifierCategoryIds] = useState<string[]>(
+    baseDraft.selectedModifierCategoryIds || []
+  );
   const [sizes, setSizes] = useState<ProductSize[]>(baseDraft.sizes);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -81,6 +84,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       tagInput,
       allergenInput,
       selectedAddonIds,
+      selectedModifierCategoryIds,
       sizes,
     }),
     [
@@ -96,6 +100,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       tagInput,
       allergenInput,
       selectedAddonIds,
+      selectedModifierCategoryIds,
       sizes,
     ]
   );
@@ -112,7 +117,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     const switchedProduct = isOpen && prevProductIdRef.current !== productToEdit?.id;
 
     if (wasClosed || switchedProduct) {
-      const freshDraft = createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee');
+      const freshDraft = createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee', modifierCategories);
       setBaseDraft(freshDraft);
       setName(freshDraft.name);
       setCategory(freshDraft.category);
@@ -126,6 +131,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       setTagInput(freshDraft.tagInput);
       setAllergenInput(freshDraft.allergenInput);
       setSelectedAddonIds(freshDraft.selectedAddonIds);
+      setSelectedModifierCategoryIds(freshDraft.selectedModifierCategoryIds);
       setSizes(freshDraft.sizes);
     }
 
@@ -140,7 +146,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     if (!isOpen) return;
 
     if (!hasChanges) {
-      const freshDraft = createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee');
+      const freshDraft = createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee', modifierCategories);
       setBaseDraft(freshDraft);
       setName(freshDraft.name);
       setCategory(freshDraft.category);
@@ -154,6 +160,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       setTagInput(freshDraft.tagInput);
       setAllergenInput(freshDraft.allergenInput);
       setSelectedAddonIds(freshDraft.selectedAddonIds);
+      setSelectedModifierCategoryIds(freshDraft.selectedModifierCategoryIds);
       setSizes(freshDraft.sizes);
     }
   }, [productToEdit, categoriesList, hasChanges, isOpen]);
@@ -432,6 +439,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       calories: Number(calories) || 0,
       sizes: temperature === 'N/A' ? [] : sizes,
       addons: selectedAddonIds,
+      modifierCategoryIds: selectedModifierCategoryIds,
       tags: tags.length > 0 ? tags : ['Handcrafted'],
       allergens: allergens.length > 0 ? allergens : undefined,
     };
@@ -892,7 +900,115 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             </div>
           )}
 
-          {/* Section 5: Applicable Add-ons & Modifiers Management */}
+          {/* Section 5A: Modifier Groups Assignment (Super Admin Authority) */}
+          <div className="p-3.5 bg-[#f9f2f0] rounded-2xl border border-[#e8e1df] space-y-3">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-[#26170c] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-[#5e604d]">dashboard_customize</span>
+                    MODIFIER GROUPS ({selectedModifierCategoryIds.length} of {modifierCategories.length} active)
+                  </label>
+                </div>
+                <p className="text-[11px] text-[#81756e]">
+                  Super Admin authority: Enable or disable modifier groups for this product on the customer menu.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setSelectedModifierCategoryIds(modifierCategories.map((c) => c.id))}
+                  className="px-2 py-1 text-[11px] font-semibold text-[#55433a] hover:bg-[#eae3e0] border border-[#d2c4bc] rounded-md transition-colors cursor-pointer"
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedModifierCategoryIds([])}
+                  className="px-2 py-1 text-[11px] font-semibold text-[#ba1a1a] hover:bg-[#ffdad6] border border-[#ffdad6] rounded-md transition-colors cursor-pointer"
+                >
+                  Clear All
+                </button>
+                {onSaveModifierCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setIsModCatModalOpen(true)}
+                    className="px-2 py-1 bg-white hover:bg-[#eee7e4] text-[#26170c] border border-[#d2c4bc] text-[11px] font-bold rounded-md transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px] text-[#5e604d]">category</span>
+                    Manage Groups
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Modifier Groups Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {modifierCategories.map((mc) => {
+                const isEnabled = selectedModifierCategoryIds.includes(mc.id);
+                return (
+                  <div
+                    key={mc.id}
+                    onClick={() => {
+                      setSelectedModifierCategoryIds((prev) =>
+                        prev.includes(mc.id) ? prev.filter((id) => id !== mc.id) : [...prev, mc.id]
+                      );
+                    }}
+                    className={`p-2.5 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between gap-2 ${
+                      isEnabled
+                        ? 'bg-white border-[#725c00] shadow-xs ring-1 ring-[#725c00]/20'
+                        : 'bg-[#f4eeeb] border-[#e2d9d6] opacity-75 hover:opacity-100 hover:bg-[#faf5f3]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`modcat-chk-${mc.id}`}
+                          checked={isEnabled}
+                          onChange={() => {}} // Handled by container onClick
+                          className="w-4 h-4 text-[#725c00] rounded focus:ring-[#725c00] border-[#d2c4bc] cursor-pointer"
+                        />
+                        <span className={`text-xs font-bold ${isEnabled ? 'text-[#26170c]' : 'text-[#70645e]'}`}>
+                          {mc.name}
+                        </span>
+                      </div>
+                      <span
+                        className={`px-1.5 py-0.5 text-[9px] font-bold rounded uppercase ${
+                          isEnabled ? 'bg-[#725c00] text-white' : 'bg-[#e2d9d6] text-[#70645e]'
+                        }`}
+                      >
+                        {isEnabled ? 'ENABLED' : 'DISABLED'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                      <span
+                        className={`px-1.5 py-0.5 rounded font-medium ${
+                          mc.itemType === 'modifier'
+                            ? 'bg-[#ffeed1] text-[#785a00]'
+                            : 'bg-[#e4dedb] text-[#55433a]'
+                        }`}
+                      >
+                        {mc.itemType === 'modifier' ? '⚡ Modifier' : '➕ Add-on'}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded font-medium bg-[#f0e9e6] text-[#63554e]">
+                        {mc.selectionType === 'single' ? 'Single Select' : 'Multi Select'}
+                      </span>
+                      {mc.required && (
+                        <span className="px-1.5 py-0.5 rounded font-medium bg-[#ffdad6] text-[#ba1a1a]">
+                          Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section 5B: Applicable Add-ons & Modifiers Management */}
           <div className="p-3.5 bg-[#f9f2f0] rounded-2xl border border-[#e8e1df] space-y-3">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
               <div>

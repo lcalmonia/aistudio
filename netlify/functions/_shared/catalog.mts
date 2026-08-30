@@ -29,6 +29,7 @@ export interface MenuItem {
   temperature: ProductTemperature;
   sizes?: ProductSize[];
   addons?: string[];
+  modifierCategoryIds?: string[];
   allergens?: string[];
   calories?: number;
   createdAt?: string;
@@ -150,6 +151,7 @@ export interface MenuItemRow {
   temperature: ProductTemperature;
   sizes: unknown;
   add_on_ids: string[] | null;
+  modifier_category_ids?: string[] | null;
   allergens: string[] | null;
   calories: number | null;
   created_at: string | Date;
@@ -265,6 +267,7 @@ export function mapMenuItemRecord(row: MenuItemRow): MenuItem {
     temperature: row.temperature || 'Hot',
     sizes: parsedSizes && parsedSizes.length > 0 ? parsedSizes : undefined,
     addons: Array.isArray(row.add_on_ids) ? row.add_on_ids : [],
+    modifierCategoryIds: Array.isArray(row.modifier_category_ids) ? row.modifier_category_ids : undefined,
     allergens: Array.isArray(row.allergens) ? row.allergens : [],
     calories: row.calories != null ? Number(row.calories) : undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
@@ -603,6 +606,7 @@ export async function insertMenuItemToDatabase(item: Partial<MenuItem>): Promise
   const temperature = item.temperature || 'Hot';
   const sizesJson = item.sizes && Array.isArray(item.sizes) ? JSON.stringify(item.sizes) : null;
   const addons = Array.isArray(item.addons) ? item.addons : [];
+  const modifierCategoryIds = Array.isArray(item.modifierCategoryIds) ? item.modifierCategoryIds : [];
   const allergens = Array.isArray(item.allergens) ? item.allergens : [];
   const calories = item.calories != null ? Math.max(0, Math.floor(Number(item.calories) || 0)) : null;
   const id = item.id || `menu-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
@@ -622,10 +626,10 @@ export async function insertMenuItemToDatabase(item: Partial<MenuItem>): Promise
     const result = await client.query(
       `INSERT INTO menu_items (
         id, name, category, price, image, description, tags, popular, available,
-        temperature, sizes, add_on_ids, allergens, calories, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, NOW(), NOW())
+        temperature, sizes, add_on_ids, modifier_category_ids, allergens, calories, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, $15, NOW(), NOW())
       RETURNING *`,
-      [id, name, category, price, image, description, tags, popular, available, temperature, sizesJson, addons, allergens, calories]
+      [id, name, category, price, image, description, tags, popular, available, temperature, sizesJson, addons, modifierCategoryIds, allergens, calories]
     );
     await client.query('COMMIT');
     return mapMenuItemRecord(result.rows[0]);
@@ -652,6 +656,7 @@ export async function updateMenuItemInDatabase(id: string, updates: Partial<Menu
   const temperature = updates.temperature !== undefined ? updates.temperature : current.temperature;
   const sizesJson = updates.sizes !== undefined ? (Array.isArray(updates.sizes) ? JSON.stringify(updates.sizes) : null) : (current.sizes ? JSON.stringify(current.sizes) : null);
   const addons = updates.addons !== undefined ? (Array.isArray(updates.addons) ? updates.addons : []) : (current.addons || []);
+  const modifierCategoryIds = updates.modifierCategoryIds !== undefined ? (Array.isArray(updates.modifierCategoryIds) ? updates.modifierCategoryIds : []) : (current.modifierCategoryIds || []);
   const allergens = updates.allergens !== undefined ? (Array.isArray(updates.allergens) ? updates.allergens : []) : (current.allergens || []);
   const calories = updates.calories !== undefined ? (updates.calories != null ? Math.max(0, Math.floor(Number(updates.calories) || 0)) : null) : (current.calories != null ? current.calories : null);
 
@@ -671,10 +676,10 @@ export async function updateMenuItemInDatabase(id: string, updates: Partial<Menu
       `UPDATE menu_items SET
         name = $1, category = $2, price = $3, image = $4, description = $5,
         tags = $6, popular = $7, available = $8, temperature = $9, sizes = $10::jsonb,
-        add_on_ids = $11, allergens = $12, calories = $13, updated_at = NOW()
-       WHERE id = $14
+        add_on_ids = $11, modifier_category_ids = $12, allergens = $13, calories = $14, updated_at = NOW()
+       WHERE id = $15
        RETURNING *`,
-      [name, category, price, image, description, tags, popular, available, temperature, sizesJson, addons, allergens, calories, id]
+      [name, category, price, image, description, tags, popular, available, temperature, sizesJson, addons, modifierCategoryIds, allergens, calories, id]
     );
     await client.query('COMMIT');
     return mapMenuItemRecord(result.rows[0]);

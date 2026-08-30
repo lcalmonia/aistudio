@@ -122,8 +122,11 @@ export interface MenuItem {
   temperature: ProductTemperature;
   sizes?: ProductSize[];
   addons?: string[]; // IDs of applicable add-ons
+  modifierCategoryIds?: string[]; // IDs of enabled modifier categories for this product
   allergens?: string[];
   calories?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface OrderItem {

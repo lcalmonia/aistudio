@@ -129,18 +129,52 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
     }
   }, [selectedTemperature, availableSizes, selectedSize]);
 
-  // Check if beverage categories support sweetness/ice
+  // Check if beverage categories or modifier categories support sweetness/ice
   const isBeverage =
     Boolean(product) &&
     product!.temperature !== 'N/A' &&
     !['Pasta', 'Pastries', 'Cakes on Tub', 'Rice Meals', 'Pika-Pika', 'Cakes'].includes(product!.category);
   const isColdDrink = selectedTemperature === 'Iced';
 
+  const isTemperatureOptionEnabled =
+    product?.temperature === 'Both' &&
+    (!Array.isArray(product.modifierCategoryIds) ||
+      product.modifierCategoryIds.some(
+        (id) => id === 'modcat-temp' || id === 'modcat-temperature' || id.toLowerCase() === 'temperature'
+      ));
+
+  const isSweetnessEnabled = Array.isArray(product?.modifierCategoryIds)
+    ? product.modifierCategoryIds.some(
+        (id) => id === 'modcat-sweetness' || id.toLowerCase().includes('sweetness')
+      )
+    : isBeverage;
+
+  const isIceEnabled = Array.isArray(product?.modifierCategoryIds)
+    ? isColdDrink &&
+      product.modifierCategoryIds.some(
+        (id) => id === 'modcat-ice' || id.toLowerCase().includes('ice')
+      )
+    : isBeverage && isColdDrink;
+
   // Filter applicable add-ons and modifiers for this product and temperature
   const relevantAddons = useMemo(() => {
     if (!product) return [];
     return safeAddonsList.filter((addon) => {
       if (!addon || !addon.available) return false;
+
+      // Check product-level assigned modifier categories if explicitly configured
+      if (Array.isArray(product.modifierCategoryIds)) {
+        const catConfig = safeCategories.find(
+          (c) => c.name.toLowerCase() === addon.category.toLowerCase()
+        );
+        const matchesCategory = product.modifierCategoryIds.some(
+          (id) =>
+            id === addon.category ||
+            id.toLowerCase() === addon.category.toLowerCase() ||
+            (catConfig && id === catConfig.id)
+        );
+        if (!matchesCategory) return false;
+      }
 
       // Product assigned addons whitelist check
       if (product.addons && product.addons.length > 0) {
@@ -161,7 +195,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
 
       return true;
     });
-  }, [safeAddonsList, product, selectedTemperature]);
+  }, [safeAddonsList, product, selectedTemperature, safeCategories]);
 
   // Group items by category and separate Modifiers from Add-ons
   const { modifierGroups, addonItems } = useMemo(() => {
@@ -349,8 +383,8 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
             </div>
           )}
 
-          {/* Temperature Choice (If Both) */}
-          {product.temperature === 'Both' && (
+          {/* Temperature Choice (If Both and enabled) */}
+          {isTemperatureOptionEnabled && (
             <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea]">
               <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f] mb-2">
                 Temperature Option <span className="text-[#ba1a1a]">*</span>
@@ -425,8 +459,8 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
             </div>
           )}
 
-          {/* Sweetness Level (Beverages) */}
-          {isBeverage && (
+          {/* Sweetness Level */}
+          {isSweetnessEnabled && (
             <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea]">
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
@@ -456,8 +490,8 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
             </div>
           )}
 
-          {/* Ice Level (Cold Beverages) */}
-          {isBeverage && isColdDrink && (
+          {/* Ice Level */}
+          {isIceEnabled && (
             <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea]">
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#4f453f]">
