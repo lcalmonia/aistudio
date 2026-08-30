@@ -1,12 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MenuItem, ProductAddon, ProductSize, ProductTemperature, ModifierCategory, ModifierCategoryType } from '../types';
 import { ModifierCategoryModal } from './ModifierCategoryModal';
+import {
+  ProductFormDraft,
+  createInitialProductDraft,
+  isProductDraftDirty,
+  PRESET_CAFE_PHOTOS,
+} from '../utils/productDraft';
 
 interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: MenuItem) => void;
-  onDelete?: (productId: string) => void;
+  onSave: (product: MenuItem) => Promise<void> | void;
+  onDelete?: (productId: string) => Promise<void> | void;
   productToEdit: MenuItem | null;
   addonsList: ProductAddon[];
   modifierCategories?: ModifierCategory[];
@@ -19,57 +25,6 @@ interface EditProductModalProps {
   onSaveCategory?: (newCategory: string, oldCategory?: string) => void;
   onDeleteCategory?: (category: string) => void;
 }
-
-const PRESET_CAFE_PHOTOS = [
-  {
-    name: 'Spanish Latte Art',
-    url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCEPK9an39rFEkfnp4LRaMqlPguV-s_RqdDV3FcNMZJuxAA2NG3s4Vj1YCqZGozzqYBUaORRDaOp1QySWD3zavJSY4WfpCoG_tOmX6LnCt7kbG-aSamCO4-gV_vKuAsnEqCQcBJQV1oJXYCXqiAz0xdScWn3LHH2FL9FY8Os11FNYgSA8OYNMaTpGUSs6lVsJ4RLjDLzmTHawjWGN39KIROIBlVnGpeNKU6y-nW8S2RGne8Y87fgfSG',
-  },
-  {
-    name: 'Cold Brew / Mocktail Cascade',
-    url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmh1VJlNrtaKb9bbtKPTLK4IphKvCgpGc1kJMjlcZ4qzTW0_7t-9hcffyNkhWQyBKjbnMBs1uepxo43ktt9u0jFkTPpZV84m34YO0G4HFZsoIUlmJatcfLBJQlG2nxudO94hIvWms1qlw4R6EluIGUP6WzrHLppvfZVDk0dW2mc3j0niFNR7upTXtEOGW0BX5aRUxW_VRi9nckzxIcfBVxhPHMIMZBglRRwaxwPqZM7RTlWgYVfsnJ',
-  },
-  {
-    name: 'Ube Leche Flan Tub Cake',
-    url: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Truffle Carbonara Pasta',
-    url: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Beef Tapa Rice Meal',
-    url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Ceremonial Matcha Green',
-    url: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Avocado Sourdough Toast',
-    url: 'https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Sea Salt Dark Brownie',
-    url: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Golden Butter Croissant',
-    url: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Strawberry Hibiscus Cooler',
-    url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Mango Frappuccino Over Cream',
-    url: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    name: 'Cheesy Nacho & Pika Platter',
-    url: 'https://images.unsplash.com/photo-1513456852971-30c0b8199d4d?auto=format&fit=crop&w=600&q=80',
-  },
-];
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
   isOpen,
@@ -90,71 +45,118 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 }) => {
   const isEditing = Boolean(productToEdit);
 
-  // Form states
-  const [name, setName] = useState(productToEdit?.name || '');
-  const [category, setCategory] = useState<string>(productToEdit?.category || categoriesList[0] || 'Coffee');
-  const [price, setPrice] = useState<number>(productToEdit?.price ?? 145);
-  const [description, setDescription] = useState(productToEdit?.description || '');
-  const [image, setImage] = useState(productToEdit?.image || PRESET_CAFE_PHOTOS[0].url);
-  const [temperature, setTemperature] = useState<ProductTemperature>(productToEdit?.temperature || 'Both');
-  const [popular, setPopular] = useState<boolean>(productToEdit?.popular ?? false);
-  const [available, setAvailable] = useState<boolean>(productToEdit?.available ?? true);
-  const [calories, setCalories] = useState<number>(productToEdit?.calories ?? 180);
-  const [tagInput, setTagInput] = useState(productToEdit?.tags?.join(', ') || 'Best Seller');
-  const [allergenInput, setAllergenInput] = useState(productToEdit?.allergens?.join(', ') || '');
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(
-    productToEdit?.addons || ['addon-oat', 'addon-shot', 'addon-vanilla-cream']
+  // Initial base snapshot for clean vs. dirty draft detection
+  const [baseDraft, setBaseDraft] = useState<ProductFormDraft>(() =>
+    createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee')
   );
 
-  // Sizes state (default in Philippine Peso deltas)
-  const [sizes, setSizes] = useState<ProductSize[]>(
-    productToEdit?.sizes || [
-      { name: 'Regular', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
-      { name: 'Large', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
+  // Active user form draft states
+  const [name, setName] = useState<string>(baseDraft.name);
+  const [category, setCategory] = useState<string>(baseDraft.category);
+  const [price, setPrice] = useState<number>(baseDraft.price);
+  const [description, setDescription] = useState<string>(baseDraft.description);
+  const [image, setImage] = useState<string>(baseDraft.image);
+  const [temperature, setTemperature] = useState<ProductTemperature>(baseDraft.temperature);
+  const [popular, setPopular] = useState<boolean>(baseDraft.popular);
+  const [available, setAvailable] = useState<boolean>(baseDraft.available);
+  const [calories, setCalories] = useState<number>(baseDraft.calories);
+  const [tagInput, setTagInput] = useState<string>(baseDraft.tagInput);
+  const [allergenInput, setAllergenInput] = useState<string>(baseDraft.allergenInput);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(baseDraft.selectedAddonIds);
+  const [sizes, setSizes] = useState<ProductSize[]>(baseDraft.sizes);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Current active draft representation
+  const currentDraft: ProductFormDraft = useMemo(
+    () => ({
+      name,
+      category,
+      price,
+      description,
+      image,
+      temperature,
+      popular,
+      available,
+      calories,
+      tagInput,
+      allergenInput,
+      selectedAddonIds,
+      sizes,
+    }),
+    [
+      name,
+      category,
+      price,
+      description,
+      image,
+      temperature,
+      popular,
+      available,
+      calories,
+      tagInput,
+      allergenInput,
+      selectedAddonIds,
+      sizes,
     ]
   );
 
+  // Check if any fields were actually modified compared to saved base draft
+  const hasChanges = isProductDraftDirty(currentDraft, baseDraft);
+
+  const prevIsOpenRef = useRef(isOpen);
+  const prevProductIdRef = useRef<string | undefined>(productToEdit?.id);
+
+  // When modal is newly opened or switched to a different product ID:
   useEffect(() => {
-    if (productToEdit) {
-      setName(productToEdit.name || '');
-      setCategory(productToEdit.category || categoriesList[0] || 'Coffee');
-      setPrice(productToEdit.price ?? 145);
-      setDescription(productToEdit.description || '');
-      setImage(productToEdit.image || PRESET_CAFE_PHOTOS[0].url);
-      setTemperature(productToEdit.temperature || 'Both');
-      setPopular(productToEdit.popular ?? false);
-      setAvailable(productToEdit.available ?? true);
-      setCalories(productToEdit.calories ?? 180);
-      setTagInput(productToEdit.tags?.join(', ') || '');
-      setAllergenInput(productToEdit.allergens?.join(', ') || '');
-      setSelectedAddonIds(productToEdit.addons || ['addon-oat', 'addon-shot', 'addon-vanilla-cream']);
-      setSizes(
-        productToEdit.sizes && productToEdit.sizes.length > 0
-          ? productToEdit.sizes
-          : [
-              { name: 'Regular', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
-              { name: 'Large', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
-            ]
-      );
-    } else {
-      setName('');
-      setCategory(categoriesList[0] || 'Coffee');
-      setPrice(145);
-      setDescription('');
-      setImage(PRESET_CAFE_PHOTOS[0].url);
-      setTemperature('Both');
-      setPopular(false);
-      setAvailable(true);
-      setCalories(180);
-      setTagInput('Best Seller');
-      setAllergenInput('');
-      setSelectedAddonIds(['addon-oat', 'addon-shot', 'addon-vanilla-cream']);
-      setSizes([
-        { name: 'Regular', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
-        { name: 'Large', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
-      ]);
+    const wasClosed = !prevIsOpenRef.current && isOpen;
+    const switchedProduct = isOpen && prevProductIdRef.current !== productToEdit?.id;
+
+    if (wasClosed || switchedProduct) {
+      const freshDraft = createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee');
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setCategory(freshDraft.category);
+      setPrice(freshDraft.price);
+      setDescription(freshDraft.description);
+      setImage(freshDraft.image);
+      setTemperature(freshDraft.temperature);
+      setPopular(freshDraft.popular);
+      setAvailable(freshDraft.available);
+      setCalories(freshDraft.calories);
+      setTagInput(freshDraft.tagInput);
+      setAllergenInput(freshDraft.allergenInput);
+      setSelectedAddonIds(freshDraft.selectedAddonIds);
+      setSizes(freshDraft.sizes);
     }
-  }, [productToEdit, isOpen, categoriesList]);
+
+    prevIsOpenRef.current = isOpen;
+    prevProductIdRef.current = productToEdit?.id;
+  }, [isOpen, productToEdit?.id, categoriesList]);
+
+  // Live cross-device & background synchronization:
+  // If the form is clean (hasChanges === false), safely update baseDraft and form fields from latest server props.
+  // If the user has active unsaved edits (hasChanges === true), do NOT touch form fields (draft protection).
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!hasChanges) {
+      const freshDraft = createInitialProductDraft(productToEdit, categoriesList[0] || 'Coffee');
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setCategory(freshDraft.category);
+      setPrice(freshDraft.price);
+      setDescription(freshDraft.description);
+      setImage(freshDraft.image);
+      setTemperature(freshDraft.temperature);
+      setPopular(freshDraft.popular);
+      setAvailable(freshDraft.available);
+      setCalories(freshDraft.calories);
+      setTagInput(freshDraft.tagInput);
+      setAllergenInput(freshDraft.allergenInput);
+      setSelectedAddonIds(freshDraft.selectedAddonIds);
+      setSizes(freshDraft.sizes);
+    }
+  }, [productToEdit, categoriesList, hasChanges, isOpen]);
 
   // Category Manager & Inline Creator state
   const [isAddingCategoryInline, setIsAddingCategoryInline] = useState(false);
@@ -403,9 +405,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSaving) return;
 
     const tags = tagInput
       .split(',')
@@ -434,8 +436,18 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       allergens: allergens.length > 0 ? allergens : undefined,
     };
 
-    onSave(productData);
-    onClose();
+    try {
+      setIsSaving(true);
+      await onSave(productData);
+      // Upon successful save, update baseDraft to clear dirty state
+      setBaseDraft({ ...currentDraft });
+      onClose();
+    } catch (err) {
+      console.error('[EditProductModal] Error saving product:', err);
+      // Form draft remains intact so user can retry
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredAddonsList = useMemo(() => {
@@ -1209,11 +1221,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             </button>
             <button
               type="button"
+              disabled={isSaving || !name.trim()}
               onClick={handleSubmit}
-              className="px-5 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-full transition-all active:scale-95 shadow-sm flex items-center gap-1.5"
+              className="px-5 py-2 bg-[#26170c] hover:bg-[#3d2b1f] disabled:bg-[#81756e] disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-all active:scale-95 shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">save</span>
-              {isEditing ? 'Save Changes' : 'Publish Product to Menu'}
+              {isSaving ? (
+                <>
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[16px]">save</span>
+                  {isEditing ? 'Save Changes' : 'Publish Product to Menu'}
+                </>
+              )}
             </button>
           </div>
         </div>

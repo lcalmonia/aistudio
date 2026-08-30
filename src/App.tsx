@@ -589,6 +589,7 @@ export default function App() {
     } catch (err: any) {
       console.error('[Product] Save error:', err);
       showNotification(`⚠️ Failed to save product: ${err?.message || 'Server error'}`);
+      throw err;
     }
   };
 
