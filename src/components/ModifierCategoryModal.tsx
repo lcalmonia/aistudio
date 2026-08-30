@@ -1,12 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ModifierCategory, ModifierCategoryType } from '../types';
+import {
+  ModifierCategoryDraft,
+  createInitialModifierCategoryDraft,
+  isModifierCategoryDraftDirty,
+} from '../utils/addonDraft';
 
 interface ModifierCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (category: ModifierCategory) => void;
-  onDelete?: (categoryId: string) => void;
-  categoryToEdit: ModifierCategory | null;
+  onSave?: (category: ModifierCategory) => Promise<void> | void;
+  onSaveCategory?: (category: ModifierCategory) => Promise<void> | void;
+  onDelete?: (categoryId: string) => Promise<void> | void;
+  onDeleteCategory?: (categoryId: string) => Promise<void> | void;
+  categoryToEdit?: ModifierCategory | null;
+  categories?: ModifierCategory[];
   productCategories?: string[];
 }
 
@@ -14,40 +22,95 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onSaveCategory,
   onDelete,
-  categoryToEdit,
+  onDeleteCategory,
+  categoryToEdit = null,
   productCategories = [],
 }) => {
   const isEditing = Boolean(categoryToEdit);
 
-  const [name, setName] = useState(categoryToEdit?.name || '');
-  const [itemType, setItemType] = useState<ModifierCategoryType>(categoryToEdit?.itemType || 'modifier');
-  const [required, setRequired] = useState<boolean>(categoryToEdit?.required ?? false);
-  const [selectionType, setSelectionType] = useState<'single' | 'multiple'>(categoryToEdit?.selectionType || 'single');
-  const [applicableTemperature, setApplicableTemperature] = useState<'Hot' | 'Cold' | 'Both' | 'All'>(
-    categoryToEdit?.applicableTemperature || 'Both'
-  );
-  const [selectedProductCategories, setSelectedProductCategories] = useState<string[]>(
-    categoryToEdit?.applicableCategories || []
+  // Initial base snapshot for clean vs. dirty draft detection
+  const [baseDraft, setBaseDraft] = useState<ModifierCategoryDraft>(() =>
+    createInitialModifierCategoryDraft(categoryToEdit)
   );
 
+  // Active form states
+  const [name, setName] = useState<string>(baseDraft.name);
+  const [itemType, setItemType] = useState<ModifierCategoryType>(baseDraft.itemType);
+  const [required, setRequired] = useState<boolean>(baseDraft.required);
+  const [selectionType, setSelectionType] = useState<'single' | 'multiple'>(baseDraft.selectionType);
+  const [applicableTemperature, setApplicableTemperature] = useState<'Hot' | 'Cold' | 'Both' | 'All'>(
+    baseDraft.applicableTemperature
+  );
+  const [selectedProductCategories, setSelectedProductCategories] = useState<string[]>(
+    baseDraft.selectedProductCategories
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Current active draft representation
+  const currentDraft: ModifierCategoryDraft = useMemo(
+    () => ({
+      name,
+      itemType,
+      required,
+      selectionType,
+      applicableTemperature,
+      selectedProductCategories,
+    }),
+    [
+      name,
+      itemType,
+      required,
+      selectionType,
+      applicableTemperature,
+      selectedProductCategories,
+    ]
+  );
+
+  // Check if any fields were actually modified compared to saved base draft
+  const hasChanges = isModifierCategoryDraftDirty(currentDraft, baseDraft);
+
+  const prevIsOpenRef = useRef(isOpen);
+  const prevCategoryIdRef = useRef<string | undefined>(categoryToEdit?.id);
+
+  // When modal is newly opened or switched to a different category ID:
   useEffect(() => {
-    if (categoryToEdit) {
-      setName(categoryToEdit.name || '');
-      setItemType(categoryToEdit.itemType || 'modifier');
-      setRequired(categoryToEdit.required ?? false);
-      setSelectionType(categoryToEdit.selectionType || 'single');
-      setApplicableTemperature(categoryToEdit.applicableTemperature || 'Both');
-      setSelectedProductCategories(categoryToEdit.applicableCategories || []);
-    } else {
-      setName('');
-      setItemType('modifier');
-      setRequired(false);
-      setSelectionType('single');
-      setApplicableTemperature('Both');
-      setSelectedProductCategories([]);
+    const wasClosed = !prevIsOpenRef.current && isOpen;
+    const switchedCategory = isOpen && prevCategoryIdRef.current !== categoryToEdit?.id;
+
+    if (wasClosed || switchedCategory) {
+      const freshDraft = createInitialModifierCategoryDraft(categoryToEdit);
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setItemType(freshDraft.itemType);
+      setRequired(freshDraft.required);
+      setSelectionType(freshDraft.selectionType);
+      setApplicableTemperature(freshDraft.applicableTemperature);
+      setSelectedProductCategories(freshDraft.selectedProductCategories);
     }
-  }, [categoryToEdit, isOpen]);
+
+    prevIsOpenRef.current = isOpen;
+    prevCategoryIdRef.current = categoryToEdit?.id;
+  }, [isOpen, categoryToEdit?.id]);
+
+  // Live cross-device & background synchronization:
+  // If the form is clean (hasChanges === false), safely update baseDraft and form fields from latest server props.
+  // If the user has active unsaved edits (hasChanges === true), do NOT touch form fields (draft protection).
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!hasChanges) {
+      const freshDraft = createInitialModifierCategoryDraft(categoryToEdit);
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setItemType(freshDraft.itemType);
+      setRequired(freshDraft.required);
+      setSelectionType(freshDraft.selectionType);
+      setApplicableTemperature(freshDraft.applicableTemperature);
+      setSelectedProductCategories(freshDraft.selectedProductCategories);
+    }
+  }, [categoryToEdit, hasChanges, isOpen]);
 
   const toggleProductCategory = (cat: string) => {
     setSelectedProductCategories((prev) =>
@@ -63,9 +126,9 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSaving) return;
 
     const data: ModifierCategory = {
       id: categoryToEdit?.id || `modcat-${Date.now()}`,
@@ -79,8 +142,32 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
       sortOrder: categoryToEdit?.sortOrder ?? 0,
     };
 
-    onSave(data);
-    onClose();
+    try {
+      setIsSaving(true);
+      const saveHandler = onSave || onSaveCategory;
+      if (saveHandler) {
+        await saveHandler(data);
+      }
+      // Upon successful save, update baseDraft to clear dirty state
+      setBaseDraft({ ...currentDraft });
+      onClose();
+    } catch (err) {
+      console.error('[ModifierCategoryModal] Error saving modifier category:', err);
+      // Form draft remains intact so user can retry
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!categoryToEdit) return;
+    if (confirm(`Delete modifier category "${categoryToEdit.name}"?`)) {
+      const deleteHandler = onDelete || onDeleteCategory;
+      if (deleteHandler) {
+        await deleteHandler(categoryToEdit.id);
+      }
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
@@ -281,16 +368,11 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
 
           {/* Action Footer */}
           <div className="pt-3 border-t border-[#e8e1df] flex justify-between items-center">
-            {isEditing && onDelete ? (
+            {isEditing && (onDelete || onDeleteCategory) ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`Delete modifier category "${categoryToEdit.name}"?`)) {
-                    onDelete(categoryToEdit.id);
-                    onClose();
-                  }
-                }}
-                className="px-3.5 py-1.5 text-xs font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-full transition-colors"
+                onClick={handleDelete}
+                className="px-3.5 py-1.5 text-xs font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-full transition-colors cursor-pointer"
               >
                 Delete Category
               </button>
@@ -300,15 +382,26 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-1.5 text-xs text-[#4f453f] hover:bg-[#e8e1df] rounded-full transition-colors"
+                className="px-4 py-1.5 text-xs text-[#4f453f] hover:bg-[#e8e1df] rounded-full transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-full transition-colors shadow-2xs"
+                disabled={isSaving || !name.trim()}
+                className="px-5 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] disabled:bg-[#81756e] disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-all active:scale-95 shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
-                {isEditing ? 'Save Changes' : 'Create Category'}
+                {isSaving ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[15px]">save</span>
+                    {isEditing ? 'Save Changes' : 'Create Category'}
+                  </>
+                )}
               </button>
             </div>
           </div>

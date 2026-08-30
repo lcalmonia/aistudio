@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ProductAddon, ModifierCategory, ModifierCategoryType } from '../types';
+import {
+  AddonFormDraft,
+  createInitialAddonDraft,
+  isAddonDraftDirty,
+} from '../utils/addonDraft';
 
 interface EditAddonModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (addon: ProductAddon) => void;
-  onDelete?: (addonId: string) => void;
+  onSave: (addon: ProductAddon) => Promise<void> | void;
+  onDelete?: (addonId: string) => Promise<void> | void;
   addonToEdit: ProductAddon | null;
   modifierCategories?: ModifierCategory[];
   productCategories?: string[];
@@ -22,53 +27,110 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
 }) => {
   const isEditing = Boolean(addonToEdit);
 
-  const [name, setName] = useState(addonToEdit?.name || '');
-  const [category, setCategory] = useState<string>(addonToEdit?.category || (modifierCategories[0]?.name || 'Syrup & Sweetener'));
-  const [customCategory, setCustomCategory] = useState<string>('');
-  const [isCustomCategory, setIsCustomCategory] = useState<boolean>(false);
-  const [itemType, setItemType] = useState<ModifierCategoryType>(addonToEdit?.itemType || 'addon');
-  const [price, setPrice] = useState<number>(addonToEdit?.price ?? 25.00);
-  const [applicableTemperature, setApplicableTemperature] = useState<ProductAddon['applicableTemperature']>(
-    addonToEdit?.applicableTemperature || 'Both'
+  // Initial base snapshot for clean vs. dirty draft detection
+  const [baseDraft, setBaseDraft] = useState<AddonFormDraft>(() =>
+    createInitialAddonDraft(addonToEdit, modifierCategories)
   );
-  const [available, setAvailable] = useState<boolean>(addonToEdit?.available ?? true);
-  const [required, setRequired] = useState<boolean>(addonToEdit?.required ?? false);
-  const [selectionType, setSelectionType] = useState<'single' | 'multiple'>(addonToEdit?.selectionType || 'single');
-  const [applicableCategories, setApplicableCategories] = useState<string[]>(addonToEdit?.applicableCategories || []);
 
+  // Active form states
+  const [name, setName] = useState<string>(baseDraft.name);
+  const [category, setCategory] = useState<string>(baseDraft.category);
+  const [customCategory, setCustomCategory] = useState<string>(baseDraft.customCategory);
+  const [isCustomCategory, setIsCustomCategory] = useState<boolean>(baseDraft.isCustomCategory);
+  const [itemType, setItemType] = useState<ModifierCategoryType>(baseDraft.itemType);
+  const [price, setPrice] = useState<number>(baseDraft.price);
+  const [applicableTemperature, setApplicableTemperature] = useState<ProductAddon['applicableTemperature']>(
+    baseDraft.applicableTemperature
+  );
+  const [available, setAvailable] = useState<boolean>(baseDraft.available);
+  const [required, setRequired] = useState<boolean>(baseDraft.required);
+  const [selectionType, setSelectionType] = useState<'single' | 'multiple'>(baseDraft.selectionType);
+  const [applicableCategories, setApplicableCategories] = useState<string[]>(baseDraft.applicableCategories);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Current active draft representation
+  const currentDraft: AddonFormDraft = useMemo(
+    () => ({
+      name,
+      category,
+      customCategory,
+      isCustomCategory,
+      itemType,
+      price,
+      applicableTemperature,
+      available,
+      required,
+      selectionType,
+      applicableCategories,
+    }),
+    [
+      name,
+      category,
+      customCategory,
+      isCustomCategory,
+      itemType,
+      price,
+      applicableTemperature,
+      available,
+      required,
+      selectionType,
+      applicableCategories,
+    ]
+  );
+
+  // Check if any fields were actually modified compared to saved base draft
+  const hasChanges = isAddonDraftDirty(currentDraft, baseDraft);
+
+  const prevIsOpenRef = useRef(isOpen);
+  const prevAddonIdRef = useRef<string | undefined>(addonToEdit?.id);
+
+  // When modal is newly opened or switched to a different addon ID:
   useEffect(() => {
-    if (addonToEdit) {
-      setName(addonToEdit.name || '');
-      const existingInList = modifierCategories.some((mc) => mc.name.toLowerCase() === addonToEdit.category.toLowerCase());
-      if (existingInList || ['Milk', 'Shot', 'Syrup', 'Topping', 'Prep'].includes(addonToEdit.category)) {
-        setCategory(addonToEdit.category);
-        setIsCustomCategory(false);
-      } else {
-        setCategory('__custom__');
-        setCustomCategory(addonToEdit.category);
-        setIsCustomCategory(true);
-      }
-      setItemType(addonToEdit.itemType || 'addon');
-      setPrice(addonToEdit.price ?? 25.00);
-      setApplicableTemperature(addonToEdit.applicableTemperature || 'Both');
-      setAvailable(addonToEdit.available ?? true);
-      setRequired(addonToEdit.required ?? false);
-      setSelectionType(addonToEdit.selectionType || 'single');
-      setApplicableCategories(addonToEdit.applicableCategories || []);
-    } else {
-      setName('');
-      setCategory(modifierCategories[0]?.name || 'Syrup & Sweetener');
-      setIsCustomCategory(false);
-      setCustomCategory('');
-      setItemType('addon');
-      setPrice(25.00);
-      setApplicableTemperature('Both');
-      setAvailable(true);
-      setRequired(false);
-      setSelectionType('single');
-      setApplicableCategories([]);
+    const wasClosed = !prevIsOpenRef.current && isOpen;
+    const switchedAddon = isOpen && prevAddonIdRef.current !== addonToEdit?.id;
+
+    if (wasClosed || switchedAddon) {
+      const freshDraft = createInitialAddonDraft(addonToEdit, modifierCategories);
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setCategory(freshDraft.category);
+      setCustomCategory(freshDraft.customCategory);
+      setIsCustomCategory(freshDraft.isCustomCategory);
+      setItemType(freshDraft.itemType);
+      setPrice(freshDraft.price);
+      setApplicableTemperature(freshDraft.applicableTemperature);
+      setAvailable(freshDraft.available);
+      setRequired(freshDraft.required);
+      setSelectionType(freshDraft.selectionType);
+      setApplicableCategories(freshDraft.applicableCategories);
     }
-  }, [addonToEdit, isOpen, modifierCategories]);
+
+    prevIsOpenRef.current = isOpen;
+    prevAddonIdRef.current = addonToEdit?.id;
+  }, [isOpen, addonToEdit?.id, modifierCategories]);
+
+  // Live cross-device & background synchronization:
+  // If the form is clean (hasChanges === false), safely update baseDraft and form fields from latest server props.
+  // If the user has active unsaved edits (hasChanges === true), do NOT touch form fields (draft protection).
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!hasChanges) {
+      const freshDraft = createInitialAddonDraft(addonToEdit, modifierCategories);
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setCategory(freshDraft.category);
+      setCustomCategory(freshDraft.customCategory);
+      setIsCustomCategory(freshDraft.isCustomCategory);
+      setItemType(freshDraft.itemType);
+      setPrice(freshDraft.price);
+      setApplicableTemperature(freshDraft.applicableTemperature);
+      setAvailable(freshDraft.available);
+      setRequired(freshDraft.required);
+      setSelectionType(freshDraft.selectionType);
+      setApplicableCategories(freshDraft.applicableCategories);
+    }
+  }, [addonToEdit, modifierCategories, hasChanges, isOpen]);
 
   const toggleCategorySelection = (catName: string) => {
     setApplicableCategories((prev) =>
@@ -94,9 +156,9 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSaving) return;
 
     const resolvedCategory = isCustomCategory ? (customCategory.trim() || 'Custom') : category;
 
@@ -113,8 +175,18 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
       applicableCategories: applicableCategories.length > 0 ? applicableCategories : undefined,
     };
 
-    onSave(addon);
-    onClose();
+    try {
+      setIsSaving(true);
+      await onSave(addon);
+      // Upon successful save, update baseDraft to clear dirty state
+      setBaseDraft({ ...currentDraft });
+      onClose();
+    } catch (err) {
+      console.error('[EditAddonModal] Error saving addon:', err);
+      // Form draft remains intact so user can retry
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -353,9 +425,20 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-5 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-full transition-colors shadow-2xs"
+                disabled={isSaving || !name.trim()}
+                className="px-5 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] disabled:bg-[#81756e] disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-all active:scale-95 shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
-                {isEditing ? 'Save Changes' : 'Create Item'}
+                {isSaving ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[15px]">save</span>
+                    {isEditing ? 'Save Changes' : 'Create Item'}
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -697,6 +697,7 @@ export default function App() {
     } catch (err: any) {
       console.error('[Addon] Save error:', err);
       showNotification(`⚠️ Failed to save modifier: ${err?.message || 'Server error'}`);
+      throw err;
     }
   };
 
@@ -708,6 +709,7 @@ export default function App() {
     } catch (err: any) {
       console.error('[Addon] Delete error:', err);
       showNotification(`⚠️ Failed to delete modifier: ${err?.message || 'Server error'}`);
+      throw err;
     }
   };
 
@@ -738,6 +740,7 @@ export default function App() {
     } catch (err: any) {
       console.error('[ModifierCategory] Save error:', err);
       showNotification(`⚠️ Failed to save modifier category: ${err?.message || 'Server error'}`);
+      throw err;
     }
   };
 
@@ -749,6 +752,7 @@ export default function App() {
     } catch (err: any) {
       console.error('[ModifierCategory] Delete error:', err);
       showNotification(`⚠️ Failed to delete modifier category: ${err?.message || 'Server error'}`);
+      throw err;
     }
   };
 
