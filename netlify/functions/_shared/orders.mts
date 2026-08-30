@@ -184,6 +184,8 @@ export async function fetchOrdersFromDatabase(options: {
   orderId?: string;
   orderNumber?: string;
   status?: OrderStatus;
+  startDate?: string;
+  endDate?: string;
   limit?: number;
 } = {}): Promise<FormattedOrder[]> {
   const db = database();
@@ -213,8 +215,26 @@ export async function fetchOrdersFromDatabase(options: {
     values.push(options.status);
   }
 
+  if (options.startDate) {
+    conditions.push(`(
+      o.created_at >= $${paramIndex}::timestamptz 
+      OR (o.timestamp IS NOT NULL AND o.timestamp >= (EXTRACT(EPOCH FROM $${paramIndex}::timestamptz) * 1000)::bigint)
+    )`);
+    values.push(options.startDate);
+    paramIndex++;
+  }
+
+  if (options.endDate) {
+    conditions.push(`(
+      o.created_at <= $${paramIndex}::timestamptz 
+      OR (o.timestamp IS NOT NULL AND o.timestamp <= (EXTRACT(EPOCH FROM $${paramIndex}::timestamptz) * 1000)::bigint)
+    )`);
+    values.push(options.endDate);
+    paramIndex++;
+  }
+
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limitClause = options.limit ? `LIMIT ${Math.min(options.limit, 200)}` : 'LIMIT 200';
+  const limitClause = options.limit ? `LIMIT ${Math.min(options.limit, 10000)}` : 'LIMIT 200';
 
   const query = `
     SELECT 

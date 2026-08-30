@@ -37,6 +37,9 @@ export const orderService = {
     orderId?: string;
     orderNumber?: string;
     status?: OrderStatus;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
   } = {}): Promise<Order[]> {
     try {
       const params = new URLSearchParams();
@@ -44,14 +47,17 @@ export const orderService = {
       if (options.orderId) params.set('orderId', options.orderId);
       if (options.orderNumber) params.set('orderNumber', options.orderNumber);
       if (options.status) params.set('status', options.status);
+      if (options.startDate) params.set('startDate', options.startDate);
+      if (options.endDate) params.set('endDate', options.endDate);
+      if (options.limit) params.set('limit', options.limit.toString());
 
       const qs = params.toString();
       const url = `/api/orders${qs ? `?${qs}` : ''}`;
       const response = await api<{ orders: Order[] }>(url, { method: 'GET' });
 
       if (response && Array.isArray(response.orders)) {
-        // Sync local storage cache for offline reliability
-        if (!options.customerId && !options.orderId && !options.status) {
+        // Sync local storage cache for offline reliability only when querying standard unfiltered active set
+        if (!options.customerId && !options.orderId && !options.status && !options.startDate && !options.endDate) {
           storageAdapter.setOrders(response.orders);
         }
         return response.orders;
@@ -73,6 +79,18 @@ export const orderService = {
     }
     if (options.status) {
       local = local.filter((o) => o.status === options.status);
+    }
+    if (options.startDate) {
+      const startMs = new Date(options.startDate).getTime();
+      if (!isNaN(startMs)) {
+        local = local.filter((o) => o.timestamp >= startMs);
+      }
+    }
+    if (options.endDate) {
+      const endMs = new Date(options.endDate).getTime();
+      if (!isNaN(endMs)) {
+        local = local.filter((o) => o.timestamp <= endMs);
+      }
     }
     return local;
   },

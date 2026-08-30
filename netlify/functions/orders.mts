@@ -22,6 +22,8 @@ export default async function handler(request: Request): Promise<Response> {
       const orderId = url.searchParams.get('orderId') || url.searchParams.get('order_id') || url.searchParams.get('id') || undefined;
       const orderNumber = url.searchParams.get('orderNumber') || url.searchParams.get('order_number') || undefined;
       const statusParam = url.searchParams.get('status') || undefined;
+      const startDate = url.searchParams.get('startDate') || url.searchParams.get('start_date') || undefined;
+      const endDate = url.searchParams.get('endDate') || url.searchParams.get('end_date') || undefined;
       const limitParam = url.searchParams.get('limit');
       const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
@@ -30,6 +32,8 @@ export default async function handler(request: Request): Promise<Response> {
         orderId,
         orderNumber,
         status: statusParam as OrderStatus | undefined,
+        startDate,
+        endDate,
         limit,
       });
 

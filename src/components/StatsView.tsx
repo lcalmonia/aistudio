@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Order, MenuItem } from '../types';
 import { reportingService } from '../services/reportingService';
+import { orderService } from '../services/orderService';
+import {
+  StatsDateRangePreset,
+  computeDateRangeBoundaries,
+  formatLocalDateToInput,
+} from '../utils/dateRange';
 
 interface StatsViewProps {
   orders?: Order[];
@@ -9,31 +15,184 @@ interface StatsViewProps {
 }
 
 export const StatsView: React.FC<StatsViewProps> = ({
-  orders = [],
+  orders: propOrders = [],
   menuItems = [],
   dailyGoal = 100,
 }) => {
-  const summary = reportingService.calculateSalesSummary(orders);
-  const hourlyData = reportingService.calculateHourlyThroughput(orders);
-  const topProducts = reportingService.calculateTopSellingItems(orders, menuItems);
+  const [selectedPreset, setSelectedPreset] = useState<StatsDateRangePreset>('today');
+  const [customStart, setCustomStart] = useState<string>(() => formatLocalDateToInput(new Date()));
+  const [customEnd, setCustomEnd] = useState<string>(() => formatLocalDateToInput(new Date()));
+  const [customError, setCustomError] = useState<string | null>(null);
+
+  // Range orders state
+  const [rangeOrders, setRangeOrders] = useState<Order[]>([]);
+  const [isLoadingRange, setIsLoadingRange] = useState<boolean>(false);
+
+  // Compute active date boundaries
+  const boundary = useMemo(() => {
+    return computeDateRangeBoundaries(selectedPreset, customStart, customEnd);
+  }, [selectedPreset, customStart, customEnd]);
+
+  // Fetch orders from PostgreSQL when date range changes
+  const fetchRangeOrders = useCallback(async () => {
+    try {
+      setIsLoadingRange(true);
+      if (boundary.isAllTime) {
+        // Query up to 10000 historical orders for All Time without 200 order limit
+        const allOrders = await orderService.listOrders({ limit: 10000 });
+        setRangeOrders(allOrders);
+      } else {
+        const filtered = await orderService.listOrders({
+          startDate: boundary.startDate,
+          endDate: boundary.endDate,
+          limit: 10000,
+        });
+        setRangeOrders(filtered);
+      }
+    } catch (err) {
+      console.error('[StatsView] Failed to fetch range orders:', err);
+      // Fallback: filter in-memory propOrders
+      if (boundary.isAllTime) {
+        setRangeOrders(propOrders);
+      } else if (boundary.startDate && boundary.endDate) {
+        const startMs = new Date(boundary.startDate).getTime();
+        const endMs = new Date(boundary.endDate).getTime();
+        const fallbackList = propOrders.filter(
+          (o) => o.timestamp >= startMs && o.timestamp <= endMs
+        );
+        setRangeOrders(fallbackList);
+      }
+    } finally {
+      setIsLoadingRange(false);
+    }
+  }, [boundary.isAllTime, boundary.startDate, boundary.endDate, propOrders]);
+
+  useEffect(() => {
+    fetchRangeOrders();
+  }, [fetchRangeOrders]);
+
+  // Handle Custom Date Change with validation
+  const handleCustomDateChange = (start: string, end: string) => {
+    setCustomStart(start);
+    setCustomEnd(end);
+    if (start && end && start > end) {
+      setCustomError('Start date cannot be after end date.');
+    } else {
+      setCustomError(null);
+    }
+  };
+
+  // Aggregations based on selected range orders
+  const summary = useMemo(() => {
+    return reportingService.calculateSalesSummary(rangeOrders);
+  }, [rangeOrders]);
+
+  const topProducts = useMemo(() => {
+    return reportingService.calculateTopSellingItems(rangeOrders, menuItems);
+  }, [rangeOrders, menuItems]);
+
+  // Preserved Today's Hourly Throughput chart (specifically today-oriented visualization)
+  const hourlyData = useMemo(() => {
+    return reportingService.calculateHourlyThroughput(propOrders.length > 0 ? propOrders : rangeOrders);
+  }, [propOrders, rangeOrders]);
 
   const maxSales = Math.max(...hourlyData.map((d) => d.sales), 1);
   const goalPercentage = dailyGoal > 0 ? Math.min(100, Math.round((summary.cupsServed / dailyGoal) * 100)) : 0;
-
-  // Find peak hour from real data
   const peakHourItem = [...hourlyData].sort((a, b) => b.cups - a.cups)[0];
-  const hasSales = summary.totalSales > 0;
+  const hasHourlySales = hourlyData.some((h) => h.sales > 0);
+
+  const presets: { key: StatsDateRangePreset; label: string }[] = [
+    { key: 'today', label: 'Today' },
+    { key: 'yesterday', label: 'Yesterday' },
+    { key: 'last7days', label: 'Last 7 Days' },
+    { key: 'thismonth', label: 'This Month' },
+    { key: 'alltime', label: 'All Time' },
+    { key: 'custom', label: 'Custom Range' },
+  ];
 
   return (
-    <div className="pt-20 px-3.5 sm:px-5 max-w-lg mx-auto pb-28">
+    <div className="pt-20 px-3.5 sm:px-5 max-w-2xl mx-auto pb-28">
       {/* Header */}
-      <section className="mb-5 sm:mb-6">
+      <section className="mb-4 sm:mb-5">
         <h2 className="font-serif text-2xl sm:text-[28px] font-bold text-[#26170c] tracking-tight">
           Sales & Cafe Analytics
         </h2>
         <p className="text-xs sm:text-[15px] text-[#4f453f] mt-0.5">
           Real-time performance summary • Philippine Peso (₱)
         </p>
+      </section>
+
+      {/* Date Range Selector Section */}
+      <section className="mb-5 p-3 sm:p-4 bg-white rounded-2xl border border-[#dec1af]/60 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#81756e] flex items-center gap-1">
+            <span className="material-symbols-outlined text-[16px] text-[#5e604d]">date_range</span>
+            Reporting Period
+          </span>
+          {isLoadingRange && (
+            <span className="text-[11px] font-semibold text-[#81756e] flex items-center gap-1 animate-pulse">
+              <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+              Updating data...
+            </span>
+          )}
+        </div>
+
+        {/* Date Presets (Wrapping pills) */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {presets.map((preset) => {
+            const isSelected = selectedPreset === preset.key;
+            return (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => setSelectedPreset(preset.key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#26170c] text-white shadow-xs'
+                    : 'bg-[#f9f2f0] text-[#4f453f] hover:bg-[#eae2e0] border border-[#dec1af]/40'
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom Date Range Inputs */}
+        {selectedPreset === 'custom' && (
+          <div className="pt-2 border-t border-[#dec1af]/30 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-[#4f453f] mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => handleCustomDateChange(e.target.value, customEnd)}
+                  className="w-full px-3 py-1.5 text-xs bg-[#fff8f5] border border-[#dec1af] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#26170c] text-[#26170c] font-medium"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[#4f453f] mb-1">
+                  End Date (Inclusive)
+                </label>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => handleCustomDateChange(customStart, e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs bg-[#fff8f5] border border-[#dec1af] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#26170c] text-[#26170c] font-medium"
+                />
+              </div>
+            </div>
+            {customError && (
+              <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                <span className="material-symbols-outlined text-[14px]">error</span>
+                {customError}
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* KPI Cards Grid */}
@@ -45,7 +204,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
             ₱{summary.totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h4>
           <span className="text-[11px] font-medium text-[#5e604d] flex items-center gap-0.5 mt-1">
-            {summary.totalOrdersCount} {summary.totalOrdersCount === 1 ? 'order' : 'orders'} total
+            {summary.totalOrdersCount} {summary.totalOrdersCount === 1 ? 'order' : 'orders'} in period
           </span>
         </div>
 
@@ -81,7 +240,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
         </div>
       </div>
 
-      {/* Hourly Sales Bar Chart */}
+      {/* Hourly Sales Bar Chart (Preserved specifically for Today's throughput) */}
       <section className="mb-5 sm:mb-6 p-4 sm:p-5 bg-[#f9f2f0] rounded-2xl border border-[#f3ecea] shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <div>
@@ -93,12 +252,12 @@ export const StatsView: React.FC<StatsViewProps> = ({
           </span>
         </div>
 
-        {!hasSales ? (
+        {!hasHourlySales ? (
           <div className="py-8 text-center border-t border-dashed border-[#dec1af]/60">
             <span className="material-symbols-outlined text-[28px] text-[#81756e] mb-1">bar_chart</span>
             <p className="text-xs font-semibold text-[#26170c]">No Sales Recorded Today</p>
             <p className="text-[11px] text-[#81756e] mt-0.5">
-              Hourly sales volume bars will calibrate dynamically as orders are fulfilled.
+              Hourly sales volume bars calibrate dynamically as orders are fulfilled.
             </p>
           </div>
         ) : (
@@ -127,17 +286,22 @@ export const StatsView: React.FC<StatsViewProps> = ({
         )}
       </section>
 
-      {/* Top Performing Items */}
+      {/* Top Performing Items for Selected Period */}
       <section className="p-4 sm:p-5 bg-[#eee7e4] rounded-2xl border border-[#e8e1df] shadow-sm">
-        <h3 className="font-serif text-base sm:text-lg font-bold text-[#26170c] mb-3">
-          Top Bestselling Items
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-serif text-base sm:text-lg font-bold text-[#26170c]">
+            Top Bestselling Items
+          </h3>
+          <span className="text-[11px] font-semibold text-[#81756e]">
+            {selectedPreset === 'alltime' ? 'All Time' : `${boundary.startDisplay} to ${boundary.endDisplay}`}
+          </span>
+        </div>
 
         {topProducts.length === 0 ? (
           <div className="py-6 text-center bg-white/50 rounded-xl border border-dashed border-[#dec1af]">
-            <p className="text-xs font-semibold text-[#26170c]">No item sales data yet</p>
+            <p className="text-xs font-semibold text-[#26170c]">No item sales in selected period</p>
             <p className="text-[11px] text-[#81756e] mt-0.5">
-              Rankings update in real-time as customers order from the menu.
+              Rankings update automatically as orders are placed and completed.
             </p>
           </div>
         ) : (
