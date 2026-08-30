@@ -12,12 +12,14 @@ interface StatsViewProps {
   orders?: Order[];
   menuItems?: MenuItem[];
   dailyGoal?: number;
+  onRefresh?: () => Promise<void> | void;
 }
 
 export const StatsView: React.FC<StatsViewProps> = ({
   orders: propOrders = [],
   menuItems = [],
   dailyGoal = 100,
+  onRefresh,
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<StatsDateRangePreset>('today');
   const [customStart, setCustomStart] = useState<string>(() => formatLocalDateToInput(new Date()));
@@ -70,6 +72,19 @@ export const StatsView: React.FC<StatsViewProps> = ({
   useEffect(() => {
     fetchRangeOrders();
   }, [fetchRangeOrders]);
+
+  // Manual refresh handler with double-click protection
+  const handleManualRefresh = async () => {
+    if (isLoadingRange) return;
+    if (onRefresh) {
+      try {
+        await onRefresh();
+      } catch (err) {
+        console.error('[StatsView] Parent refresh failed:', err);
+      }
+    }
+    await fetchRangeOrders();
+  };
 
   // Handle Custom Date Change with validation
   const handleCustomDateChange = (start: string, end: string) => {
@@ -125,13 +140,27 @@ export const StatsView: React.FC<StatsViewProps> = ({
   return (
     <div className="pt-20 px-3.5 sm:px-5 max-w-2xl mx-auto pb-28">
       {/* Header */}
-      <section className="mb-4 sm:mb-5">
-        <h2 className="font-serif text-2xl sm:text-[28px] font-bold text-[#26170c] tracking-tight">
-          Sales & Cafe Analytics
-        </h2>
-        <p className="text-xs sm:text-[15px] text-[#4f453f] mt-0.5">
-          Real-time performance summary • Philippine Peso (₱)
-        </p>
+      <section className="mb-4 sm:mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-serif text-2xl sm:text-[28px] font-bold text-[#26170c] tracking-tight">
+            Sales & Cafe Analytics
+          </h2>
+          <p className="text-xs sm:text-[15px] text-[#4f453f] mt-0.5">
+            Real-time performance summary • Philippine Peso (₱)
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleManualRefresh}
+          disabled={isLoadingRange}
+          title="Refresh analytics data"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#e1e1c9] text-[#5e604d] hover:bg-[#d5d5b8] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-2xs whitespace-nowrap flex-shrink-0"
+        >
+          <span className={`material-symbols-outlined text-[16px] ${isLoadingRange ? 'animate-spin' : ''}`}>
+            sync
+          </span>
+          <span>{isLoadingRange ? 'Refreshing...' : 'Refresh'}</span>
+        </button>
       </section>
 
       {/* Date Range Selector Section */}

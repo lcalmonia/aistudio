@@ -1055,6 +1055,7 @@ export default function App() {
                 orders={orders}
                 menuItems={menuItems}
                 dailyGoal={dailyGoal}
+                onRefresh={refreshOrders}
               />
             )}
 

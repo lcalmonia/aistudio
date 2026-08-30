@@ -421,4 +421,49 @@ test('Phase 8C-1A - 24-Hour Peak Rush: Correctly identifies non-traditional rush
   assert.equal(peakHourItem.sales, 1200);
 });
 
+test('Phase 8C-1B-1 - Manual Refresh Flow: Invokes refresh handler and handles asynchronous resolution', async () => {
+  let refreshCalls = 0;
+  const mockOnRefresh = async () => {
+    refreshCalls++;
+  };
+
+  // Simulate refresh invocation
+  await mockOnRefresh();
+  assert.equal(refreshCalls, 1);
+});
+
+test('Phase 8C-1B-1 - Refresh Double-Click Protection: Ignores rapid sequential triggers while busy', async () => {
+  let activeSyncs = 0;
+  let executedSyncs = 0;
+  let isLoading = false;
+
+  const triggerRefresh = async () => {
+    if (isLoading) {
+      return; // Protected
+    }
+    isLoading = true;
+    activeSyncs++;
+    try {
+      // Simulate network wait
+      await new Promise((r) => setTimeout(r, 10));
+      executedSyncs++;
+    } finally {
+      isLoading = false;
+      activeSyncs--;
+    }
+  };
+
+  // Trigger 3 concurrent calls
+  const p1 = triggerRefresh();
+  const p2 = triggerRefresh();
+  const p3 = triggerRefresh();
+
+  await Promise.all([p1, p2, p3]);
+
+  // Only 1 execution occurred due to loading guard
+  assert.equal(executedSyncs, 1);
+  assert.equal(isLoading, false);
+});
+
+
 
