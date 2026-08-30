@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PromoBundle, MenuItem } from '../types';
+import { calculateBundleOriginalPrice, calculateBundleSavings } from '../utils/bundlePricing';
 
 interface EditBundleModalProps {
   isOpen: boolean;
@@ -23,7 +24,6 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
   const [name, setName] = useState(bundleToEdit?.name || '');
   const [description, setDescription] = useState(bundleToEdit?.description || '');
   const [price, setPrice] = useState<number>(bundleToEdit?.price ?? 199.00);
-  const [originalPrice, setOriginalPrice] = useState<number>(bundleToEdit?.originalPrice ?? 250.00);
   const [discountBadge, setDiscountBadge] = useState(bundleToEdit?.discountBadge || 'Save 20%');
   const [temperatureOption, setTemperatureOption] = useState(bundleToEdit?.temperatureOption || 'Choice of Hot or Iced Drink');
   const [timeSlot, setTimeSlot] = useState(bundleToEdit?.timeSlot || 'Daily until 11:30 AM');
@@ -33,12 +33,21 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
     bundleToEdit?.bundleItems || [menuItems[0]?.name, menuItems[1]?.name].filter(Boolean)
   );
 
+  // Dynamically calculate the combined original/base price from selected menu items
+  const calculatedOriginalPrice = useMemo(() => {
+    return calculateBundleOriginalPrice(selectedItems, menuItems);
+  }, [selectedItems, menuItems]);
+
+  // Dynamically compute savings between combined original price and promo price
+  const { savingsAmount, savingsPercentage } = useMemo(() => {
+    return calculateBundleSavings(calculatedOriginalPrice, price);
+  }, [calculatedOriginalPrice, price]);
+
   useEffect(() => {
     if (bundleToEdit) {
       setName(bundleToEdit.name || '');
       setDescription(bundleToEdit.description || '');
       setPrice(bundleToEdit.price ?? 199.00);
-      setOriginalPrice(bundleToEdit.originalPrice ?? 250.00);
       setDiscountBadge(bundleToEdit.discountBadge || 'Save 20%');
       setTemperatureOption(bundleToEdit.temperatureOption || 'Choice of Hot or Iced Drink');
       setTimeSlot(bundleToEdit.timeSlot || 'Daily until 11:30 AM');
@@ -49,7 +58,6 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
       setName('');
       setDescription('');
       setPrice(199.00);
-      setOriginalPrice(250.00);
       setDiscountBadge('Save 20%');
       setTemperatureOption('Choice of Hot or Iced Drink');
       setTimeSlot('Daily until 11:30 AM');
@@ -69,14 +77,17 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
+    // Use calculated original price, falling back to bundle price if no items matched
+    const finalOriginalPrice = calculatedOriginalPrice > 0 ? calculatedOriginalPrice : Number(price);
+
     const bundle: PromoBundle = {
       id: bundleToEdit?.id || `bundle-${Date.now()}`,
       name: name.trim(),
       description: description.trim(),
       bundleItems: selectedItems,
       price: Number(price),
-      originalPrice: Number(originalPrice),
-      discountBadge: discountBadge.trim(),
+      originalPrice: finalOriginalPrice,
+      discountBadge: discountBadge.trim() || (savingsAmount > 0 ? `Save ₱${savingsAmount.toFixed(0)}` : ''),
       image: image || menuItems[0]?.image,
       available,
       temperatureOption: temperatureOption.trim(),
@@ -101,7 +112,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
               {isEditing ? 'Edit Promo Bundle' : 'Create New Promo Bundle'}
             </h3>
           </div>
-          <button onClick={onClose} className="p-1 text-[#4f453f] hover:bg-[#e8e1df] rounded-full">
+          <button onClick={onClose} className="p-1 text-[#4f453f] hover:bg-[#e8e1df] rounded-full cursor-pointer">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
@@ -134,6 +145,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
           <div>
             <label className="block text-xs font-bold text-[#26170c] mb-1.5 flex items-center justify-between">
               <span>Select Included Menu Items ({selectedItems.length} selected)</span>
+              <span className="text-[11px] text-[#81756e] font-normal">Click to add/remove</span>
             </label>
             <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-[#d2c4bc]">
               {menuItems.map((item) => {
@@ -143,14 +155,19 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => handleToggleItem(item.name)}
-                    className={`p-2 rounded-lg text-left text-xs border transition-all flex items-center gap-2 ${
+                    className={`p-2 rounded-lg text-left text-xs border transition-all flex items-center justify-between gap-1.5 cursor-pointer ${
                       isSelected
                         ? 'bg-[#e1e1c9] border-[#636451] font-semibold text-[#26170c]'
                         : 'bg-[#f9f2f0] border-transparent text-[#4f453f] hover:bg-[#eee7e4]'
                     }`}
                   >
-                    <img src={item.image} alt={item.name} className="w-6 h-6 rounded-md object-cover flex-shrink-0" referrerPolicy="no-referrer" />
-                    <span className="truncate text-[11px]">{item.name}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <img src={item.image} alt={item.name} className="w-6 h-6 rounded-md object-cover flex-shrink-0" referrerPolicy="no-referrer" />
+                      <span className="truncate text-[11px]">{item.name}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-[#5e604d] flex-shrink-0">
+                      ₱{Number(item.price || 0).toFixed(0)}
+                    </span>
                   </button>
                 );
               })}
@@ -160,7 +177,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
           {/* Pricing Row */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#26170c] mb-1">Promo Price (₱)</label>
+              <label className="block text-xs font-bold text-[#26170c] mb-1">Bundle Price (₱) *</label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-sm font-bold text-[#4f453f]">₱</span>
                 <input
@@ -170,21 +187,25 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
                   required
                   value={price}
                   onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full pl-7 pr-3 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc]"
+                  className="w-full pl-7 pr-3 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:ring-2 focus:ring-[#5e604d]"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#26170c] mb-1">Orig. Price (₱)</label>
+              <label className="block text-xs font-bold text-[#26170c] mb-1 flex items-center justify-between">
+                <span>Orig. Price (₱)</span>
+                <span className="text-[9px] font-semibold text-[#5e604d] bg-[#e1e1c9] px-1 py-0.2 rounded">Auto</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-sm font-bold text-[#4f453f]">₱</span>
                 <input
                   type="number"
-                  step="1"
-                  min="0"
-                  value={originalPrice}
-                  onChange={(e) => setOriginalPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full pl-7 pr-3 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc]"
+                  step="0.01"
+                  readOnly
+                  tabIndex={-1}
+                  value={calculatedOriginalPrice}
+                  className="w-full pl-7 pr-3 py-2 text-sm bg-[#f3ecea] text-[#26170c] font-bold rounded-xl border border-[#d2c4bc] cursor-default select-all"
+                  title="Automatically calculated from the base prices of selected items"
                 />
               </div>
             </div>
@@ -197,6 +218,27 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
                 onChange={(e) => setDiscountBadge(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc]"
               />
+            </div>
+          </div>
+
+          {/* Pricing & Savings Breakdown Card */}
+          <div className="p-3 bg-[#f9f2f0] rounded-xl border border-[#e8e1df] flex items-center justify-between text-xs">
+            <div className="flex items-center gap-3">
+              <div>
+                <span className="text-[#81756e] block text-[10px] uppercase font-bold">Orig. Price</span>
+                <span className="font-bold text-[#26170c] text-sm">₱{calculatedOriginalPrice.toFixed(2)}</span>
+              </div>
+              <span className="text-[#81756e] font-bold">−</span>
+              <div>
+                <span className="text-[#81756e] block text-[10px] uppercase font-bold">Bundle Price</span>
+                <span className="font-bold text-[#26170c] text-sm">₱{Number(price || 0).toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[#81756e] block text-[10px] uppercase font-bold">Savings</span>
+              <span className={`font-bold text-sm ${savingsAmount > 0 ? 'text-[#2e6b3e]' : 'text-[#81756e]'}`}>
+                ₱{savingsAmount.toFixed(2)} {savingsPercentage > 0 ? `(${savingsPercentage}% OFF)` : ''}
+              </span>
             </div>
           </div>
 
@@ -235,7 +277,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
             />
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#26170c] pt-2">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#26170c] pt-1">
             <input
               type="checkbox"
               checked={available}
@@ -256,19 +298,19 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
                   onClose();
                 }
               }}
-              className="px-3 py-1.5 text-xs font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-full transition-colors"
+              className="px-3 py-1.5 text-xs font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-full transition-colors cursor-pointer"
             >
               Delete Bundle
             </button>
           ) : <div />}
 
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-[#4f453f] hover:bg-[#e8e1df] rounded-full">
+            <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-[#4f453f] hover:bg-[#e8e1df] rounded-full cursor-pointer">
               Cancel
             </button>
             <button
               onClick={handleSubmit}
-              className="px-5 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f] transition-all"
+              className="px-5 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f] transition-all cursor-pointer"
             >
               {isEditing ? 'Update Bundle' : 'Save Bundle'}
             </button>
@@ -278,3 +320,4 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
     </div>
   );
 };
+
