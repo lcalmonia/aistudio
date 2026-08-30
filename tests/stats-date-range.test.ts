@@ -331,22 +331,94 @@ test('Phase 8C-1 - Peak Rush Window: Matches exact hourly dataset calculation', 
   assert.equal(peakHourItem.sales, 1000);
 });
 
-test('Phase 8C-1 - All Time / Custom Range: Aggregates historical hours and does not default to today', () => {
-  const historicalOrder15PM: Order = {
-    id: 'ord-hist-3pm',
-    orderNumber: '#0100',
-    customerName: 'Historical User',
-    timestamp: new Date('2026-05-15T15:30:00').getTime(),
-    timeAgo: 'months ago',
+test('Phase 8C-1A - 24-Hour Buckets: Exactly 24 hourly buckets returned covering 12 AM (0) through 11 PM (23)', () => {
+  const hourly = reportingService.calculateHourlyThroughput([]);
+  assert.equal(hourly.length, 24);
+
+  // Check 12 AM (0) and 11 PM (23)
+  assert.equal(hourly[0].time, '12 AM');
+  assert.equal(hourly[0].hour, 0);
+  assert.equal(hourly[23].time, '11 PM');
+  assert.equal(hourly[23].hour, 23);
+
+  // Verify all 24 continuous hours exist
+  for (let i = 0; i < 24; i++) {
+    assert.equal(hourly[i].hour, i);
+    assert.equal(hourly[i].sales, 0);
+    assert.equal(hourly[i].cups, 0);
+  }
+});
+
+test('Phase 8C-1A - Early Morning & Late Night Orders: 2 AM and 11 PM orders are captured accurately', () => {
+  const earlyMorningOrder: Order = {
+    id: 'ord-2am',
+    orderNumber: '#0020',
+    customerName: 'Night Owl',
+    timestamp: new Date().setHours(2, 15, 0, 0),
+    timeAgo: 'earlier',
     status: 'Completed',
-    total: 800,
-    items: [{ name: 'Signature Frappe', quantity: 4, price: 200 }],
+    total: 350,
+    items: [{ name: 'Espresso Double', quantity: 2, price: 175 }],
   };
 
-  const hourly = reportingService.calculateHourlyThroughput([historicalOrder15PM]);
-  const pt3PM = hourly.find((h) => h.hour === 15);
-  assert.ok(pt3PM);
-  assert.equal(pt3PM.sales, 800);
-  assert.equal(pt3PM.cups, 4);
+  const lateNightOrder: Order = {
+    id: 'ord-11pm',
+    orderNumber: '#0021',
+    customerName: 'Late Worker',
+    timestamp: new Date().setHours(23, 40, 0, 0),
+    timeAgo: 'late',
+    status: 'Completed',
+    total: 550,
+    items: [{ name: 'Midnight Cold Brew', quantity: 3, price: 183.33 }],
+  };
+
+  const hourly = reportingService.calculateHourlyThroughput([earlyMorningOrder, lateNightOrder]);
+  assert.equal(hourly.length, 24);
+
+  const pt2AM = hourly.find((h) => h.hour === 2);
+  assert.ok(pt2AM);
+  assert.equal(pt2AM.time, '2 AM');
+  assert.equal(pt2AM.sales, 350);
+  assert.equal(pt2AM.cups, 2);
+
+  const pt11PM = hourly.find((h) => h.hour === 23);
+  assert.ok(pt11PM);
+  assert.equal(pt11PM.time, '11 PM');
+  assert.equal(pt11PM.sales, 550);
+  assert.equal(pt11PM.cups, 3);
 });
+
+test('Phase 8C-1A - 24-Hour Peak Rush: Correctly identifies non-traditional rush hours (e.g. 2 AM / 8 PM)', () => {
+  const orders: Order[] = [
+    {
+      id: 'ord-peak-8pm',
+      orderNumber: '#8001',
+      customerName: 'Evening Crowd',
+      timestamp: new Date().setHours(20, 10, 0, 0), // 8 PM
+      timeAgo: 'evening',
+      status: 'Completed',
+      total: 1200,
+      items: [{ name: 'Frappes', quantity: 8, price: 150 }],
+    },
+    {
+      id: 'ord-afternoon',
+      orderNumber: '#8002',
+      customerName: 'Afternoon',
+      timestamp: new Date().setHours(14, 0, 0, 0), // 2 PM
+      timeAgo: 'afternoon',
+      status: 'Completed',
+      total: 300,
+      items: [{ name: 'Latte', quantity: 2, price: 150 }],
+    },
+  ];
+
+  const hourly = reportingService.calculateHourlyThroughput(orders);
+  const peakHourItem = [...hourly].sort((a, b) => b.cups - a.cups)[0];
+
+  assert.equal(peakHourItem.time, '8 PM');
+  assert.equal(peakHourItem.hour, 20);
+  assert.equal(peakHourItem.cups, 8);
+  assert.equal(peakHourItem.sales, 1200);
+});
+
 

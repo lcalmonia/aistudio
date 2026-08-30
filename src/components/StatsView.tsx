@@ -281,27 +281,33 @@ export const StatsView: React.FC<StatsViewProps> = ({
             </p>
           </div>
         ) : (
-          <div className="flex items-end justify-between gap-1.5 sm:gap-2 h-36 pt-4 pb-2 border-b border-[#d2c4bc]/40">
-            {hourlyData.map((h, i) => {
-              const barHeightPct = maxSales > 0 ? (h.sales / maxSales) * 100 : 0;
-              const isPeak = peakHourItem && peakHourItem.time === h.time && h.sales > 0;
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                  <span className="text-[8px] sm:text-[9px] font-bold text-[#26170c]">
-                    {h.sales > 0 ? `₱${(h.sales / 1000).toFixed(1)}k` : '₱0'}
-                  </span>
+          <div className="overflow-x-auto pb-2 -mx-1 px-1">
+            <div className="flex items-end justify-between gap-1 sm:gap-1.5 h-36 pt-4 pb-2 border-b border-[#d2c4bc]/40 min-w-[620px] sm:min-w-0">
+              {hourlyData.map((h, i) => {
+                const barHeightPct = maxSales > 0 ? (h.sales / maxSales) * 100 : 0;
+                const isPeak = peakHourItem && peakHourItem.time === h.time && h.sales > 0;
+                return (
                   <div
-                    className={`w-full max-w-[24px] sm:max-w-[28px] rounded-t-lg transition-all duration-500 min-h-[4px] ${
-                      isPeak ? 'bg-[#26170c]' : h.sales > 0 ? 'bg-[#5e604d]' : 'bg-[#e8e1df]'
-                    }`}
-                    style={{ height: `${Math.max(4, barHeightPct)}%` }}
-                  />
-                  <span className="text-[9px] sm:text-[10px] font-medium text-[#81756e] mt-1 truncate">
-                    {h.time}
-                  </span>
-                </div>
-              );
-            })}
+                    key={i}
+                    title={`${h.time}: ₱${h.sales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${h.cups} items)`}
+                    className="flex-1 flex flex-col items-center gap-1 h-full justify-end min-w-[18px]"
+                  >
+                    <span className="text-[7px] sm:text-[8px] font-bold text-[#26170c] truncate max-w-full">
+                      {h.sales > 0 ? `₱${(h.sales / 1000).toFixed(1)}k` : '₱0'}
+                    </span>
+                    <div
+                      className={`w-full max-w-[18px] sm:max-w-[22px] rounded-t-sm sm:rounded-t-md transition-all duration-500 min-h-[4px] ${
+                        isPeak ? 'bg-[#26170c]' : h.sales > 0 ? 'bg-[#5e604d]' : 'bg-[#e8e1df]'
+                      }`}
+                      style={{ height: `${Math.max(4, barHeightPct)}%` }}
+                    />
+                    <span className="text-[7px] sm:text-[9px] font-medium text-[#81756e] mt-1 whitespace-nowrap">
+                      {h.time}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </section>
