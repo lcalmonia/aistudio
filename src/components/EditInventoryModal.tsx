@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { InventoryItem } from '../types';
+import {
+  InventoryFormDraft,
+  createInitialInventoryDraft,
+  isInventoryDraftDirty,
+} from '../utils/inventoryDraft';
 
 interface EditInventoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: InventoryItem) => void;
-  onDelete?: (id: string) => void;
+  onSave: (item: InventoryItem) => Promise<void> | void;
+  onDelete?: (id: string) => Promise<void> | void;
   itemToEdit: InventoryItem | null;
   categories: string[];
   onAddCategory?: (category: string) => void;
@@ -38,14 +43,21 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
 }) => {
   const isEdit = !!itemToEdit;
 
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState(categories[0] || 'Beans');
-  const [stock, setStock] = useState<number>(10);
-  const [unit, setUnit] = useState('kg');
-  const [minThreshold, setMinThreshold] = useState<number>(5);
-  const [costPerUnit, setCostPerUnit] = useState<number>(0);
-  const [supplier, setSupplier] = useState('');
-  const [notes, setNotes] = useState('');
+  // Initial base snapshot for clean vs dirty draft detection
+  const [baseDraft, setBaseDraft] = useState<InventoryFormDraft>(() =>
+    createInitialInventoryDraft(itemToEdit, categories[0] || 'Beans')
+  );
+
+  // Active user form draft states
+  const [name, setName] = useState<string>(baseDraft.name);
+  const [category, setCategory] = useState<string>(baseDraft.category);
+  const [stock, setStock] = useState<number>(baseDraft.stock);
+  const [unit, setUnit] = useState<string>(baseDraft.unit);
+  const [minThreshold, setMinThreshold] = useState<number>(baseDraft.minThreshold);
+  const [costPerUnit, setCostPerUnit] = useState<number>(baseDraft.costPerUnit);
+  const [supplier, setSupplier] = useState<string>(baseDraft.supplier);
+  const [notes, setNotes] = useState<string>(baseDraft.notes);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Inline new category creation
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -54,30 +66,71 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Current active draft representation
+  const currentDraft: InventoryFormDraft = useMemo(
+    () => ({
+      name,
+      category,
+      stock,
+      unit,
+      minThreshold,
+      costPerUnit,
+      supplier,
+      notes,
+    }),
+    [name, category, stock, unit, minThreshold, costPerUnit, supplier, notes]
+  );
+
+  // Check if any fields were actually modified compared to saved base draft
+  const hasChanges = isInventoryDraftDirty(currentDraft, baseDraft);
+
+  const prevIsOpenRef = useRef(isOpen);
+  const prevItemIdRef = useRef<string | undefined>(itemToEdit?.id);
+
+  // When modal is newly opened or switched to a different item ID:
   useEffect(() => {
-    if (itemToEdit) {
-      setName(itemToEdit.name);
-      setCategory(itemToEdit.category);
-      setStock(itemToEdit.stock);
-      setUnit(itemToEdit.unit);
-      setMinThreshold(itemToEdit.minThreshold);
-      setCostPerUnit(itemToEdit.costPerUnit || 0);
-      setSupplier(itemToEdit.supplier || '');
-      setNotes(itemToEdit.notes || '');
-    } else {
-      setName('');
-      setCategory(categories[0] || 'Beans');
-      setStock(10);
-      setUnit('kg');
-      setMinThreshold(5);
-      setCostPerUnit(0);
-      setSupplier('');
-      setNotes('');
+    const wasClosed = !prevIsOpenRef.current && isOpen;
+    const switchedItem = isOpen && prevItemIdRef.current !== itemToEdit?.id;
+
+    if (wasClosed || switchedItem) {
+      const freshDraft = createInitialInventoryDraft(itemToEdit, categories[0] || 'Beans');
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setCategory(freshDraft.category);
+      setStock(freshDraft.stock);
+      setUnit(freshDraft.unit);
+      setMinThreshold(freshDraft.minThreshold);
+      setCostPerUnit(freshDraft.costPerUnit);
+      setSupplier(freshDraft.supplier);
+      setNotes(freshDraft.notes);
+      setIsAddingCategory(false);
+      setNewCategoryName('');
+      setShowDeleteConfirm(false);
     }
-    setIsAddingCategory(false);
-    setNewCategoryName('');
-    setShowDeleteConfirm(false);
-  }, [itemToEdit, isOpen, categories]);
+
+    prevIsOpenRef.current = isOpen;
+    prevItemIdRef.current = itemToEdit?.id;
+  }, [isOpen, itemToEdit?.id, categories]);
+
+  // Live cross-device & background synchronization:
+  // If the form is clean (hasChanges === false), safely update baseDraft and form fields from latest server props.
+  // If the user has active unsaved edits (hasChanges === true), do NOT touch form fields (draft protection).
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!hasChanges) {
+      const freshDraft = createInitialInventoryDraft(itemToEdit, categories[0] || 'Beans');
+      setBaseDraft(freshDraft);
+      setName(freshDraft.name);
+      setCategory(freshDraft.category);
+      setStock(freshDraft.stock);
+      setUnit(freshDraft.unit);
+      setMinThreshold(freshDraft.minThreshold);
+      setCostPerUnit(freshDraft.costPerUnit);
+      setSupplier(freshDraft.supplier);
+      setNotes(freshDraft.notes);
+    }
+  }, [itemToEdit, categories, hasChanges, isOpen]);
 
   if (!isOpen) return null;
 
@@ -99,14 +152,15 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
     return 'In Stock';
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSaving) return;
 
     const numStock = Number(stock) || 0;
     const numThreshold = Number(minThreshold) || 0;
 
     const savedItem: InventoryItem = {
+      ...(itemToEdit || {}),
       id: itemToEdit ? itemToEdit.id : `inv-${Date.now()}`,
       name: name.trim(),
       category: category || 'Beans',
@@ -117,11 +171,30 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
       costPerUnit: Number(costPerUnit) || 0,
       supplier: supplier.trim() || undefined,
       notes: notes.trim() || undefined,
-      lastRestocked: new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
+      lastRestocked: itemToEdit?.lastRestocked || new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
     };
 
-    onSave(savedItem);
-    onClose();
+    try {
+      setIsSaving(true);
+      await onSave(savedItem);
+      // Upon successful save, update baseDraft to clear dirty state
+      setBaseDraft({
+        name: savedItem.name,
+        category: savedItem.category,
+        stock: savedItem.stock,
+        unit: savedItem.unit,
+        minThreshold: savedItem.minThreshold,
+        costPerUnit: savedItem.costPerUnit || 0,
+        supplier: savedItem.supplier || '',
+        notes: savedItem.notes || '',
+      });
+      onClose();
+    } catch (err) {
+      console.error('[EditInventoryModal] Error saving inventory item:', err);
+      // Preserve draft on failure to allow retry
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -350,23 +423,32 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (itemToEdit) {
-                          onDelete(itemToEdit.id);
-                          onClose();
+                      disabled={isSaving}
+                      onClick={async () => {
+                        if (itemToEdit && onDelete) {
+                          try {
+                            setIsSaving(true);
+                            await onDelete(itemToEdit.id);
+                            onClose();
+                          } catch (err) {
+                            console.error('[EditInventoryModal] Delete error:', err);
+                          } finally {
+                            setIsSaving(false);
+                          }
                         }
                       }}
-                      className="px-3 py-1 bg-[#ba1a1a] text-white text-xs font-bold rounded-lg hover:bg-[#93000a] active:scale-95 transition-all"
+                      className="px-3 py-1 bg-[#ba1a1a] text-white text-xs font-bold rounded-lg hover:bg-[#93000a] active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                     >
-                      Confirm Delete
+                      {isSaving ? 'Deleting...' : 'Confirm Delete'}
                     </button>
                   </div>
                 </div>
               ) : (
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="text-xs text-[#ba1a1a] hover:text-[#93000a] font-semibold flex items-center gap-1 cursor-pointer"
+                  className="text-xs text-[#ba1a1a] hover:text-[#93000a] font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[16px]">delete</span>
                   Delete Inventory Item
@@ -379,17 +461,19 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#f3ecea]">
             <button
               type="button"
+              disabled={isSaving}
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-bold text-[#4f453f] hover:bg-[#e8e1df] rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2.5 text-xs font-bold text-[#4f453f] hover:bg-[#e8e1df] rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              disabled={isSaving}
+              className="px-5 py-2.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[16px]">check</span>
-              {isEdit ? 'Save Changes' : 'Add Item to Stock'}
+              {isSaving ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Item to Stock'}
             </button>
           </div>
         </form>
