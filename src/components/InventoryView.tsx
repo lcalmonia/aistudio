@@ -7,7 +7,7 @@ interface InventoryViewProps {
   categories: string[];
   onSaveItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
-  onAddCategory: (category: string) => void;
+  onAddCategory: (category: string) => Promise<void> | void;
   onShowNotification: (msg: string) => void;
 }
 
@@ -22,6 +22,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Low Stock' | 'In Stock'>('All');
+
+  // Category Creation State
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -248,42 +253,133 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1">
-          <button
-            onClick={() => setSelectedCategory('All')}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-              selectedCategory === 'All'
-                ? 'bg-[#26170c] text-white shadow-xs'
-                : 'bg-white text-[#4f453f] hover:bg-[#eae2e0] border border-[#dec1af]/40'
-            }`}
-          >
-            All Categories ({items.length})
-          </button>
-          {categories.map((cat) => {
-            const count = items.filter((it) => it.category.toLowerCase() === cat.toLowerCase()).length;
-            const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
-            return (
+        {/* Category Filter Section & Add Category Control */}
+        <div className="pt-2 border-t border-[#dec1af]/30 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#81756e]">
+              Filter by Category
+            </span>
+            {!isAddingCategory && (
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-[#26170c] text-white shadow-xs'
-                    : 'bg-white text-[#4f453f] hover:bg-[#eae2e0] border border-[#dec1af]/40'
-                }`}
+                type="button"
+                onClick={() => {
+                  setIsAddingCategory(true);
+                  setNewCategoryName('');
+                }}
+                className="text-xs font-bold text-[#26170c] hover:text-[#543b2b] flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <span>{cat}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                    isSelected ? 'bg-white/20 text-white' : 'bg-[#f3ecea] text-[#81756e]'
+                <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                <span>Add Category</span>
+              </button>
+            )}
+          </div>
+
+          {/* Inline Add Category Form */}
+          {isAddingCategory && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const trimmed = newCategoryName.trim();
+                if (!trimmed || isSubmittingCategory) return;
+                try {
+                  setIsSubmittingCategory(true);
+                  await onAddCategory(trimmed);
+                  setSelectedCategory(trimmed);
+                  setNewCategoryName('');
+                  setIsAddingCategory(false);
+                } catch (err) {
+                  console.error('Failed to add category:', err);
+                } finally {
+                  setIsSubmittingCategory(false);
+                }
+              }}
+              className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2.5 bg-white rounded-xl border border-[#dec1af] shadow-xs"
+            >
+              <input
+                type="text"
+                autoFocus
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter category name (e.g. Chocolate & Cocoa)..."
+                className="flex-1 min-w-[200px] px-3 py-1.5 text-xs bg-[#fff8f5] border border-[#dec1af] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#26170c] text-[#26170c] font-medium"
+              />
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={isSubmittingCategory}
+                  onClick={() => {
+                    setIsAddingCategory(false);
+                    setNewCategoryName('');
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold text-[#81756e] hover:bg-[#f3ecea] rounded-lg cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newCategoryName.trim() || isSubmittingCategory}
+                  className="px-3.5 py-1.5 text-xs font-bold bg-[#26170c] text-white hover:bg-[#3d2b1f] rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">check</span>
+                  {isSubmittingCategory ? 'Saving...' : 'Save Category'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Category Filter Pills (Wrapping naturally into multiple rows - NO horizontal scroll) */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('All')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                selectedCategory === 'All'
+                  ? 'bg-[#26170c] text-white shadow-xs'
+                  : 'bg-white text-[#4f453f] hover:bg-[#eae2e0] border border-[#dec1af]/40'
+              }`}
+            >
+              All Categories ({items.length})
+            </button>
+            {categories.map((cat) => {
+              const count = items.filter((it) => it.category.toLowerCase() === cat.toLowerCase()).length;
+              const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
+              return (
+                <button
+                  type="button"
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-[#26170c] text-white shadow-xs'
+                      : 'bg-white text-[#4f453f] hover:bg-[#eae2e0] border border-[#dec1af]/40'
                   }`}
                 >
-                  {count}
-                </span>
+                  <span>{cat}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-[#f3ecea] text-[#81756e]'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+            {!isAddingCategory && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingCategory(true);
+                  setNewCategoryName('');
+                }}
+                className="px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border border-dashed border-[#81756e]/50 text-[#81756e] hover:border-[#26170c] hover:text-[#26170c] hover:bg-white"
+                title="Add new category"
+              >
+                <span className="material-symbols-outlined text-[14px]">add</span>
+                <span>Add Category</span>
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
       </div>
 
