@@ -47,6 +47,7 @@ export const reportingService = {
 
   /**
    * Generates hourly throughput breakdown based on actual order timestamps.
+   * Aggregates valid non-cancelled orders across the given range by hour of day (7 AM - 5 PM).
    */
   calculateHourlyThroughput(orders: Order[] = []): HourlySalesPoint[] {
     const list = orders || [];
@@ -64,15 +65,10 @@ export const reportingService = {
       { label: '5 PM', hour: 17 },
     ];
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayOrders = list.filter(
-      (o) => o && o.status !== 'Cancelled' && o.timestamp >= todayStart.getTime()
-    );
+    const validOrders = list.filter((o) => o && o.status !== 'Cancelled');
 
     return hours.map(({ label, hour }) => {
-      const matchingOrders = todayOrders.filter((o) => {
+      const matchingOrders = validOrders.filter((o) => {
         const orderHour = new Date(o.timestamp).getHours();
         return orderHour === hour;
       });

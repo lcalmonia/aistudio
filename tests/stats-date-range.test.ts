@@ -194,3 +194,159 @@ test('Phase 8B - Scalability Beyond 200 Orders: Date range query allows limit up
   assert.equal(summary.totalSales, 35000);
   assert.equal(summary.cupsServed, 350);
 });
+
+test('Phase 8C-1 - Hourly Throughput: Today uses today orders and excludes cancelled', () => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const orderToday10AM: Order = {
+    id: 'ord-today-10am',
+    orderNumber: '#2001',
+    customerName: 'Morning User',
+    timestamp: new Date().setHours(10, 30, 0, 0),
+    timeAgo: 'earlier',
+    status: 'Completed',
+    total: 300,
+    items: [{ name: 'Latte', quantity: 2, price: 150 }],
+  };
+
+  const orderTodayCancelled10AM: Order = {
+    id: 'ord-today-can-10am',
+    orderNumber: '#2002',
+    customerName: 'Cancelled User',
+    timestamp: new Date().setHours(10, 45, 0, 0),
+    timeAgo: 'earlier',
+    status: 'Cancelled',
+    total: 500,
+    items: [{ name: 'Cake', quantity: 1, price: 500 }],
+  };
+
+  const hourly = reportingService.calculateHourlyThroughput([orderToday10AM, orderTodayCancelled10AM]);
+  const pt10AM = hourly.find((h) => h.hour === 10);
+  assert.ok(pt10AM);
+  assert.equal(pt10AM.sales, 300);
+  assert.equal(pt10AM.cups, 2);
+});
+
+test('Phase 8C-1 - Hourly Throughput: Yesterday uses yesterday orders and excludes today', () => {
+  const yesterday14PM: Order = {
+    id: 'ord-yest-2pm',
+    orderNumber: '#1999',
+    customerName: 'Yesterday Afternoon',
+    timestamp: new Date(new Date().setDate(new Date().getDate() - 1)).setHours(14, 15, 0, 0),
+    timeAgo: 'yesterday',
+    status: 'Completed',
+    total: 250,
+    items: [{ name: 'Mocha', quantity: 1, price: 250 }],
+  };
+
+  const today14PM: Order = {
+    id: 'ord-today-2pm',
+    orderNumber: '#2003',
+    customerName: 'Today Afternoon',
+    timestamp: new Date().setHours(14, 30, 0, 0),
+    timeAgo: 'today',
+    status: 'Completed',
+    total: 400,
+    items: [{ name: 'Caramel Macchiato', quantity: 2, price: 200 }],
+  };
+
+  // When yesterday range is selected, only yesterday orders are passed
+  const yesterdayHourly = reportingService.calculateHourlyThroughput([yesterday14PM]);
+  const pt2PM = yesterdayHourly.find((h) => h.hour === 14);
+  assert.ok(pt2PM);
+  assert.equal(pt2PM.sales, 250);
+  assert.equal(pt2PM.cups, 1);
+
+  // Does not include today's 400
+  assert.notEqual(pt2PM.sales, 650);
+});
+
+test('Phase 8C-1 - Hourly Throughput: Last 7 Days aggregates across all 7 days by hour of day', () => {
+  const day1_9AM: Order = {
+    id: 'ord-d1-9am',
+    orderNumber: '#101',
+    customerName: 'D1',
+    timestamp: new Date(new Date().setDate(new Date().getDate() - 1)).setHours(9, 10, 0, 0),
+    timeAgo: '1d',
+    status: 'Completed',
+    total: 100,
+    items: [{ name: 'Espresso', quantity: 1, price: 100 }],
+  };
+  const day2_9AM: Order = {
+    id: 'ord-d2-9am',
+    orderNumber: '#102',
+    customerName: 'D2',
+    timestamp: new Date(new Date().setDate(new Date().getDate() - 3)).setHours(9, 20, 0, 0),
+    timeAgo: '3d',
+    status: 'Completed',
+    total: 150,
+    items: [{ name: 'Latte', quantity: 1, price: 150 }],
+  };
+  const day3_9AM: Order = {
+    id: 'ord-d3-9am',
+    orderNumber: '#103',
+    customerName: 'D3',
+    timestamp: new Date(new Date().setDate(new Date().getDate() - 5)).setHours(9, 45, 0, 0),
+    timeAgo: '5d',
+    status: 'Completed',
+    total: 200,
+    items: [{ name: 'Cold Brew', quantity: 1, price: 200 }],
+  };
+
+  const hourly = reportingService.calculateHourlyThroughput([day1_9AM, day2_9AM, day3_9AM]);
+  const pt9AM = hourly.find((h) => h.hour === 9);
+  assert.ok(pt9AM);
+  assert.equal(pt9AM.sales, 450); // 100 + 150 + 200
+  assert.equal(pt9AM.cups, 3);
+});
+
+test('Phase 8C-1 - Peak Rush Window: Matches exact hourly dataset calculation', () => {
+  const ord11AM: Order = {
+    id: 'ord-11am',
+    orderNumber: '#301',
+    customerName: 'Peak User 1',
+    timestamp: new Date().setHours(11, 10, 0, 0),
+    timeAgo: 'earlier',
+    status: 'Completed',
+    total: 1000,
+    items: [{ name: 'Batch Drinks', quantity: 10, price: 100 }],
+  };
+  const ord12PM: Order = {
+    id: 'ord-12pm',
+    orderNumber: '#302',
+    customerName: 'User 2',
+    timestamp: new Date().setHours(12, 10, 0, 0),
+    timeAgo: 'earlier',
+    status: 'Completed',
+    total: 150,
+    items: [{ name: 'Drink', quantity: 1, price: 150 }],
+  };
+
+  const hourly = reportingService.calculateHourlyThroughput([ord11AM, ord12PM]);
+  const peakHourItem = [...hourly].sort((a, b) => b.cups - a.cups)[0];
+
+  assert.equal(peakHourItem.time, '11 AM');
+  assert.equal(peakHourItem.cups, 10);
+  assert.equal(peakHourItem.sales, 1000);
+});
+
+test('Phase 8C-1 - All Time / Custom Range: Aggregates historical hours and does not default to today', () => {
+  const historicalOrder15PM: Order = {
+    id: 'ord-hist-3pm',
+    orderNumber: '#0100',
+    customerName: 'Historical User',
+    timestamp: new Date('2026-05-15T15:30:00').getTime(),
+    timeAgo: 'months ago',
+    status: 'Completed',
+    total: 800,
+    items: [{ name: 'Signature Frappe', quantity: 4, price: 200 }],
+  };
+
+  const hourly = reportingService.calculateHourlyThroughput([historicalOrder15PM]);
+  const pt3PM = hourly.find((h) => h.hour === 15);
+  assert.ok(pt3PM);
+  assert.equal(pt3PM.sales, 800);
+  assert.equal(pt3PM.cups, 4);
+});
+

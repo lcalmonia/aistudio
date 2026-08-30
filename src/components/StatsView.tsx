@@ -91,15 +91,27 @@ export const StatsView: React.FC<StatsViewProps> = ({
     return reportingService.calculateTopSellingItems(rangeOrders, menuItems);
   }, [rangeOrders, menuItems]);
 
-  // Preserved Today's Hourly Throughput chart (specifically today-oriented visualization)
+  // Hourly Throughput aggregation for the selected date range
   const hourlyData = useMemo(() => {
-    return reportingService.calculateHourlyThroughput(propOrders.length > 0 ? propOrders : rangeOrders);
-  }, [propOrders, rangeOrders]);
+    return reportingService.calculateHourlyThroughput(rangeOrders);
+  }, [rangeOrders]);
 
   const maxSales = Math.max(...hourlyData.map((d) => d.sales), 1);
   const goalPercentage = dailyGoal > 0 ? Math.min(100, Math.round((summary.cupsServed / dailyGoal) * 100)) : 0;
   const peakHourItem = [...hourlyData].sort((a, b) => b.cups - a.cups)[0];
   const hasHourlySales = hourlyData.some((h) => h.sales > 0);
+
+  const rangeLabel = useMemo(() => {
+    if (selectedPreset === 'today') return 'Today';
+    if (selectedPreset === 'yesterday') return 'Yesterday';
+    if (selectedPreset === 'last7days') return 'Last 7 Days';
+    if (selectedPreset === 'thismonth') {
+      const now = new Date();
+      return now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+    if (selectedPreset === 'alltime') return 'All Time';
+    return `${boundary.startDisplay} to ${boundary.endDisplay}`;
+  }, [selectedPreset, boundary.startDisplay, boundary.endDisplay]);
 
   const presets: { key: StatsDateRangePreset; label: string }[] = [
     { key: 'today', label: 'Today' },
@@ -240,22 +252,30 @@ export const StatsView: React.FC<StatsViewProps> = ({
         </div>
       </div>
 
-      {/* Hourly Sales Bar Chart (Preserved specifically for Today's throughput) */}
+      {/* Hourly Sales Bar Chart (Dynamic by Selected Date Range) */}
       <section className="mb-5 sm:mb-6 p-4 sm:p-5 bg-[#f9f2f0] rounded-2xl border border-[#f3ecea] shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h3 className="font-serif text-base sm:text-lg font-bold text-[#26170c]">Hourly Throughput</h3>
-            <p className="text-xs text-[#4f453f]">Today's hourly sales in ₱</p>
+            <h3 className="font-serif text-base sm:text-lg font-bold text-[#26170c]">
+              Hourly Throughput — {rangeLabel}
+            </h3>
+            <p className="text-xs text-[#4f453f]">
+              {selectedPreset === 'today'
+                ? "Today's hourly sales in ₱"
+                : selectedPreset === 'yesterday'
+                ? "Yesterday's hourly sales in ₱"
+                : `Hourly sales aggregated across ${rangeLabel.toLowerCase()} in ₱`}
+            </p>
           </div>
           <span className="text-xs font-bold text-[#5e604d] bg-[#e1e1c9] px-2.5 py-1 rounded-full">
-            Today
+            {rangeLabel}
           </span>
         </div>
 
         {!hasHourlySales ? (
           <div className="py-8 text-center border-t border-dashed border-[#dec1af]/60">
             <span className="material-symbols-outlined text-[28px] text-[#81756e] mb-1">bar_chart</span>
-            <p className="text-xs font-semibold text-[#26170c]">No Sales Recorded Today</p>
+            <p className="text-xs font-semibold text-[#26170c]">No Sales Recorded in Period</p>
             <p className="text-[11px] text-[#81756e] mt-0.5">
               Hourly sales volume bars calibrate dynamically as orders are fulfilled.
             </p>
