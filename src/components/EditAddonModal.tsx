@@ -20,8 +20,6 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
   modifierCategories = [],
   productCategories = [],
 }) => {
-  if (!isOpen) return null;
-
   const isEditing = Boolean(addonToEdit);
 
   const [name, setName] = useState(addonToEdit?.name || '');
@@ -118,6 +116,8 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
     onSave(addon);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[85] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">

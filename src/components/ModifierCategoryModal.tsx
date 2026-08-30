@@ -18,8 +18,6 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
   categoryToEdit,
   productCategories = [],
 }) => {
-  if (!isOpen) return null;
-
   const isEditing = Boolean(categoryToEdit);
 
   const [name, setName] = useState(categoryToEdit?.name || '');
@@ -84,6 +82,8 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
     onSave(data);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">

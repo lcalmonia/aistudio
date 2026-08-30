@@ -40,14 +40,12 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   modifierCategories = [],
   onAddToCart,
 }) => {
-  if (!isOpen || !product) return null;
-
   const safeAddonsList = addonsList || [];
   const safeCategories = modifierCategories || [];
 
   // Determine initial temperature
   const defaultTemp: 'Hot' | 'Iced' | 'N/A' =
-    product.temperature === 'N/A'
+    !product || product.temperature === 'N/A'
       ? 'N/A'
       : product.temperature === 'Cold'
       ? 'Iced'
@@ -65,7 +63,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
 
   // Compute available sizes for the current temperature
   const availableSizes = useMemo(() => {
-    if (!product.sizes || product.sizes.length === 0) return [];
+    if (!product || !product.sizes || product.sizes.length === 0) return [];
     if (selectedTemperature === 'N/A') return product.sizes;
 
     return product.sizes.filter((s) => {
@@ -86,7 +84,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
       }
       return true;
     });
-  }, [product.sizes, selectedTemperature]);
+  }, [product, selectedTemperature]);
 
   // Reset and initialize when product or open state changes
   useEffect(() => {
@@ -133,12 +131,14 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
 
   // Check if beverage categories support sweetness/ice
   const isBeverage =
-    product.temperature !== 'N/A' &&
-    !['Pasta', 'Pastries', 'Cakes on Tub', 'Rice Meals', 'Pika-Pika', 'Cakes'].includes(product.category);
+    Boolean(product) &&
+    product!.temperature !== 'N/A' &&
+    !['Pasta', 'Pastries', 'Cakes on Tub', 'Rice Meals', 'Pika-Pika', 'Cakes'].includes(product!.category);
   const isColdDrink = selectedTemperature === 'Iced';
 
   // Filter applicable add-ons and modifiers for this product and temperature
   const relevantAddons = useMemo(() => {
+    if (!product) return [];
     return safeAddonsList.filter((addon) => {
       if (!addon || !addon.available) return false;
 
@@ -230,7 +230,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
   };
 
   // Calculate Unit Price
-  const basePrice = product.price;
+  const basePrice = product?.price || 0;
   const sizePriceDelta = selectedSize?.priceDelta || 0;
 
   const multiAddonsPrice = selectedAddonIds.reduce((sum, id) => {
@@ -248,6 +248,7 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
 
   // Validate and handle Add to Bag
   const handleAdd = () => {
+    if (!product) return;
     // Check required modifier groups
     for (const [catName, group] of Object.entries(modifierGroups) as [string, ModifierGroup][]) {
       if (group.isRequired && !singleChoiceSelections[catName]) {
@@ -280,6 +281,8 @@ export const CustomerProductModal: React.FC<CustomerProductModalProps> = ({
     onAddToCart(cartItem);
     onClose();
   };
+
+  if (!isOpen || !product) return null;
 
   return (
     <div

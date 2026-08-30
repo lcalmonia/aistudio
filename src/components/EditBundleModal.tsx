@@ -18,8 +18,6 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
   bundleToEdit,
   menuItems = [],
 }) => {
-  if (!isOpen) return null;
-
   const isEditing = Boolean(bundleToEdit);
 
   const [name, setName] = useState(bundleToEdit?.name || '');
@@ -88,6 +86,8 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
     onSave(bundle);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">

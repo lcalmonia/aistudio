@@ -88,8 +88,6 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onSaveCategory,
   onDeleteCategory,
 }) => {
-  if (!isOpen) return null;
-
   const isEditing = Boolean(productToEdit);
 
   // Form states
@@ -474,6 +472,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const filteredCategoriesForManager = (categoriesList || []).filter((c) =>
     (c || '').toLowerCase().includes(categorySearchQuery.toLowerCase())
   );
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
