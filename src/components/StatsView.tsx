@@ -142,7 +142,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
           </div>
         ) : (
           <div className="space-y-2.5">
-            {topProducts.slice(0, 5).map((item, i) => (
+            {(topProducts || []).slice(0, 5).map((item, i) => (
               <div key={i} className="flex items-center justify-between text-xs bg-white/80 p-2.5 rounded-xl border border-[#dec1af]/30">
                 <div className="min-w-0 flex-1 pr-2">
                   <span className="font-bold text-[#26170c] truncate block">{item.name}</span>

@@ -55,19 +55,44 @@ export interface StaffUser {
   title?: string;
 }
 
+export type ModifierCategoryType = 'modifier' | 'addon';
+
+export interface ModifierCategory {
+  id: string;
+  name: string;
+  itemType: ModifierCategoryType;
+  required?: boolean;
+  selectionType?: 'single' | 'multiple';
+  applicableCategories?: string[];
+  applicableTemperature?: 'Hot' | 'Cold' | 'Both' | 'All';
+  sortOrder?: number;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ProductSize {
   name: string;
   volume: string;
   priceDelta: number;
+  availableTemperatures?: ('Hot' | 'Cold' | 'Both')[];
+  applicableTemperature?: 'Hot' | 'Cold' | 'Both' | 'All';
 }
 
 export interface ProductAddon {
   id: string;
   name: string;
-  category: 'Milk' | 'Shot' | 'Syrup' | 'Topping' | 'Prep';
+  category: string;
+  itemType?: ModifierCategoryType;
   price: number;
   applicableTemperature: 'Hot' | 'Cold' | 'Both' | 'All';
   available: boolean;
+  required?: boolean;
+  selectionType?: 'single' | 'multiple';
+  applicableCategories?: string[];
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PromoBundle {
@@ -162,6 +187,8 @@ export interface CustomerCartItem {
   sweetnessLevel?: string;
   iceLevel?: string;
   selectedAddons?: ProductAddon[];
+  selectedModifiers?: Record<string, string | string[]>;
+  selectedModifierItems?: ProductAddon[];
   specialInstructions?: string;
   quantity: number;
   unitPrice: number;

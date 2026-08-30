@@ -142,7 +142,7 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
             <article key={account.id} className="p-4 rounded-2xl bg-[#f9f2f0] border border-[#f3ecea] shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="w-11 h-11 rounded-full bg-[#26170c] text-[#fbddca] flex items-center justify-center font-serif font-bold">
-                  {account.displayName.slice(0, 1).toUpperCase()}
+                  {(account?.displayName || account?.username || 'A').slice(0, 1).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">

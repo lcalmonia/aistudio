@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { MenuItem, ProductAddon, PromoBundle, ProductTemperature } from '../types';
+import { MenuItem, ProductAddon, PromoBundle, ProductTemperature, ModifierCategory, ModifierCategoryType } from '../types';
+import { ModifierCategoryModal } from './ModifierCategoryModal';
 
 interface AdminMenuViewProps {
   menuItems?: MenuItem[];
   addons?: ProductAddon[];
+  modifierCategories?: ModifierCategory[];
   promoBundles?: PromoBundle[];
   categories?: string[];
   onAddProduct?: () => void;
@@ -27,6 +29,8 @@ interface AdminMenuViewProps {
   onToggleAddonStock?: (addonId: string) => void;
   onSaveCategory?: (newCategory: string, oldCategory?: string) => void;
   onDeleteCategory?: (category: string) => void;
+  onSaveModifierCategory?: (category: ModifierCategory) => void;
+  onDeleteModifierCategory?: (categoryId: string) => void;
   onShowNotification?: (msg: string) => void;
   onSwitchToCustomerPortal?: () => void;
 }
@@ -34,6 +38,7 @@ interface AdminMenuViewProps {
 export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   menuItems = [],
   addons = [],
+  modifierCategories = [],
   promoBundles = [],
   categories = [],
   onAddProduct,
@@ -57,6 +62,8 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   onToggleAddonStock = (_addonId: string) => {},
   onSaveCategory,
   onDeleteCategory,
+  onSaveModifierCategory,
+  onDeleteModifierCategory,
 }) => {
   // Defensive fallbacks for aliased handlers
   const handleAddProduct = onAddProduct || onOpenAddProduct || (() => {});
@@ -64,7 +71,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   const handleToggleProduct = onToggleProductStock || onToggleAvailability || (() => {});
   const handleAddBundle = onAddBundle || onOpenAddBundle || (() => {});
   const handleEditBundle = onEditBundle || onOpenEditBundle || (() => {});
-  const handleToggleBundle = onToggleBundleStock || onToggleAvailability || (() => {});
+  const handleToggleBundle = onToggleBundleStock || (() => {});
   const handleAddAddon = onAddAddon || onOpenAddAddon || (() => {});
   const handleEditAddon = onEditAddon || onOpenEditAddon || (() => {});
   // Navigation sub-tabs within Menu Admin
@@ -75,6 +82,84 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [temperatureFilter, setTemperatureFilter] = useState<string>('All');
   const [stockFilter, setStockFilter] = useState<'All' | 'InStock' | 'OutOfStock'>('All');
+
+  // Modifiers & Add-ons filters and modal state
+  const [isModCatModalOpen, setIsModCatModalOpen] = useState(false);
+  const [addonTypeFilter, setAddonTypeFilter] = useState<'All' | 'modifier' | 'addon'>('All');
+  const [addonCategoryFilter, setAddonCategoryFilter] = useState<string>('All');
+  const [addonSearchQuery, setAddonSearchQuery] = useState<string>('');
+
+  // Split addons into modifier vs addon counts
+  const modifierCount = useMemo(() => addons.filter((a) => a.itemType === 'modifier').length, [addons]);
+  const addonCount = useMemo(() => addons.filter((a) => a.itemType !== 'modifier').length, [addons]);
+
+  // Unique categories combining modifierCategories and existing addons
+  const allModifierCategoryNames = useMemo(() => {
+    const names = new Set<string>();
+    modifierCategories.forEach((mc) => names.add(mc.name));
+    addons.forEach((a) => {
+      if (a.category) names.add(a.category);
+    });
+    return Array.from(names);
+  }, [modifierCategories, addons]);
+
+  // Filtered addons based on type, search, and category
+  const filteredAddons = useMemo(() => {
+    return addons.filter((addon) => {
+      // Type Filter
+      if (addonTypeFilter === 'modifier' && addon.itemType !== 'modifier') return false;
+      if (addonTypeFilter === 'addon' && addon.itemType === 'modifier') return false;
+
+      // Category Filter
+      if (addonCategoryFilter !== 'All' && addon.category !== addonCategoryFilter) return false;
+
+      // Search Query
+      if (addonSearchQuery.trim()) {
+        const q = addonSearchQuery.toLowerCase();
+        const matchesName = addon.name.toLowerCase().includes(q);
+        const matchesCat = addon.category.toLowerCase().includes(q);
+        if (!matchesName && !matchesCat) return false;
+      }
+
+      return true;
+    });
+  }, [addons, addonTypeFilter, addonCategoryFilter, addonSearchQuery]);
+
+  // Group filtered addons by category
+  const groupedAddonCategories = useMemo(() => {
+    const categoryMap = new Map<string, { categoryDef?: ModifierCategory; items: ProductAddon[] }>();
+
+    // Seed with defined modifierCategories if matching filter
+    modifierCategories.forEach((mc) => {
+      if (addonTypeFilter === 'modifier' && mc.itemType !== 'modifier') return;
+      if (addonTypeFilter === 'addon' && mc.itemType === 'modifier') return;
+      if (addonCategoryFilter !== 'All' && mc.name !== addonCategoryFilter) return;
+
+      categoryMap.set(mc.name, {
+        categoryDef: mc,
+        items: [],
+      });
+    });
+
+    // Populate with filtered items
+    filteredAddons.forEach((item) => {
+      const catName = item.category || 'Other';
+      if (!categoryMap.has(catName)) {
+        const foundDef = modifierCategories.find((mc) => mc.name.toLowerCase() === catName.toLowerCase());
+        categoryMap.set(catName, {
+          categoryDef: foundDef,
+          items: [],
+        });
+      }
+      categoryMap.get(catName)!.items.push(item);
+    });
+
+    return Array.from(categoryMap.entries()).map(([name, data]) => ({
+      name,
+      categoryDef: data.categoryDef,
+      items: data.items,
+    }));
+  }, [modifierCategories, filteredAddons, addonTypeFilter, addonCategoryFilter]);
 
   // Quick Category Add State
   const [isQuickAddCategoryOpen, setIsQuickAddCategoryOpen] = useState(false);
@@ -692,98 +777,325 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
       {/* ========================================================================= */}
       {adminTab === 'addons' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#fff8f5] p-3.5 sm:p-4 rounded-2xl border border-[#e8e1df]">
+          {/* Top Control Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-[#fff8f5] p-3.5 sm:p-4 rounded-2xl border border-[#e8e1df]">
             <div>
-              <h3 className="font-serif text-base sm:text-lg font-bold text-[#26170c]">Add-ons & Modifiers Library</h3>
-              <p className="text-xs text-[#4f453f]">
-                Manage milk substitutes, syrups, extra shots, sweet creams, and temperature rules in ₱.
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-serif text-base sm:text-lg font-bold text-[#26170c]">
+                  Modifiers & Add-ons Library
+                </h3>
+                <span className="text-[10px] font-bold bg-[#e1e1c9] text-[#636451] px-2 py-0.5 rounded-full">
+                  {modifierCount} Modifiers • {addonCount} Add-ons
+                </span>
+              </div>
+              <p className="text-xs text-[#4f453f] mt-0.5">
+                Configure barista preparation rules, single/multi choices, syrup pumps, dairy alternatives, and extra topping pricing in ₱.
               </p>
             </div>
-            <button
-              onClick={handleAddAddon}
-              className="w-full sm:w-auto px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">add_circle</span>
-              <span>Add New Modifier</span>
-            </button>
+
+            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={() => setIsModCatModalOpen(true)}
+                className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] border border-[#d2c4bc] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">folder_special</span>
+                <span>Manage Categories</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAddAddon}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                <span>Add New Item</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar: Classification, Search & Category */}
+          <div className="bg-white p-3 rounded-2xl border border-[#d2c4bc] shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+              {/* Classification Segmented Tabs */}
+              <div className="inline-flex p-1 bg-[#f3ecea] rounded-xl border border-[#d2c4bc]">
+                <button
+                  type="button"
+                  onClick={() => setAddonTypeFilter('All')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    addonTypeFilter === 'All'
+                      ? 'bg-white text-[#26170c] shadow-xs'
+                      : 'text-[#4f453f] hover:text-[#26170c]'
+                  }`}
+                >
+                  All ({addons.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddonTypeFilter('modifier')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    addonTypeFilter === 'modifier'
+                      ? 'bg-white text-[#636451] shadow-xs'
+                      : 'text-[#4f453f] hover:text-[#26170c]'
+                  }`}
+                >
+                  <span>⚡ Modifiers</span>
+                  <span className="text-[10px] opacity-75">({modifierCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddonTypeFilter('addon')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    addonTypeFilter === 'addon'
+                      ? 'bg-white text-[#26170c] shadow-xs'
+                      : 'text-[#4f453f] hover:text-[#26170c]'
+                  }`}
+                >
+                  <span>➕ Add-ons</span>
+                  <span className="text-[10px] opacity-75">({addonCount})</span>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-sm">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#81756e] text-[18px]">
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search modifiers or add-ons..."
+                  value={addonSearchQuery}
+                  onChange={(e) => setAddonSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-[#fff8f5] border border-[#d2c4bc] rounded-xl text-xs text-[#26170c] placeholder-[#81756e] focus:outline-none focus:ring-2 focus:ring-[#5e604d]"
+                />
+                {addonSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setAddonSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#81756e] hover:text-[#26170c]"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-bold text-[#81756e] uppercase tracking-wider mr-1 flex-shrink-0">
+                Category:
+              </span>
+              <button
+                type="button"
+                onClick={() => setAddonCategoryFilter('All')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex-shrink-0 cursor-pointer ${
+                  addonCategoryFilter === 'All'
+                    ? 'bg-[#26170c] text-white'
+                    : 'bg-[#f3ecea] text-[#4f453f] hover:bg-[#e8e1df]'
+                }`}
+              >
+                All Categories
+              </button>
+              {allModifierCategoryNames.map((catName) => (
+                <button
+                  key={catName}
+                  type="button"
+                  onClick={() => setAddonCategoryFilter(catName)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex-shrink-0 cursor-pointer ${
+                    addonCategoryFilter === catName
+                      ? 'bg-[#26170c] text-white'
+                      : 'bg-[#f3ecea] text-[#4f453f] hover:bg-[#e8e1df]'
+                  }`}
+                >
+                  {catName}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Grouped by Category */}
-          {(['Milk', 'Shot', 'Syrup', 'Topping', 'Prep'] as const).map((cat) => {
-            const catAddons = addons.filter((a) => a.category === cat);
-            const categoryLabels: Record<string, string> = {
-              Milk: 'Alternative Milks & Dairy Options',
-              Shot: 'Espresso Shots & Roasts',
-              Syrup: 'Syrups, Flavors & Sweeteners',
-              Topping: 'Pearls, Creams & Toppings',
-              Prep: 'Barista Prep & Temperature Rules',
-            };
-
-            return (
-              <div key={cat} className="bg-[#fff8f5] p-3.5 sm:p-4 rounded-2xl border border-[#e8e1df] space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-serif text-sm font-bold text-[#26170c] flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#5e604d]" />
-                    {categoryLabels[cat]}
-                  </h4>
-                  <span className="text-[11px] text-[#81756e] font-semibold">{catAddons.length} options</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {catAddons.map((addon) => (
-                    <div
-                      key={addon.id}
-                      className="bg-white p-3 rounded-xl border border-[#d2c4bc] flex justify-between items-center shadow-2xs hover:border-[#81756e] transition-all gap-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-[#26170c] truncate">{addon.name}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-xs font-bold text-[#636451] whitespace-nowrap">
-                            {addon.price > 0 ? `+₱${addon.price.toFixed(2)}` : 'Free'}
-                          </span>
-                          <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 bg-[#f3ecea] text-[#4f453f] rounded whitespace-nowrap">
-                            {addon.applicableTemperature === 'Both'
-                              ? 'Hot & Cold'
-                              : addon.applicableTemperature === 'Hot'
-                              ? 'Hot Only'
-                              : 'Cold Only'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => onToggleAddonStock(addon.id)}
-                          title={addon.available ? 'In Stock' : 'Out of Stock'}
-                          className={`p-1 rounded-md text-xs font-bold cursor-pointer ${
-                            addon.available ? 'text-[#636451] hover:bg-[#e1e1c9]' : 'text-[#ba1a1a] hover:bg-[#ffdad6]'
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {addon.available ? 'toggle_on' : 'toggle_off'}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => handleEditAddon(addon)}
-                          className="p-1 text-[#4f453f] hover:bg-[#f3ecea] rounded-md cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">edit</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete modifier "${addon.name}"?`)) onDeleteAddon(addon.id);
-                          }}
-                          className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {groupedAddonCategories.length === 0 ? (
+            <div className="bg-[#fff8f5] p-8 rounded-2xl border border-[#e8e1df] text-center space-y-3">
+              <span className="material-symbols-outlined text-[42px] text-[#81756e]">search_off</span>
+              <h4 className="font-serif text-base font-bold text-[#26170c]">No Items Found</h4>
+              <p className="text-xs text-[#4f453f] max-w-sm mx-auto">
+                No modifiers or add-ons match the selected filters. You can add a new item or clear your search query.
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddonTypeFilter('All');
+                    setAddonSearchQuery('');
+                    setAddonCategoryFilter('All');
+                  }}
+                  className="px-3 py-1.5 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] text-xs font-bold rounded-lg border border-[#d2c4bc]"
+                >
+                  Reset Filters
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddAddon}
+                  className="px-3 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-lg"
+                >
+                  Add Item
+                </button>
               </div>
-            );
-          })}
+            </div>
+          ) : (
+            groupedAddonCategories.map((group) => {
+              const def = group.categoryDef;
+              const isModifierGroup = def ? def.itemType === 'modifier' : group.items[0]?.itemType === 'modifier';
+
+              return (
+                <div
+                  key={group.name}
+                  className="bg-[#fff8f5] p-3.5 sm:p-4 rounded-2xl border border-[#e8e1df] space-y-3 shadow-2xs"
+                >
+                  {/* Group Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#f3ecea]">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isModifierGroup ? 'bg-[#5e604d]' : 'bg-[#a37050]'}`} />
+                      <h4 className="font-serif text-sm sm:text-base font-bold text-[#26170c]">
+                        {group.name}
+                      </h4>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                          isModifierGroup
+                            ? 'bg-[#e1e1c9] text-[#636451]'
+                            : 'bg-[#e2d5cc] text-[#26170c]'
+                        }`}
+                      >
+                        {isModifierGroup ? 'Modifier' : 'Add-on'}
+                      </span>
+                      {def?.selectionType && (
+                        <span className="text-[10px] font-semibold bg-white border border-[#d2c4bc] px-2 py-0.5 rounded-md text-[#4f453f]">
+                          {def.selectionType === 'single' ? 'Single Choice' : 'Multiple Choices'}
+                        </span>
+                      )}
+                      {def?.required && (
+                        <span className="text-[10px] font-bold bg-[#ffdad6] text-[#ba1a1a] px-2 py-0.5 rounded-md">
+                          Required
+                        </span>
+                      )}
+                      {def?.applicableCategories && def.applicableCategories.length > 0 && (
+                        <span className="text-[10px] text-[#81756e] font-medium hidden md:inline">
+                          Applies to: {def.applicableCategories.join(', ')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-[#81756e] font-semibold">
+                        {group.items.length} {group.items.length === 1 ? 'option' : 'options'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddAddon}
+                        className="text-[11px] font-bold text-[#636451] hover:underline flex items-center gap-0.5 cursor-pointer ml-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">add</span>
+                        <span>Add Option</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Options Grid */}
+                  {group.items.length === 0 ? (
+                    <div className="bg-white/60 p-4 rounded-xl border border-dashed border-[#d2c4bc] text-center">
+                      <p className="text-xs text-[#81756e]">No active options in this category.</p>
+                      <button
+                        type="button"
+                        onClick={handleAddAddon}
+                        className="mt-2 text-xs font-bold text-[#26170c] underline cursor-pointer"
+                      >
+                        + Create option for {group.name}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {group.items.map((addon) => {
+                        const isMod = addon.itemType === 'modifier';
+
+                        return (
+                          <div
+                            key={addon.id}
+                            className={`bg-white p-3 rounded-xl border flex justify-between items-center shadow-2xs hover:border-[#81756e] transition-all gap-2 ${
+                              addon.available ? 'border-[#d2c4bc]' : 'border-[#ffdad6] opacity-75'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                                    isMod ? 'bg-[#e1e1c9] text-[#636451]' : 'bg-[#f3ecea] text-[#4f453f]'
+                                  }`}
+                                >
+                                  {isMod ? 'Mod' : 'Addon'}
+                                </span>
+                                <p className="text-xs font-bold text-[#26170c] truncate">{addon.name}</p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <span className="text-xs font-bold text-[#636451] whitespace-nowrap">
+                                  {addon.price > 0 ? `+₱${addon.price.toFixed(2)}` : 'Free / Included'}
+                                </span>
+                                <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 bg-[#f3ecea] text-[#4f453f] rounded whitespace-nowrap">
+                                  {addon.applicableTemperature === 'Both'
+                                    ? '🔥/❄️ Hot & Cold'
+                                    : addon.applicableTemperature === 'Hot'
+                                    ? '🔥 Hot Only'
+                                    : '❄️ Cold Only'}
+                                </span>
+                                {addon.required && (
+                                  <span className="text-[9px] px-1.5 py-0.2 bg-[#ffdad6] text-[#ba1a1a] rounded font-bold">
+                                    Req
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => onToggleAddonStock(addon.id)}
+                                title={addon.available ? 'In Stock (Click to toggle)' : 'Out of Stock (Click to toggle)'}
+                                className={`p-1 rounded-md text-xs font-bold cursor-pointer ${
+                                  addon.available ? 'text-[#636451] hover:bg-[#e1e1c9]' : 'text-[#ba1a1a] hover:bg-[#ffdad6]'
+                                }`}
+                              >
+                                <span className="material-symbols-outlined text-[18px]">
+                                  {addon.available ? 'toggle_on' : 'toggle_off'}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEditAddon(addon)}
+                                title="Edit Item"
+                                className="p-1 text-[#4f453f] hover:bg-[#f3ecea] rounded-md cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Delete option "${addon.name}"?`)) onDeleteAddon(addon.id);
+                                }}
+                                title="Delete Item"
+                                className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
@@ -1024,6 +1336,26 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modifier Categories Management Modal */}
+      {isModCatModalOpen && (
+        <ModifierCategoryModal
+          isOpen={isModCatModalOpen}
+          onClose={() => setIsModCatModalOpen(false)}
+          categories={modifierCategories}
+          productCategories={categories}
+          onSaveCategory={(cat) => {
+            if (onSaveModifierCategory) {
+              onSaveModifierCategory(cat);
+            }
+          }}
+          onDeleteCategory={(catId) => {
+            if (onDeleteModifierCategory) {
+              onDeleteModifierCategory(catId);
+            }
+          }}
+        />
       )}
     </div>
   );

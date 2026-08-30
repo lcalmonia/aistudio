@@ -10,6 +10,8 @@ export interface ProductSize {
   name: string;
   volume: string;
   priceDelta: number;
+  availableTemperatures?: ('Hot' | 'Cold' | 'Both')[];
+  applicableTemperature?: 'Hot' | 'Cold' | 'Both' | 'All';
 }
 
 export type ProductTemperature = 'Hot' | 'Cold' | 'Both' | 'N/A';
@@ -33,13 +35,34 @@ export interface MenuItem {
   updatedAt?: string;
 }
 
+export type ModifierCategoryType = 'modifier' | 'addon';
+
+export interface ModifierCategory {
+  id: string;
+  name: string;
+  itemType: ModifierCategoryType;
+  required?: boolean;
+  selectionType?: 'single' | 'multiple';
+  applicableCategories?: string[];
+  applicableTemperature?: 'Hot' | 'Cold' | 'Both' | 'All';
+  sortOrder?: number;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ProductAddon {
   id: string;
   name: string;
-  category: 'Milk' | 'Shot' | 'Syrup' | 'Topping' | 'Prep';
+  category: string;
+  itemType?: ModifierCategoryType;
   price: number;
   applicableTemperature: 'Hot' | 'Cold' | 'Both' | 'All';
   available: boolean;
+  required?: boolean;
+  selectionType?: 'single' | 'multiple';
+  applicableCategories?: string[];
+  sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -87,10 +110,29 @@ export interface CategoryRow {
 export interface AddonRow {
   id: string;
   name: string;
-  category: 'Milk' | 'Shot' | 'Syrup' | 'Topping' | 'Prep';
+  category: string;
+  item_type?: ModifierCategoryType | null;
   price: string | number;
   applicable_temperature: 'Hot' | 'Cold' | 'Both' | 'All';
   available: boolean;
+  required?: boolean | null;
+  selection_type?: 'single' | 'multiple' | null;
+  applicable_categories?: string[] | null;
+  sort_order?: number | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
+export interface ModifierCategoryRow {
+  id: string;
+  name: string;
+  item_type: ModifierCategoryType;
+  required: boolean | null;
+  selection_type: 'single' | 'multiple' | null;
+  applicable_categories: string[] | null;
+  applicable_temperature: 'Hot' | 'Cold' | 'Both' | 'All' | null;
+  sort_order: number | null;
+  active: boolean;
   created_at: string | Date;
   updated_at: string | Date;
 }
@@ -153,14 +195,35 @@ export function mapCategoryRecord(row: { name?: string; category_name?: string }
   return String(row.name || row.category_name || '').trim();
 }
 
+export function mapModifierCategoryRecord(row: ModifierCategoryRow): ModifierCategory {
+  return {
+    id: row.id,
+    name: row.name,
+    itemType: row.item_type || 'modifier',
+    required: Boolean(row.required),
+    selectionType: row.selection_type || 'single',
+    applicableCategories: Array.isArray(row.applicable_categories) ? row.applicable_categories : [],
+    applicableTemperature: row.applicable_temperature || 'Both',
+    sortOrder: Number(row.sort_order) || 0,
+    active: row.active !== false,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+  };
+}
+
 export function mapAddonRecord(row: AddonRow): ProductAddon {
   return {
     id: row.id,
     name: row.name,
     category: row.category,
+    itemType: row.item_type || 'addon',
     price: Number(row.price) || 0,
     applicableTemperature: row.applicable_temperature || 'Both',
     available: row.available !== false,
+    required: Boolean(row.required),
+    selectionType: row.selection_type || 'single',
+    applicableCategories: Array.isArray(row.applicable_categories) ? row.applicable_categories : undefined,
+    sortOrder: row.sort_order != null ? Number(row.sort_order) : undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
   };
@@ -344,7 +407,81 @@ export async function deleteCategoryFromDatabase(name: string, fallbackCategory?
 }
 
 // ============================================================================
-// ADD-ON OPERATIONS
+// MODIFIER CATEGORY OPERATIONS
+// ============================================================================
+
+export async function fetchModifierCategoriesFromDatabase(): Promise<ModifierCategory[]> {
+  const db = database();
+  try {
+    const result = await db.pool.query(
+      `SELECT * FROM modifier_categories ORDER BY sort_order ASC, name ASC`
+    );
+    return result.rows.map((row: ModifierCategoryRow) => mapModifierCategoryRecord(row));
+  } catch {
+    // If table doesn't exist yet in fallback environment, return empty list
+    return [];
+  }
+}
+
+export async function insertModifierCategoryToDatabase(cat: Partial<ModifierCategory>): Promise<ModifierCategory> {
+  const name = cat.name?.trim();
+  if (!name) throw new RequestError(400, 'Category name is required.');
+
+  const itemType = cat.itemType || 'modifier';
+  const required = Boolean(cat.required);
+  const selectionType = cat.selectionType || 'single';
+  const applicableCats = Array.isArray(cat.applicableCategories) ? cat.applicableCategories : [];
+  const applicableTemp = cat.applicableTemperature || 'Both';
+  const sortOrder = Number(cat.sortOrder) || 0;
+  const active = cat.active !== false;
+  const id = cat.id || `modcat-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+
+  const db = database();
+  const result = await db.pool.query(
+    `INSERT INTO modifier_categories (
+      id, name, item_type, required, selection_type, applicable_categories,
+      applicable_temperature, sort_order, active, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+    RETURNING *`,
+    [id, name, itemType, required, selectionType, applicableCats, applicableTemp, sortOrder, active]
+  );
+  return mapModifierCategoryRecord(result.rows[0]);
+}
+
+export async function updateModifierCategoryInDatabase(id: string, updates: Partial<ModifierCategory>): Promise<ModifierCategory> {
+  const db = database();
+  const currentResult = await db.pool.query(`SELECT * FROM modifier_categories WHERE id = $1 LIMIT 1`, [id]);
+  if (currentResult.rows.length === 0) throw new RequestError(404, `Modifier category "${id}" not found.`);
+
+  const current = mapModifierCategoryRecord(currentResult.rows[0]);
+  const name = updates.name !== undefined ? updates.name.trim() : current.name;
+  const itemType = updates.itemType !== undefined ? updates.itemType : current.itemType;
+  const required = updates.required !== undefined ? Boolean(updates.required) : Boolean(current.required);
+  const selectionType = updates.selectionType !== undefined ? updates.selectionType : current.selectionType;
+  const applicableCats = updates.applicableCategories !== undefined ? updates.applicableCategories : current.applicableCategories;
+  const applicableTemp = updates.applicableTemperature !== undefined ? updates.applicableTemperature : current.applicableTemperature;
+  const sortOrder = updates.sortOrder !== undefined ? Number(updates.sortOrder) : current.sortOrder;
+  const active = updates.active !== undefined ? Boolean(updates.active) : current.active;
+
+  const result = await db.pool.query(
+    `UPDATE modifier_categories
+     SET name = $1, item_type = $2, required = $3, selection_type = $4, applicable_categories = $5,
+         applicable_temperature = $6, sort_order = $7, active = $8, updated_at = NOW()
+     WHERE id = $9
+     RETURNING *`,
+    [name, itemType, required, selectionType, applicableCats, applicableTemp, sortOrder, active, id]
+  );
+  return mapModifierCategoryRecord(result.rows[0]);
+}
+
+export async function deleteModifierCategoryFromDatabase(id: string): Promise<boolean> {
+  const db = database();
+  const result = await db.pool.query(`DELETE FROM modifier_categories WHERE id = $1`, [id]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+// ============================================================================
+// ADD-ON & MODIFIER OPERATIONS
 // ============================================================================
 
 export async function fetchAddonsFromDatabase(): Promise<ProductAddon[]> {
@@ -367,17 +504,24 @@ export async function insertAddonToDatabase(addon: Partial<ProductAddon>): Promi
   if (!name) throw new RequestError(400, 'Add-on name is required.');
 
   const category = addon.category || 'Milk';
+  const itemType = addon.itemType || 'addon';
   const price = Math.max(0, Number(addon.price) || 0);
   const applicableTemp = addon.applicableTemperature || 'Both';
   const available = addon.available !== false;
+  const required = Boolean(addon.required);
+  const selectionType = addon.selectionType || 'single';
+  const applicableCategories = Array.isArray(addon.applicableCategories) ? addon.applicableCategories : [];
+  const sortOrder = Number(addon.sortOrder) || 0;
   const id = addon.id || `addon-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
   const db = database();
   const result = await db.pool.query(
-    `INSERT INTO add_ons (id, name, category, price, applicable_temperature, available, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-     RETURNING *`,
-    [id, name, category, price, applicableTemp, available]
+    `INSERT INTO add_ons (
+      id, name, category, item_type, price, applicable_temperature, available,
+      required, selection_type, applicable_categories, sort_order, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+    RETURNING *`,
+    [id, name, category, itemType, price, applicableTemp, available, required, selectionType, applicableCategories, sortOrder]
   );
   return mapAddonRecord(result.rows[0]);
 }
@@ -388,17 +532,24 @@ export async function updateAddonInDatabase(id: string, updates: Partial<Product
 
   const name = updates.name !== undefined ? updates.name.trim() : current.name;
   const category = updates.category !== undefined ? updates.category : current.category;
+  const itemType = updates.itemType !== undefined ? updates.itemType : (current.itemType || 'addon');
   const price = updates.price !== undefined ? Math.max(0, Number(updates.price) || 0) : current.price;
   const applicableTemp = updates.applicableTemperature !== undefined ? updates.applicableTemperature : current.applicableTemperature;
   const available = updates.available !== undefined ? updates.available : current.available;
+  const required = updates.required !== undefined ? Boolean(updates.required) : Boolean(current.required);
+  const selectionType = updates.selectionType !== undefined ? updates.selectionType : (current.selectionType || 'single');
+  const applicableCategories = updates.applicableCategories !== undefined ? updates.applicableCategories : (current.applicableCategories || []);
+  const sortOrder = updates.sortOrder !== undefined ? Number(updates.sortOrder) : (current.sortOrder || 0);
 
   const db = database();
   const result = await db.pool.query(
     `UPDATE add_ons
-     SET name = $1, category = $2, price = $3, applicable_temperature = $4, available = $5, updated_at = NOW()
-     WHERE id = $6
+     SET name = $1, category = $2, item_type = $3, price = $4, applicable_temperature = $5,
+         available = $6, required = $7, selection_type = $8, applicable_categories = $9,
+         sort_order = $10, updated_at = NOW()
+     WHERE id = $11
      RETURNING *`,
-    [name, category, price, applicableTemp, available, id]
+    [name, category, itemType, price, applicableTemp, available, required, selectionType, applicableCategories, sortOrder, id]
   );
   return mapAddonRecord(result.rows[0]);
 }

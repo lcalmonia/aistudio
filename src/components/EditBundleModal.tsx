@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PromoBundle, MenuItem } from '../types';
 
 interface EditBundleModalProps {
@@ -24,8 +24,8 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
 
   const [name, setName] = useState(bundleToEdit?.name || '');
   const [description, setDescription] = useState(bundleToEdit?.description || '');
-  const [price, setPrice] = useState<number>(bundleToEdit?.price ?? 10.50);
-  const [originalPrice, setOriginalPrice] = useState<number>(bundleToEdit?.originalPrice ?? 13.00);
+  const [price, setPrice] = useState<number>(bundleToEdit?.price ?? 199.00);
+  const [originalPrice, setOriginalPrice] = useState<number>(bundleToEdit?.originalPrice ?? 250.00);
   const [discountBadge, setDiscountBadge] = useState(bundleToEdit?.discountBadge || 'Save 20%');
   const [temperatureOption, setTemperatureOption] = useState(bundleToEdit?.temperatureOption || 'Choice of Hot or Iced Drink');
   const [timeSlot, setTimeSlot] = useState(bundleToEdit?.timeSlot || 'Daily until 11:30 AM');
@@ -34,6 +34,32 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
   const [selectedItems, setSelectedItems] = useState<string[]>(
     bundleToEdit?.bundleItems || [menuItems[0]?.name, menuItems[1]?.name].filter(Boolean)
   );
+
+  useEffect(() => {
+    if (bundleToEdit) {
+      setName(bundleToEdit.name || '');
+      setDescription(bundleToEdit.description || '');
+      setPrice(bundleToEdit.price ?? 199.00);
+      setOriginalPrice(bundleToEdit.originalPrice ?? 250.00);
+      setDiscountBadge(bundleToEdit.discountBadge || 'Save 20%');
+      setTemperatureOption(bundleToEdit.temperatureOption || 'Choice of Hot or Iced Drink');
+      setTimeSlot(bundleToEdit.timeSlot || 'Daily until 11:30 AM');
+      setImage(bundleToEdit.image || menuItems[0]?.image || '');
+      setAvailable(bundleToEdit.available ?? true);
+      setSelectedItems(bundleToEdit.bundleItems || []);
+    } else {
+      setName('');
+      setDescription('');
+      setPrice(199.00);
+      setOriginalPrice(250.00);
+      setDiscountBadge('Save 20%');
+      setTemperatureOption('Choice of Hot or Iced Drink');
+      setTimeSlot('Daily until 11:30 AM');
+      setImage(menuItems[0]?.image || '');
+      setAvailable(true);
+      setSelectedItems([menuItems[0]?.name, menuItems[1]?.name].filter(Boolean));
+    }
+  }, [bundleToEdit, isOpen, menuItems]);
 
   const handleToggleItem = (itemName: string) => {
     setSelectedItems((prev) =>

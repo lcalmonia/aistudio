@@ -14,3 +14,4 @@ export * from './loyaltyService';
 export * from './auxiliaryServices';
 export * from './reportingService';
 export * from './routeService';
+export * from './modifierCategoryService';

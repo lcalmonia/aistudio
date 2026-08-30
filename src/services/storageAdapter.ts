@@ -12,6 +12,7 @@ import {
   Order,
   MenuItem,
   ProductAddon,
+  ModifierCategory,
   PromoBundle,
   InventoryItem,
   InventoryMovement,
@@ -24,6 +25,7 @@ import {
   INITIAL_ORDERS,
   INITIAL_MENU_ITEMS,
   DEFAULT_CATEGORIES,
+  DEFAULT_MODIFIER_CATEGORIES,
   INITIAL_ADDONS,
   INITIAL_PROMO_BUNDLES,
   INVENTORY_ITEMS,
@@ -42,6 +44,7 @@ const KEYS = {
   ORDERS: 'iluvkeyks_orders_v2',
   MENU_ITEMS: 'iluvkeyks_menu_items_v2',
   CATEGORIES: 'iluvkeyks_categories_v2',
+  MODIFIER_CATEGORIES: 'iluvkeyks_modifier_categories_v2',
   ADDONS: 'iluvkeyks_addons_v2',
   BUNDLES: 'iluvkeyks_bundles_v2',
   INVENTORY: 'iluvkeyks_inventory_v2',
@@ -143,7 +146,11 @@ export const storageAdapter = {
   getCategories: (): string[] => safeGetItem<string[]>(KEYS.CATEGORIES, DEFAULT_CATEGORIES),
   setCategories: (categories: string[]): void => safeSetItem(KEYS.CATEGORIES, categories),
 
-  // Addons
+  // Modifier Categories
+  getModifierCategories: (): ModifierCategory[] => safeGetItem<ModifierCategory[]>(KEYS.MODIFIER_CATEGORIES, DEFAULT_MODIFIER_CATEGORIES),
+  setModifierCategories: (cats: ModifierCategory[]): void => safeSetItem(KEYS.MODIFIER_CATEGORIES, cats),
+
+  // Addons & Modifiers
   getAddons: (): ProductAddon[] => safeGetItem<ProductAddon[]>(KEYS.ADDONS, INITIAL_ADDONS),
   setAddons: (addons: ProductAddon[]): void => safeSetItem(KEYS.ADDONS, addons),
 

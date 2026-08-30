@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { MenuItem, ProductAddon, ProductSize, ProductTemperature } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MenuItem, ProductAddon, ProductSize, ProductTemperature, ModifierCategory, ModifierCategoryType } from '../types';
+import { ModifierCategoryModal } from './ModifierCategoryModal';
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -8,9 +9,12 @@ interface EditProductModalProps {
   onDelete?: (productId: string) => void;
   productToEdit: MenuItem | null;
   addonsList: ProductAddon[];
+  modifierCategories?: ModifierCategory[];
   onSaveAddon?: (addon: ProductAddon) => void;
   onDeleteAddon?: (addonId: string) => void;
   onToggleAddonStock?: (addonId: string) => void;
+  onSaveModifierCategory?: (category: ModifierCategory) => void;
+  onDeleteModifierCategory?: (categoryId: string) => void;
   categoriesList?: string[];
   onSaveCategory?: (newCategory: string, oldCategory?: string) => void;
   onDeleteCategory?: (category: string) => void;
@@ -73,10 +77,13 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onSave,
   onDelete,
   productToEdit,
-  addonsList,
+  addonsList = [],
+  modifierCategories = [],
   onSaveAddon,
   onDeleteAddon,
   onToggleAddonStock,
+  onSaveModifierCategory,
+  onDeleteModifierCategory,
   categoriesList = [],
   onSaveCategory,
   onDeleteCategory,
@@ -104,10 +111,52 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   // Sizes state (default in Philippine Peso deltas)
   const [sizes, setSizes] = useState<ProductSize[]>(
     productToEdit?.sizes || [
-      { name: 'Regular', volume: '16oz', priceDelta: 0.00 },
-      { name: 'Large', volume: '22oz', priceDelta: 20.00 },
+      { name: 'Regular', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
+      { name: 'Large', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
     ]
   );
+
+  useEffect(() => {
+    if (productToEdit) {
+      setName(productToEdit.name || '');
+      setCategory(productToEdit.category || categoriesList[0] || 'Coffee');
+      setPrice(productToEdit.price ?? 145);
+      setDescription(productToEdit.description || '');
+      setImage(productToEdit.image || PRESET_CAFE_PHOTOS[0].url);
+      setTemperature(productToEdit.temperature || 'Both');
+      setPopular(productToEdit.popular ?? false);
+      setAvailable(productToEdit.available ?? true);
+      setCalories(productToEdit.calories ?? 180);
+      setTagInput(productToEdit.tags?.join(', ') || '');
+      setAllergenInput(productToEdit.allergens?.join(', ') || '');
+      setSelectedAddonIds(productToEdit.addons || ['addon-oat', 'addon-shot', 'addon-vanilla-cream']);
+      setSizes(
+        productToEdit.sizes && productToEdit.sizes.length > 0
+          ? productToEdit.sizes
+          : [
+              { name: 'Regular', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
+              { name: 'Large', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
+            ]
+      );
+    } else {
+      setName('');
+      setCategory(categoriesList[0] || 'Coffee');
+      setPrice(145);
+      setDescription('');
+      setImage(PRESET_CAFE_PHOTOS[0].url);
+      setTemperature('Both');
+      setPopular(false);
+      setAvailable(true);
+      setCalories(180);
+      setTagInput('Best Seller');
+      setAllergenInput('');
+      setSelectedAddonIds(['addon-oat', 'addon-shot', 'addon-vanilla-cream']);
+      setSizes([
+        { name: 'Regular', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
+        { name: 'Large', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Hot', 'Cold', 'Both'] },
+      ]);
+    }
+  }, [productToEdit, isOpen, categoriesList]);
 
   // Category Manager & Inline Creator state
   const [isAddingCategoryInline, setIsAddingCategoryInline] = useState(false);
@@ -117,7 +166,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const [managerNewCategoryInput, setManagerNewCategoryInput] = useState('');
 
+  // Modifier Category Manager Sub-modal
+  const [isModCatModalOpen, setIsModCatModalOpen] = useState(false);
+
   // Add-on Manager & In-place Editor Sub-state
+  const [classificationFilter, setClassificationFilter] = useState<'All' | 'modifier' | 'addon'>('All');
   const [addonCategoryFilter, setAddonCategoryFilter] = useState<string>('All');
   const [addonSearch, setAddonSearch] = useState<string>('');
   const [isAddonEditorOpen, setIsAddonEditorOpen] = useState<boolean>(false);
@@ -125,13 +178,28 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
   // Add-on form fields
   const [addonFormName, setAddonFormName] = useState('');
-  const [addonFormCategory, setAddonFormCategory] = useState<ProductAddon['category']>('Syrup');
+  const [addonFormCategory, setAddonFormCategory] = useState<string>('Syrup');
+  const [addonFormType, setAddonFormType] = useState<ModifierCategoryType>('addon');
   const [addonFormPrice, setAddonFormPrice] = useState<number>(25.00);
   const [addonFormTemp, setAddonFormTemp] = useState<ProductAddon['applicableTemperature']>('Both');
   const [addonFormAvailable, setAddonFormAvailable] = useState<boolean>(true);
+  const [addonFormSelectionType, setAddonFormSelectionType] = useState<'single' | 'multiple'>('multiple');
+  const [addonFormRequired, setAddonFormRequired] = useState<boolean>(false);
 
   const [activePhotoTab, setActivePhotoTab] = useState<'upload' | 'preset' | 'url'>('upload');
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Dynamic available categories from both modifier categories and addons
+  const availableAddonCategories = useMemo(() => {
+    const catMap = new Map<string, string>();
+    modifierCategories.forEach((c) => {
+      if (c.name) catMap.set(c.name.toLowerCase(), c.name);
+    });
+    addonsList.forEach((a) => {
+      if (a.category) catMap.set(a.category.toLowerCase(), a.category);
+    });
+    return Array.from(catMap.values());
+  }, [modifierCategories, addonsList]);
 
   // Inline Category Creator Handlers
   const handleQuickAddCategory = () => {
@@ -185,10 +253,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const handleOpenNewAddon = () => {
     setEditingAddon(null);
     setAddonFormName('');
-    setAddonFormCategory('Syrup');
+    const defaultCat = availableAddonCategories[0] || 'Syrup';
+    setAddonFormCategory(defaultCat);
+    const catConfig = modifierCategories.find((c) => c.name.toLowerCase() === defaultCat.toLowerCase());
+    setAddonFormType(catConfig?.itemType || 'addon');
     setAddonFormPrice(25.00);
     setAddonFormTemp('Both');
     setAddonFormAvailable(true);
+    setAddonFormSelectionType(catConfig?.selectionType || 'multiple');
+    setAddonFormRequired(Boolean(catConfig?.required));
     setIsAddonEditorOpen(true);
   };
 
@@ -197,9 +270,13 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     setEditingAddon(addon);
     setAddonFormName(addon.name);
     setAddonFormCategory(addon.category);
+    const catConfig = modifierCategories.find((c) => c.name.toLowerCase() === addon.category.toLowerCase());
+    setAddonFormType(addon.itemType || catConfig?.itemType || 'addon');
     setAddonFormPrice(addon.price);
     setAddonFormTemp(addon.applicableTemperature);
     setAddonFormAvailable(addon.available);
+    setAddonFormSelectionType(addon.selectionType || catConfig?.selectionType || 'multiple');
+    setAddonFormRequired(Boolean(addon.required || catConfig?.required));
     setIsAddonEditorOpen(true);
   };
 
@@ -212,9 +289,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       id: editingAddon?.id || `addon-${Date.now()}`,
       name: addonFormName.trim(),
       category: addonFormCategory,
+      itemType: addonFormType,
       price: Number(addonFormPrice),
       applicableTemperature: addonFormTemp,
       available: addonFormAvailable,
+      selectionType: addonFormSelectionType,
+      required: addonFormRequired,
     };
 
     if (onSaveAddon) {
@@ -242,6 +322,34 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const handleToggleAddonSelected = (addonId: string) => {
     setSelectedAddonIds((prev) =>
       prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
+    );
+  };
+
+  // Select all currently filtered addons
+  const handleSelectAllFilteredAddons = () => {
+    const filteredIds = filteredAddonsList.map((a) => a.id);
+    setSelectedAddonIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+  };
+
+  // Deselect all currently filtered addons
+  const handleDeselectAllFilteredAddons = () => {
+    const filteredIdSet = new Set(filteredAddonsList.map((a) => a.id));
+    setSelectedAddonIds((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+  };
+
+  // Size temperature applicability toggle
+  const handleSizeTempChange = (index: number, mode: 'Both' | 'Hot' | 'Cold') => {
+    setSizes((prev) =>
+      prev.map((s, i) => {
+        if (i !== index) return s;
+        if (mode === 'Both') {
+          return { ...s, availableTemperatures: ['Hot', 'Cold', 'Both'], applicableTemperature: 'Both' };
+        } else if (mode === 'Hot') {
+          return { ...s, availableTemperatures: ['Hot'], applicableTemperature: 'Hot' };
+        } else {
+          return { ...s, availableTemperatures: ['Cold'], applicableTemperature: 'Cold' };
+        }
+      })
     );
   };
 
@@ -276,7 +384,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
   // Size row handlers
   const handleAddSize = () => {
-    setSizes((prev) => [...prev, { name: 'Extra Large', volume: '24oz', priceDelta: 35.00 }]);
+    setSizes((prev) => [
+      ...prev,
+      {
+        name: 'Extra Large',
+        volume: '24oz',
+        priceDelta: 35.00,
+        availableTemperatures: temperature === 'Both' ? ['Hot', 'Cold', 'Both'] : undefined,
+      },
+    ]);
   };
 
   const handleRemoveSize = (index: number) => {
@@ -324,14 +440,36 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     onClose();
   };
 
-  const filteredAddonsList = (addonsList || []).filter((a) => {
-    if (!a) return false;
-    const matchesCategory = addonCategoryFilter === 'All' || a.category === addonCategoryFilter;
-    const matchesSearch =
-      (a.name || '').toLowerCase().includes(addonSearch.toLowerCase()) ||
-      (a.category || '').toLowerCase().includes(addonSearch.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredAddonsList = useMemo(() => {
+    return (addonsList || []).filter((a) => {
+      if (!a) return false;
+
+      const catConfig = modifierCategories.find(
+        (c) => c.name.toLowerCase() === (a.category || '').toLowerCase()
+      );
+      const isModifier =
+        a.itemType === 'modifier' ||
+        catConfig?.itemType === 'modifier' ||
+        a.selectionType === 'single' ||
+        catConfig?.selectionType === 'single';
+
+      const resolvedType: ModifierCategoryType = isModifier ? 'modifier' : 'addon';
+
+      if (classificationFilter !== 'All' && resolvedType !== classificationFilter) {
+        return false;
+      }
+
+      const matchesCategory =
+        addonCategoryFilter === 'All' ||
+        (a.category || '').toLowerCase() === addonCategoryFilter.toLowerCase();
+
+      const matchesSearch =
+        (a.name || '').toLowerCase().includes(addonSearch.toLowerCase()) ||
+        (a.category || '').toLowerCase().includes(addonSearch.toLowerCase());
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [addonsList, modifierCategories, classificationFilter, addonCategoryFilter, addonSearch]);
 
   const filteredCategoriesForManager = (categoriesList || []).filter((c) =>
     (c || '').toLowerCase().includes(categorySearchQuery.toLowerCase())
@@ -645,14 +783,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           {temperature !== 'N/A' && (
             <div className="p-3.5 bg-[#f9f2f0] rounded-xl border border-[#e8e1df]">
               <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-[#26170c] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">straighten</span>
-                  Cup Sizes & Price Modifiers (₱)
-                </label>
+                <div>
+                  <label className="text-xs font-bold text-[#26170c] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">straighten</span>
+                    Cup Sizes & Price Modifiers (₱)
+                  </label>
+                  {temperature === 'Both' && (
+                    <p className="text-[10px] text-[#81756e]">
+                      Configure size availability per temperature (Hot, Iced, or Both).
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleAddSize}
-                  className="text-[11px] font-bold text-[#5e604d] hover:text-[#26170c] flex items-center gap-0.5"
+                  className="text-[11px] font-bold text-[#5e604d] hover:text-[#26170c] flex items-center gap-0.5 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[14px]">add</span>
                   Add Size
@@ -660,93 +805,172 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               </div>
 
               <div className="space-y-2">
-                {sizes.map((s, idx) => (
-                  <div key={idx} className="flex gap-2 items-center bg-white p-2 rounded-lg border border-[#d2c4bc]">
-                    <input
-                      type="text"
-                      placeholder="Size name (e.g. Regular, Large)"
-                      value={s.name}
-                      onChange={(e) => handleSizeChange(idx, 'name', e.target.value)}
-                      className="flex-1 px-2 py-1 text-xs border rounded bg-[#fdfaf8]"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Volume (16oz)"
-                      value={s.volume}
-                      onChange={(e) => handleSizeChange(idx, 'volume', e.target.value)}
-                      className="w-20 px-2 py-1 text-xs border rounded bg-[#fdfaf8]"
-                    />
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-bold text-[#81756e]">+₱</span>
-                      <input
-                        type="number"
-                        step="1"
-                        placeholder="Price diff"
-                        value={s.priceDelta}
-                        onChange={(e) => handleSizeChange(idx, 'priceDelta', parseFloat(e.target.value) || 0)}
-                        className="w-20 px-2 py-1 text-xs border rounded bg-[#fdfaf8]"
-                      />
+                {sizes.map((s, idx) => {
+                  const currentTempMode: 'Both' | 'Hot' | 'Cold' =
+                    s.availableTemperatures?.length === 1 && s.availableTemperatures[0] === 'Hot'
+                      ? 'Hot'
+                      : s.availableTemperatures?.length === 1 && s.availableTemperatures[0] === 'Cold'
+                      ? 'Cold'
+                      : 'Both';
+
+                  return (
+                    <div key={idx} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-white p-2.5 rounded-xl border border-[#d2c4bc]">
+                      <div className="flex-1 flex gap-2 w-full">
+                        <input
+                          type="text"
+                          placeholder="Size name (e.g. Regular, Large)"
+                          value={s.name}
+                          onChange={(e) => handleSizeChange(idx, 'name', e.target.value)}
+                          className="flex-1 px-2.5 py-1 text-xs border rounded-lg bg-[#fdfaf8]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Volume (16oz)"
+                          value={s.volume}
+                          onChange={(e) => handleSizeChange(idx, 'volume', e.target.value)}
+                          className="w-20 px-2 py-1 text-xs border rounded-lg bg-[#fdfaf8]"
+                        />
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-bold text-[#81756e]">+₱</span>
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="Price diff"
+                            value={s.priceDelta}
+                            onChange={(e) => handleSizeChange(idx, 'priceDelta', parseFloat(e.target.value) || 0)}
+                            className="w-18 px-2 py-1 text-xs border rounded-lg bg-[#fdfaf8]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Temperature toggle for this size if product supports Both */}
+                      {temperature === 'Both' && (
+                        <div className="flex items-center gap-1 self-end sm:self-center">
+                          {(['Both', 'Hot', 'Cold'] as const).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => handleSizeTempChange(idx, mode)}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-all cursor-pointer ${
+                                currentTempMode === mode
+                                  ? 'bg-[#26170c] text-white border-[#26170c]'
+                                  : 'bg-[#f3ecea] text-[#4f453f] border-[#d2c4bc] hover:bg-[#e8e1df]'
+                              }`}
+                            >
+                              {mode === 'Both' ? '🔥/❄️ Both' : mode === 'Hot' ? '🔥 Hot' : '❄️ Iced'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {sizes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSize(idx)}
+                          className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded transition-colors self-end sm:self-center cursor-pointer"
+                          title="Remove Size"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                      )}
                     </div>
-                    {sizes.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSize(idx)}
-                        className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Section 5: Applicable Add-ons Management */}
+          {/* Section 5: Applicable Add-ons & Modifiers Management */}
           <div className="p-3.5 bg-[#f9f2f0] rounded-2xl border border-[#e8e1df] space-y-3">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
               <div>
                 <label className="text-xs font-bold text-[#26170c] flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px] text-[#5e604d]">tune</span>
-                  Applicable Add-ons & Modifiers ({selectedAddonIds.length} enabled for this item)
+                  Modifiers & Add-ons ({selectedAddonIds.length} enabled for this item)
                 </label>
                 <p className="text-[11px] text-[#81756e]">
-                  Select modifiers or create/edit custom add-ons available across all products.
+                  Manage options, single-choice modifiers, and paid extra add-ons.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleOpenNewAddon}
-                className="px-3 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 self-start sm:self-auto shadow-2xs"
-              >
-                <span className="material-symbols-outlined text-[16px]">add_circle</span>
-                Create New Add-on
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {onSaveModifierCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setIsModCatModalOpen(true)}
+                    className="px-2.5 py-1.5 bg-white hover:bg-[#eee7e4] text-[#26170c] border border-[#d2c4bc] text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-[#5e604d]">category</span>
+                    Manage Categories
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleOpenNewAddon}
+                  className="px-3 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                  Create Option
+                </button>
+              </div>
             </div>
 
-            {/* Search and Category Filter for Add-ons */}
-            <div className="flex gap-2 items-center">
-              <div className="relative flex-1">
+            {/* Classification & Search Controls */}
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+              {/* Classification Filter Tabs */}
+              <div className="flex bg-white p-0.5 rounded-xl border border-[#d2c4bc] w-fit">
+                {(['All', 'modifier', 'addon'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setClassificationFilter(type)}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                      classificationFilter === type
+                        ? 'bg-[#26170c] text-white shadow-2xs'
+                        : 'text-[#4f453f] hover:bg-[#f3ecea]'
+                    }`}
+                  >
+                    {type === 'All' ? 'All Items' : type === 'modifier' ? '⚡ Modifiers' : '➕ Add-ons'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative flex-1 sm:max-w-xs">
                 <span className="material-symbols-outlined absolute left-2.5 top-2 text-[#81756e] text-[16px]">
                   search
                 </span>
                 <input
                   type="text"
-                  placeholder="Filter add-ons..."
+                  placeholder="Search modifiers & add-ons..."
                   value={addonSearch}
                   onChange={(e) => setAddonSearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 text-xs bg-white rounded-lg border border-[#d2c4bc]"
                 />
               </div>
+            </div>
 
-              <div className="flex gap-1 overflow-x-auto scrolling-hide">
-                {['All', 'Milk', 'Shot', 'Syrup', 'Topping', 'Prep'].map((cat) => (
+            {/* Dynamic Category Filter Pills */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-1 overflow-x-auto scrolling-hide py-0.5 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setAddonCategoryFilter('All')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all flex-shrink-0 cursor-pointer ${
+                    addonCategoryFilter === 'All'
+                      ? 'bg-[#26170c] text-white'
+                      : 'bg-white text-[#4f453f] border border-[#d2c4bc] hover:bg-[#eee7e4]'
+                  }`}
+                >
+                  All Categories
+                </button>
+                {availableAddonCategories.map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setAddonCategoryFilter(cat)}
-                    className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all ${
+                    className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all flex-shrink-0 cursor-pointer ${
                       addonCategoryFilter === cat
                         ? 'bg-[#26170c] text-white'
                         : 'bg-white text-[#4f453f] border border-[#d2c4bc] hover:bg-[#eee7e4]'
@@ -756,22 +980,41 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   </button>
                 ))}
               </div>
+
+              {/* Quick Select All / Clear for this filtered set */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleSelectAllFilteredAddons}
+                  className="px-2 py-1 text-[10px] font-bold text-[#5e604d] hover:bg-white rounded border border-[#d2c4bc] bg-[#fdfaf8] transition-colors cursor-pointer"
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeselectAllFilteredAddons}
+                  className="px-2 py-1 text-[10px] font-bold text-[#81756e] hover:bg-white rounded border border-[#d2c4bc] bg-[#fdfaf8] transition-colors cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
 
             {/* Add-ons List Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
               {filteredAddonsList.length === 0 ? (
-                <div className="col-span-2 text-center py-4 text-xs text-[#81756e]">
-                  No add-on modifiers found matching "{addonSearch}".
+                <div className="col-span-2 text-center py-6 text-xs text-[#81756e] bg-white rounded-xl border border-dashed border-[#d2c4bc]">
+                  No items found matching the current filter.
                 </div>
               ) : (
                 filteredAddonsList.map((addon) => {
                   const isChecked = selectedAddonIds.includes(addon.id);
+                  const isModifier = addon.itemType === 'modifier' || addon.selectionType === 'single';
 
                   return (
                     <div
                       key={addon.id}
-                      className={`p-2 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
                         isChecked
                           ? 'bg-[#e1e1c9] border-[#636451]'
                           : 'bg-white border-[#d2c4bc] hover:border-[#81756e]'
@@ -779,7 +1022,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                     >
                       <div
                         onClick={() => handleToggleAddonSelected(addon.id)}
-                        className="flex items-center gap-2 cursor-pointer min-w-0 flex-1"
+                        className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1"
                       >
                         <div
                           className={`w-4 h-4 rounded flex items-center justify-center border transition-all flex-shrink-0 ${
@@ -794,9 +1037,18 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className={`text-xs truncate ${isChecked ? 'font-bold text-[#26170c]' : 'text-[#4f453f]'}`}>
                               {addon.name}
+                            </span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider flex-shrink-0 ${
+                                isModifier
+                                  ? 'bg-[#d8e2ff] text-[#001a41]'
+                                  : 'bg-[#ffdcc1] text-[#6e3900]'
+                              }`}
+                            >
+                              {isModifier ? 'Modifier' : 'Add-on'}
                             </span>
                             {!addon.available && (
                               <span className="text-[9px] bg-[#ffdad6] text-[#ba1a1a] px-1 rounded font-bold flex-shrink-0">
@@ -804,7 +1056,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-[#81756e]">
+
+                          <div className="flex items-center gap-1.5 text-[10px] text-[#81756e] mt-0.5">
                             <span className="bg-[#e8e1df] text-[#4f453f] px-1 rounded font-medium">
                               {addon.category}
                             </span>
@@ -814,6 +1067,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                             <span>
                               {addon.applicableTemperature === 'Hot' ? '🔥' : addon.applicableTemperature === 'Cold' ? '❄️' : '🔥/❄️'}
                             </span>
+                            {addon.required && (
+                              <span className="text-[#ba1a1a] font-bold text-[9px]">• Required</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -825,7 +1081,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                             type="button"
                             title={addon.available ? 'Mark Out of Stock' : 'Mark In Stock'}
                             onClick={() => onToggleAddonStock(addon.id)}
-                            className={`p-1 rounded hover:bg-[#e8e1df] transition-colors ${
+                            className={`p-1 rounded hover:bg-[#e8e1df] transition-colors cursor-pointer ${
                               addon.available ? 'text-[#5e604d]' : 'text-[#ba1a1a]'
                             }`}
                           >
@@ -836,17 +1092,17 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                         )}
                         <button
                           type="button"
-                          title="Edit this add-on across all products"
+                          title="Edit this option"
                           onClick={() => handleOpenEditExistingAddon(addon)}
-                          className="p-1 text-[#4f453f] hover:text-[#26170c] hover:bg-[#e8e1df] rounded transition-colors"
+                          className="p-1 text-[#4f453f] hover:text-[#26170c] hover:bg-[#e8e1df] rounded transition-colors cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[14px]">edit</span>
                         </button>
                         <button
                           type="button"
-                          title="Delete add-on from store"
+                          title="Delete option from store"
                           onClick={() => handleDeleteAddonGlobal(addon)}
-                          className="p-1 text-[#81756e] hover:text-[#ba1a1a] hover:bg-[#ffdad6] rounded transition-colors"
+                          className="p-1 text-[#81756e] hover:text-[#ba1a1a] hover:bg-[#ffdad6] rounded transition-colors cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[14px]">delete</span>
                         </button>
@@ -1174,20 +1430,59 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#26170c] mb-1">Type / Category</label>
+                  <label className="block text-xs font-bold text-[#26170c] mb-1">Category / Group</label>
                   <select
                     value={addonFormCategory}
-                    onChange={(e) => setAddonFormCategory(e.target.value as ProductAddon['category'])}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      setAddonFormCategory(newCat);
+                      const catConfig = modifierCategories.find((c) => c.name.toLowerCase() === newCat.toLowerCase());
+                      if (catConfig) {
+                        setAddonFormType(catConfig.itemType);
+                        setAddonFormSelectionType(catConfig.selectionType);
+                        setAddonFormRequired(Boolean(catConfig.required));
+                      }
+                    }}
                     className="w-full px-3 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc]"
                   >
-                    <option value="Milk">Alternative Milk</option>
-                    <option value="Shot">Espresso Shot</option>
-                    <option value="Syrup">Syrup & Sweetener</option>
-                    <option value="Topping">Topping & Dusting</option>
-                    <option value="Prep">Barista Prep / Temp</option>
+                    {availableAddonCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-[#26170c] mb-1">Classification Type</label>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setAddonFormType('modifier')}
+                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        addonFormType === 'modifier'
+                          ? 'bg-[#26170c] text-white border-[#26170c]'
+                          : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'
+                      }`}
+                    >
+                      ⚡ Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddonFormType('addon')}
+                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        addonFormType === 'addon'
+                          ? 'bg-[#26170c] text-white border-[#26170c]'
+                          : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'
+                      }`}
+                    >
+                      ➕ Add-on
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#26170c] mb-1">Price (₱ PHP)</label>
                   <div className="relative">
@@ -1202,6 +1497,34 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#26170c] mb-1">Selection Rule</label>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setAddonFormSelectionType('single')}
+                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        addonFormSelectionType === 'single'
+                          ? 'bg-[#26170c] text-white border-[#26170c]'
+                          : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'
+                      }`}
+                    >
+                      Single Choice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddonFormSelectionType('multiple')}
+                      className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        addonFormSelectionType === 'multiple'
+                          ? 'bg-[#26170c] text-white border-[#26170c]'
+                          : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'
+                      }`}
+                    >
+                      Multi Choice
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -1212,7 +1535,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                       key={temp}
                       type="button"
                       onClick={() => setAddonFormTemp(temp)}
-                      className={`py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                      className={`py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                         addonFormTemp === temp
                           ? 'bg-[#26170c] text-white border-[#26170c]'
                           : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'
@@ -1224,34 +1547,59 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#26170c]">
-                <input
-                  type="checkbox"
-                  checked={addonFormAvailable}
-                  onChange={(e) => setAddonFormAvailable(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#26170c] accent-[#26170c]"
-                />
-                In Stock & Available Store-wide
-              </label>
+              <div className="flex flex-col gap-2 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#26170c]">
+                  <input
+                    type="checkbox"
+                    checked={addonFormRequired}
+                    onChange={(e) => setAddonFormRequired(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#26170c] accent-[#26170c]"
+                  />
+                  Required customer selection for this item
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#26170c]">
+                  <input
+                    type="checkbox"
+                    checked={addonFormAvailable}
+                    onChange={(e) => setAddonFormAvailable(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#26170c] accent-[#26170c]"
+                  />
+                  In Stock & Available Store-wide
+                </label>
+              </div>
 
               <div className="pt-3 border-t border-[#e8e1df] flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddonEditorOpen(false)}
-                  className="px-4 py-1.5 text-xs text-[#4f453f] hover:bg-[#e8e1df] rounded-full"
+                  className="px-4 py-1.5 text-xs text-[#4f453f] hover:bg-[#e8e1df] rounded-full cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f]"
+                  className="px-5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f] cursor-pointer shadow-xs"
                 >
-                  Save Modifier
+                  {editingAddon ? 'Save Changes' : 'Create Option'}
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-MODAL 3: MODIFIER CATEGORY MANAGER MODAL */}
+      {/* ========================================================================= */}
+      {isModCatModalOpen && onSaveModifierCategory && (
+        <ModifierCategoryModal
+          isOpen={isModCatModalOpen}
+          categories={modifierCategories}
+          onClose={() => setIsModCatModalOpen(false)}
+          onSave={onSaveModifierCategory}
+          onDelete={onDeleteModifierCategory}
+        />
       )}
     </div>
   );

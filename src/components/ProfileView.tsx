@@ -55,18 +55,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <section className="p-4 sm:p-5 bg-[#f9f2f0] rounded-2xl border border-[#f3ecea] shadow-sm mb-5 sm:mb-6">
         <div className="flex items-center gap-3.5 sm:gap-4">
           <div className="w-16 h-16 rounded-full overflow-hidden bg-[#26170c] text-[#fbddca] border-2 border-[#dec1af] shadow-md flex items-center justify-center font-serif text-2xl font-bold flex-shrink-0">
-            {admin.hasProfilePicture && admin.profilePictureUrl ? (
+            {admin?.hasProfilePicture && admin?.profilePictureUrl ? (
               <img src={`${admin.profilePictureUrl}?v=${profilePictureVersion}`} alt="Admin profile" className="w-full h-full object-cover" />
             ) : (
-              admin.displayName.slice(0, 1).toUpperCase()
+              (admin?.displayName || admin?.username || 'A').slice(0, 1).toUpperCase()
             )}
           </div>
           <div className="min-w-0 flex-1">
             <span className="text-[11px] font-semibold px-2 py-0.5 bg-[#e1e1c9] text-[#636451] rounded-full inline-block">
-              {admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+              {admin?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
             </span>
-            <h3 className="font-serif text-xl font-bold text-[#26170c] mt-1 truncate">{admin.displayName}</h3>
-            <p className="text-xs text-[#4f453f] truncate">@{admin.username}</p>
+            <h3 className="font-serif text-xl font-bold text-[#26170c] mt-1 truncate">{admin?.displayName || 'Admin'}</h3>
+            <p className="text-xs text-[#4f453f] truncate">@{admin?.username || 'admin'}</p>
           </div>
         </div>
 

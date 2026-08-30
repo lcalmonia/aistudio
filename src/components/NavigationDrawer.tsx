@@ -48,7 +48,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
         {/* Manager Profile Header */}
         <div className="flex flex-col items-start gap-3 mb-4 pt-4">
           <div className="relative flex items-center gap-3">
-            {admin.hasProfilePicture && admin.profilePictureUrl ? (
+            {admin?.hasProfilePicture && admin?.profilePictureUrl ? (
               <img
                 src={`${admin.profilePictureUrl}?v=${profilePictureVersion}`}
                 alt="Admin profile"
@@ -56,7 +56,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
               />
             ) : (
               <div className="w-14 h-14 rounded-full bg-[#26170c] text-[#fbddca] border-2 border-[#dec1af] shadow-md flex items-center justify-center font-serif text-xl font-bold">
-                {admin.displayName.slice(0, 1).toUpperCase()}
+                {(admin?.displayName || admin?.username || 'A').slice(0, 1).toUpperCase()}
               </div>
             )}
             <span className="absolute bottom-0 left-10 w-3.5 h-3.5 bg-[#8fbc8f] border-2 border-white rounded-full"></span>
@@ -65,13 +65,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="px-2 py-0.2 bg-[#26170c] text-white text-[10px] font-bold rounded">
-                {admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+                {admin?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
               </span>
               <h3 className="font-serif text-[17px] font-bold text-[#26170c] truncate max-w-[180px]">
-                {admin.displayName}
+                {admin?.displayName || 'Admin'}
               </h3>
             </div>
-            <p className="text-xs text-[#4f453f] font-medium truncate max-w-[200px] mt-0.5">@{admin.username} · {branchName}</p>
+            <p className="text-xs text-[#4f453f] font-medium truncate max-w-[200px] mt-0.5">@{admin?.username || 'admin'} · {branchName}</p>
           </div>
         </div>
 

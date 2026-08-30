@@ -90,16 +90,16 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenDrawer}
           className="w-9 h-9 rounded-full overflow-hidden bg-[#e1e1c9] text-[#26170c] border border-[#dec1af] flex items-center justify-center font-serif font-bold"
-          aria-label={`${admin.displayName} profile menu`}
+          aria-label={`${admin?.displayName || admin?.username || 'Admin'} profile menu`}
         >
-          {admin.hasProfilePicture && admin.profilePictureUrl ? (
+          {admin?.hasProfilePicture && admin?.profilePictureUrl ? (
             <img
               src={`${admin.profilePictureUrl}?v=${profilePictureVersion}`}
               alt="Admin profile"
               className="w-full h-full object-cover"
             />
           ) : (
-            admin.displayName.slice(0, 1).toUpperCase()
+            (admin?.displayName || admin?.username || 'A').slice(0, 1).toUpperCase()
           )}
         </button>
 

@@ -9,6 +9,7 @@ import {
   StoreSettings,
   CustomerUser,
   AdminPrincipal,
+  ModifierCategory,
 } from './types';
 import {
   authService,
@@ -17,6 +18,7 @@ import {
   menuService,
   categoryService,
   addonService,
+  modifierCategoryService,
   promoService,
   inventoryService,
   settingsService,
@@ -93,6 +95,7 @@ export default function App() {
   const [categories, setCategories] = useState<string[]>(() => storageAdapter.getCategories());
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => storageAdapter.getMenuItems());
   const [addons, setAddons] = useState<ProductAddon[]>(() => storageAdapter.getAddons());
+  const [modifierCategories, setModifierCategories] = useState<ModifierCategory[]>(() => storageAdapter.getModifierCategories());
   const [promoBundles, setPromoBundles] = useState<PromoBundle[]>(() => storageAdapter.getPromoBundles());
 
   // Inventory Management State
@@ -140,6 +143,7 @@ export default function App() {
           loadedMenuItems,
           loadedCategories,
           loadedAddons,
+          loadedModifierCats,
           loadedBundles,
           loadedInventory,
           loadedSettings,
@@ -150,6 +154,7 @@ export default function App() {
           menuService.listMenuItems(),
           categoryService.listCategories(),
           addonService.listAddons(),
+          modifierCategoryService.listCategories(),
           promoService.listPromoBundles(),
           inventoryService.listInventory(),
           settingsService.getStoreSettings(),
@@ -161,6 +166,7 @@ export default function App() {
         setMenuItems(loadedMenuItems);
         setCategories(loadedCategories);
         setAddons(loadedAddons);
+        setModifierCategories(loadedModifierCats);
         setPromoBundles(loadedBundles);
         setInventoryItems(loadedInventory);
         setStoreSettings(loadedSettings);
@@ -651,6 +657,19 @@ export default function App() {
     }
   };
 
+  const handleToggleBundleStock = async (bundleId: string) => {
+    try {
+      const updated = await promoService.toggleStock(bundleId);
+      if (updated) {
+        setPromoBundles(await promoService.listPromoBundles());
+        showNotification(`Combo "${updated.name}" is now ${updated.available !== false ? 'Active' : 'Paused'}.`);
+      }
+    } catch (err: any) {
+      console.error('[Bundle] Toggle stock error:', err);
+      showNotification(`⚠️ Failed to toggle combo availability: ${err?.message || 'Server error'}`);
+    }
+  };
+
   // -------------------------------------------------------------
   // Addon / Modifier CRUD Handlers
   // -------------------------------------------------------------
@@ -701,6 +720,34 @@ export default function App() {
     } catch (err: any) {
       console.error('[Addon] Toggle stock error:', err);
       showNotification(`⚠️ Failed to toggle modifier stock: ${err?.message || 'Server error'}`);
+    }
+  };
+
+  const handleSaveModifierCategory = async (category: ModifierCategory) => {
+    try {
+      const existing = modifierCategories.some((mc) => mc.id === category.id);
+      if (existing) {
+        await modifierCategoryService.updateCategory(category.id, category);
+        showNotification(`Category "${category.name}" updated!`);
+      } else {
+        await modifierCategoryService.createCategory(category);
+        showNotification(`New category "${category.name}" created!`);
+      }
+      setModifierCategories(await modifierCategoryService.listCategories());
+    } catch (err: any) {
+      console.error('[ModifierCategory] Save error:', err);
+      showNotification(`⚠️ Failed to save modifier category: ${err?.message || 'Server error'}`);
+    }
+  };
+
+  const handleDeleteModifierCategory = async (categoryId: string) => {
+    try {
+      await modifierCategoryService.deleteCategory(categoryId);
+      setModifierCategories(await modifierCategoryService.listCategories());
+      showNotification('Modifier category deleted.');
+    } catch (err: any) {
+      console.error('[ModifierCategory] Delete error:', err);
+      showNotification(`⚠️ Failed to delete modifier category: ${err?.message || 'Server error'}`);
     }
   };
 
@@ -793,6 +840,7 @@ export default function App() {
           menuItems={menuItems}
           categories={categories}
           addons={addons}
+          modifierCategories={modifierCategories}
           promoBundles={promoBundles}
           orders={orders}
           currentCustomer={currentCustomer}
@@ -902,6 +950,7 @@ export default function App() {
                 menuItems={menuItems}
                 categories={categories}
                 addons={addons}
+                modifierCategories={modifierCategories}
                 promoBundles={promoBundles}
                 onOpenAddProduct={handleOpenAddProduct}
                 onOpenEditProduct={handleOpenEditProduct}
@@ -910,12 +959,15 @@ export default function App() {
                 onOpenAddBundle={handleOpenAddBundle}
                 onOpenEditBundle={handleOpenEditBundle}
                 onDeleteBundle={handleDeleteBundle}
+                onToggleBundleStock={handleToggleBundleStock}
                 onOpenAddAddon={handleOpenAddAddon}
                 onOpenEditAddon={handleOpenEditAddon}
                 onDeleteAddon={handleDeleteAddon}
                 onToggleAddonStock={handleToggleAddonStock}
                 onSaveCategory={handleSaveCategory}
                 onDeleteCategory={handleDeleteCategory}
+                onSaveModifierCategory={handleSaveModifierCategory}
+                onDeleteModifierCategory={handleDeleteModifierCategory}
                 onShowNotification={showNotification}
                 onSwitchToCustomerPortal={() => {
                   if (currentCustomer) {
@@ -1054,9 +1106,12 @@ export default function App() {
             onDelete={handleDeleteProduct}
             productToEdit={productToEdit}
             addonsList={addons}
+            modifierCategories={modifierCategories}
             onSaveAddon={handleSaveAddon}
             onDeleteAddon={handleDeleteAddon}
             onToggleAddonStock={handleToggleAddonStock}
+            onSaveModifierCategory={handleSaveModifierCategory}
+            onDeleteModifierCategory={handleDeleteModifierCategory}
             categoriesList={categories}
             onSaveCategory={handleSaveCategory}
             onDeleteCategory={handleDeleteCategory}
@@ -1079,6 +1134,8 @@ export default function App() {
             onSave={handleSaveAddon}
             onDelete={handleDeleteAddon}
             addonToEdit={addonToEdit}
+            modifierCategories={modifierCategories}
+            productCategories={categories}
           />
 
           {/* Bottom Navigation & Floating Action Button */}

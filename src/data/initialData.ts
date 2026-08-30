@@ -1,4 +1,4 @@
-import { Order, MenuItem, InventoryItem, ProductAddon, PromoBundle, StoreSettings, CustomerUser, StaffUser } from '../types';
+import { Order, MenuItem, InventoryItem, ProductAddon, ModifierCategory, PromoBundle, StoreSettings, CustomerUser, StaffUser } from '../types';
 
 export const INITIAL_STAFF_USERS: StaffUser[] = [
   {
@@ -73,20 +73,137 @@ export const DEFAULT_CATEGORIES: string[] = [
   'Rice Meals',
 ];
 
+export const DEFAULT_MODIFIER_CATEGORIES: ModifierCategory[] = [
+  {
+    id: 'modcat-rice',
+    name: 'Rice Meal Options',
+    itemType: 'modifier',
+    required: false,
+    selectionType: 'multiple',
+    applicableCategories: ['Rice Meals'],
+    sortOrder: 1,
+    active: true,
+  },
+  {
+    id: 'modcat-pika',
+    name: 'Pika-Pika Flavors',
+    itemType: 'modifier',
+    required: true,
+    selectionType: 'single',
+    applicableCategories: ['Pika-Pika'],
+    sortOrder: 2,
+    active: true,
+  },
+  {
+    id: 'modcat-sweetness',
+    name: 'Sweetness Level',
+    itemType: 'modifier',
+    required: true,
+    selectionType: 'single',
+    applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'],
+    sortOrder: 3,
+    active: true,
+  },
+  {
+    id: 'modcat-ice',
+    name: 'Ice Preference',
+    itemType: 'modifier',
+    required: true,
+    selectionType: 'single',
+    applicableTemperature: 'Cold',
+    applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'],
+    sortOrder: 4,
+    active: true,
+  },
+  {
+    id: 'modcat-milk',
+    name: 'Alternative Milk',
+    itemType: 'addon',
+    required: false,
+    selectionType: 'single',
+    applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Frappe Based', 'Frappuccino'],
+    sortOrder: 5,
+    active: true,
+  },
+  {
+    id: 'modcat-shot',
+    name: 'Espresso Shots & Roasts',
+    itemType: 'addon',
+    required: false,
+    selectionType: 'multiple',
+    applicableCategories: ['Coffee', 'Frappuccino'],
+    sortOrder: 6,
+    active: true,
+  },
+  {
+    id: 'modcat-syrup',
+    name: 'Syrups & Sweeteners',
+    itemType: 'addon',
+    required: false,
+    selectionType: 'multiple',
+    applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'],
+    sortOrder: 7,
+    active: true,
+  },
+  {
+    id: 'modcat-topping',
+    name: 'Toppings & Creams',
+    itemType: 'addon',
+    required: false,
+    selectionType: 'multiple',
+    applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino', 'Pastries', 'Cakes on Tub'],
+    sortOrder: 8,
+    active: true,
+  },
+];
+
 export const INITIAL_ADDONS: ProductAddon[] = [
-  { id: 'addon-oat', name: 'Oatly Barista Oat Milk Sub', category: 'Milk', price: 40.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-almond', name: 'Almond Milk Sub', category: 'Milk', price: 35.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-shot', name: 'Extra Espresso Shot', category: 'Shot', price: 30.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-decaf', name: 'Decaf Espresso Option', category: 'Shot', price: 20.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-honey', name: 'Raw Honey Drizzle', category: 'Syrup', price: 25.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-vanilla-cream', name: 'Sweet Vanilla Cold Foam', category: 'Syrup', price: 35.00, applicableTemperature: 'Cold', available: true },
-  { id: 'addon-caramel', name: 'Salted Caramel Sauce', category: 'Syrup', price: 25.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-whip', name: 'Whipped Cream Topping', category: 'Topping', price: 25.00, applicableTemperature: 'Both', available: true },
-  { id: 'addon-nata', name: 'Nata de Coco Jelly', category: 'Topping', price: 25.00, applicableTemperature: 'Cold', available: true },
-  { id: 'addon-pearls', name: 'Chewy Tapioca Pearls', category: 'Topping', price: 25.00, applicableTemperature: 'Cold', available: true },
-  { id: 'addon-cream-cheese', name: 'Cream Cheese Wall', category: 'Topping', price: 35.00, applicableTemperature: 'Cold', available: true },
-  { id: 'addon-extra-hot', name: 'Extra Hot (70°C+)', category: 'Prep', price: 0.00, applicableTemperature: 'Hot', available: true },
-  { id: 'addon-light-ice', name: 'Less Ice / Light Ice', category: 'Prep', price: 0.00, applicableTemperature: 'Cold', available: true },
+  // Modifiers: Rice Meal Options
+  { id: 'addon-extra-rice', name: 'Extra Garlic Butter Rice', category: 'Rice Meal Options', itemType: 'modifier', price: 30.00, applicableTemperature: 'All', available: true, applicableCategories: ['Rice Meals'] },
+  { id: 'addon-fried-egg', name: 'Extra Sunny-Side Up Egg', category: 'Rice Meal Options', itemType: 'modifier', price: 25.00, applicableTemperature: 'All', available: true, applicableCategories: ['Rice Meals'] },
+  { id: 'addon-atchara', name: 'Extra Papaya Atchara', category: 'Rice Meal Options', itemType: 'modifier', price: 15.00, applicableTemperature: 'All', available: true, applicableCategories: ['Rice Meals'] },
+
+  // Modifiers: Pika-Pika Flavors
+  { id: 'addon-flavor-sour-cream', name: 'Sour Cream & Chives Dusting', category: 'Pika-Pika Flavors', itemType: 'modifier', price: 0.00, applicableTemperature: 'All', available: true, applicableCategories: ['Pika-Pika'] },
+  { id: 'addon-flavor-cheese', name: 'Sharp Cheddar Cheese Dusting', category: 'Pika-Pika Flavors', itemType: 'modifier', price: 0.00, applicableTemperature: 'All', available: true, applicableCategories: ['Pika-Pika'] },
+  { id: 'addon-flavor-bbq', name: 'Smoky Barbecue Dusting', category: 'Pika-Pika Flavors', itemType: 'modifier', price: 0.00, applicableTemperature: 'All', available: true, applicableCategories: ['Pika-Pika'] },
+  { id: 'addon-flavor-spicy-bbq', name: 'Spicy Barbecue Seasoning', category: 'Pika-Pika Flavors', itemType: 'modifier', price: 0.00, applicableTemperature: 'All', available: true, applicableCategories: ['Pika-Pika'] },
+
+  // Modifiers: Sweetness Level
+  { id: 'addon-sweet-100', name: '100% (Standard Sweetness)', category: 'Sweetness Level', itemType: 'modifier', price: 0.00, applicableTemperature: 'Both', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-sweet-75', name: '75% (Less Sweet)', category: 'Sweetness Level', itemType: 'modifier', price: 0.00, applicableTemperature: 'Both', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-sweet-50', name: '50% (Half Sweet)', category: 'Sweetness Level', itemType: 'modifier', price: 0.00, applicableTemperature: 'Both', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-sweet-25', name: '25% (Mild Sweet)', category: 'Sweetness Level', itemType: 'modifier', price: 0.00, applicableTemperature: 'Both', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-sweet-0', name: '0% (Unsweetened / No Sugar)', category: 'Sweetness Level', itemType: 'modifier', price: 0.00, applicableTemperature: 'Both', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+
+  // Modifiers: Ice Preference
+  { id: 'addon-ice-reg', name: 'Regular Ice (100%)', category: 'Ice Preference', itemType: 'modifier', price: 0.00, applicableTemperature: 'Cold', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-ice-less', name: 'Less Ice (50%)', category: 'Ice Preference', itemType: 'modifier', price: 0.00, applicableTemperature: 'Cold', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-ice-extra', name: 'Extra Ice', category: 'Ice Preference', itemType: 'modifier', price: 0.00, applicableTemperature: 'Cold', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+  { id: 'addon-ice-none', name: 'No Ice', category: 'Ice Preference', itemType: 'modifier', price: 0.00, applicableTemperature: 'Cold', available: true, applicableCategories: ['Coffee', 'Non-Coffee', 'Matcha Series', 'Coolers/Mocktails', 'Frappe Based', 'Frappuccino'] },
+
+  // Add-ons: Milks
+  { id: 'addon-oat', name: 'Oatly Barista Oat Milk Sub', category: 'Milk', itemType: 'addon', price: 40.00, applicableTemperature: 'Both', available: true },
+  { id: 'addon-almond', name: 'Almond Milk Sub', category: 'Milk', itemType: 'addon', price: 35.00, applicableTemperature: 'Both', available: true },
+
+  // Add-ons: Shots
+  { id: 'addon-shot', name: 'Extra Espresso Shot', category: 'Shot', itemType: 'addon', price: 30.00, applicableTemperature: 'Both', available: true },
+  { id: 'addon-decaf', name: 'Decaf Espresso Option', category: 'Shot', itemType: 'addon', price: 20.00, applicableTemperature: 'Both', available: true },
+
+  // Add-ons: Syrups
+  { id: 'addon-honey', name: 'Raw Honey Drizzle', category: 'Syrup', itemType: 'addon', price: 25.00, applicableTemperature: 'Both', available: true },
+  { id: 'addon-vanilla-cream', name: 'Sweet Vanilla Cold Foam', category: 'Syrup', itemType: 'addon', price: 35.00, applicableTemperature: 'Cold', available: true },
+  { id: 'addon-caramel', name: 'Salted Caramel Sauce', category: 'Syrup', itemType: 'addon', price: 25.00, applicableTemperature: 'Both', available: true },
+
+  // Add-ons: Toppings
+  { id: 'addon-whip', name: 'Whipped Cream Topping', category: 'Topping', itemType: 'addon', price: 25.00, applicableTemperature: 'Both', available: true },
+  { id: 'addon-nata', name: 'Nata de Coco Jelly', category: 'Topping', itemType: 'addon', price: 25.00, applicableTemperature: 'Cold', available: true },
+  { id: 'addon-pearls', name: 'Chewy Tapioca Pearls', category: 'Topping', itemType: 'addon', price: 25.00, applicableTemperature: 'Cold', available: true },
+  { id: 'addon-cream-cheese', name: 'Cream Cheese Wall', category: 'Topping', itemType: 'addon', price: 35.00, applicableTemperature: 'Cold', available: true },
+
+  // Add-ons: Prep Rules
+  { id: 'addon-extra-hot', name: 'Extra Hot (70°C+)', category: 'Prep', itemType: 'addon', price: 0.00, applicableTemperature: 'Hot', available: true },
+  { id: 'addon-light-ice', name: 'Less Ice / Light Ice', category: 'Prep', itemType: 'addon', price: 0.00, applicableTemperature: 'Cold', available: true },
 ];
 
 export const INITIAL_PROMO_BUNDLES: PromoBundle[] = [
@@ -145,8 +262,9 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     available: true,
     temperature: 'Both',
     sizes: [
-      { name: 'Regular 16oz', volume: '16oz', priceDelta: 0.00 },
-      { name: 'Large 22oz', volume: '22oz', priceDelta: 20.00 },
+      { name: 'Regular 16oz', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold'] },
+      { name: 'Large 22oz', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Cold'] },
+      { name: 'Small 12oz', volume: '12oz', priceDelta: -15.00, availableTemperatures: ['Hot', 'Cold'] },
     ],
     addons: ['addon-shot', 'addon-oat', 'addon-vanilla-cream', 'addon-light-ice'],
     allergens: ['Dairy'],
@@ -164,8 +282,9 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     available: true,
     temperature: 'Both',
     sizes: [
-      { name: 'Regular 16oz', volume: '16oz', priceDelta: 0.00 },
-      { name: 'Large 22oz', volume: '22oz', priceDelta: 20.00 },
+      { name: 'Regular 16oz', volume: '16oz', priceDelta: 0.00, availableTemperatures: ['Hot', 'Cold'] },
+      { name: 'Large 22oz', volume: '22oz', priceDelta: 20.00, availableTemperatures: ['Cold'] },
+      { name: 'Small 12oz', volume: '12oz', priceDelta: -15.00, availableTemperatures: ['Hot', 'Cold'] },
     ],
     addons: ['addon-shot', 'addon-oat', 'addon-caramel', 'addon-whip'],
     allergens: ['Dairy'],

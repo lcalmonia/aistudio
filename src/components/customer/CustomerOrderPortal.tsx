@@ -7,6 +7,7 @@ import {
   Order,
   StoreSettings,
   CustomerUser,
+  ModifierCategory,
 } from '../../types';
 import { CustomerProductModal } from './CustomerProductModal';
 import { CustomerCartDrawer } from './CustomerCartDrawer';
@@ -16,6 +17,7 @@ interface CustomerOrderPortalProps {
   menuItems: MenuItem[];
   categories: string[];
   addons: ProductAddon[];
+  modifierCategories?: ModifierCategory[];
   promoBundles: PromoBundle[];
   orders: Order[];
   currentCustomer: CustomerUser;
@@ -32,6 +34,7 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   menuItems = [],
   categories = [],
   addons = [],
+  modifierCategories = [],
   promoBundles = [],
   orders = [],
   currentCustomer,
@@ -94,12 +97,16 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
 
   const filteredItems = useMemo(() => {
     return availableItems.filter((item) => {
+      if (!item) return false;
+      const itemCategory = item.category || '';
       const matchesCategory =
-        selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase();
+        selectedCategory === 'All' || itemCategory.toLowerCase() === (selectedCategory || '').toLowerCase();
+      const q = (searchQuery || '').toLowerCase();
       const matchesSearch =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        (item.name || '').toLowerCase().includes(q) ||
+        (item.description || '').toLowerCase().includes(q) ||
+        itemCategory.toLowerCase().includes(q);
       const matchesTag =
         activeTag === 'All'
           ? true
@@ -117,11 +124,15 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
 
   // Customer-specific orders (filtered strictly by currentCustomer.id or name/phone)
   const myOrders = useMemo(() => {
+    if (!currentCustomer) return [];
+    const customerEmail = (currentCustomer.email || '').toLowerCase();
+    const customerName = (currentCustomer.name || '').toLowerCase();
     return orders.filter(
       (o) =>
-        o.customerId === currentCustomer.id ||
-        (o.customerEmail && o.customerEmail.toLowerCase() === currentCustomer.email.toLowerCase()) ||
-        (o.customerName && o.customerName.toLowerCase() === currentCustomer.name.toLowerCase())
+        o &&
+        (o.customerId === currentCustomer.id ||
+          (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||
+          (customerName && o.customerName && o.customerName.toLowerCase() === customerName))
     );
   }, [orders, currentCustomer]);
 
@@ -982,6 +993,7 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
         onClose={() => setIsProductModalOpen(false)}
         product={selectedProduct}
         addonsList={addons}
+        modifierCategories={modifierCategories}
         onAddToCart={handleAddToCart}
       />
 
