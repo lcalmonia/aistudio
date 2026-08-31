@@ -103,7 +103,13 @@ export function createInitialProductDraft(
       selectedModifierCategoryIds: initialModCatIds,
       sizes:
         product.sizes && product.sizes.length > 0
-          ? product.sizes
+          ? product.sizes.map((s) => ({
+              name: s.name,
+              volume: s.volume,
+              priceDelta: s.priceDelta,
+              availableTemperatures: s.availableTemperatures ? [...s.availableTemperatures] : undefined,
+              applicableTemperature: s.applicableTemperature,
+            }))
           : [
               { name: 'Regular', volume: '16oz', priceDelta: 0.0, availableTemperatures: ['Hot', 'Cold', 'Both'] },
               { name: 'Large', volume: '22oz', priceDelta: 20.0, availableTemperatures: ['Hot', 'Cold', 'Both'] },

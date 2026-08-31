@@ -398,6 +398,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         volume: '24oz',
         priceDelta: 35.00,
         availableTemperatures: temperature === 'Both' ? ['Hot', 'Cold', 'Both'] : undefined,
+        applicableTemperature: temperature === 'Both' ? 'Both' : undefined,
       },
     ]);
   };
@@ -826,12 +827,19 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
               <div className="space-y-2">
                 {sizes.map((s, idx) => {
-                  const currentTempMode: 'Both' | 'Hot' | 'Cold' =
-                    s.availableTemperatures?.length === 1 && s.availableTemperatures[0] === 'Hot'
-                      ? 'Hot'
-                      : s.availableTemperatures?.length === 1 && s.availableTemperatures[0] === 'Cold'
-                      ? 'Cold'
-                      : 'Both';
+                  const isHotOnly =
+                    (s.availableTemperatures?.length === 1 && s.availableTemperatures[0] === 'Hot') ||
+                    (s.applicableTemperature === 'Hot' && (!s.availableTemperatures || s.availableTemperatures.length === 1));
+
+                  const isColdOnly =
+                    (s.availableTemperatures?.length === 1 && s.availableTemperatures[0] === 'Cold') ||
+                    (s.applicableTemperature === 'Cold' && (!s.availableTemperatures || s.availableTemperatures.length === 1));
+
+                  const currentTempMode: 'Both' | 'Hot' | 'Cold' = isHotOnly
+                    ? 'Hot'
+                    : isColdOnly
+                    ? 'Cold'
+                    : 'Both';
 
                   return (
                     <div key={idx} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-white p-2.5 rounded-xl border border-[#d2c4bc]">

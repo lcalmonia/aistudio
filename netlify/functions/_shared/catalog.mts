@@ -231,23 +231,54 @@ export function mapAddonRecord(row: AddonRow): ProductAddon {
   };
 }
 
+function mapProductSizeRecord(s: Record<string, unknown>): ProductSize {
+  let availableTemperatures: ('Hot' | 'Cold' | 'Both')[] | undefined;
+  const rawAvail = s.availableTemperatures ?? s.available_temperatures;
+  if (Array.isArray(rawAvail)) {
+    const valid = rawAvail.filter(
+      (t): t is 'Hot' | 'Cold' | 'Both' => t === 'Hot' || t === 'Cold' || t === 'Both'
+    );
+    if (valid.length > 0) {
+      availableTemperatures = valid;
+    }
+  }
+
+  let applicableTemperature: 'Hot' | 'Cold' | 'Both' | 'All' | undefined;
+  const rawApplicable = s.applicableTemperature ?? s.applicable_temperature;
+  if (
+    rawApplicable === 'Hot' ||
+    rawApplicable === 'Cold' ||
+    rawApplicable === 'Both' ||
+    rawApplicable === 'All'
+  ) {
+    applicableTemperature = rawApplicable;
+  }
+
+  const mapped: ProductSize = {
+    name: String(s.name || ''),
+    volume: String(s.volume || ''),
+    priceDelta: Number(s.priceDelta ?? s.price_delta) || 0,
+  };
+
+  if (availableTemperatures && availableTemperatures.length > 0) {
+    mapped.availableTemperatures = availableTemperatures;
+  }
+  if (applicableTemperature) {
+    mapped.applicableTemperature = applicableTemperature;
+  }
+
+  return mapped;
+}
+
 export function mapMenuItemRecord(row: MenuItemRow): MenuItem {
   let parsedSizes: ProductSize[] | undefined;
   if (Array.isArray(row.sizes)) {
-    parsedSizes = row.sizes.map((s: Record<string, unknown>) => ({
-      name: String(s.name || ''),
-      volume: String(s.volume || ''),
-      priceDelta: Number(s.priceDelta) || 0,
-    }));
+    parsedSizes = row.sizes.map((s: Record<string, unknown>) => mapProductSizeRecord(s));
   } else if (typeof row.sizes === 'string') {
     try {
       const parsed = JSON.parse(row.sizes);
       if (Array.isArray(parsed)) {
-        parsedSizes = parsed.map((s: Record<string, unknown>) => ({
-          name: String(s.name || ''),
-          volume: String(s.volume || ''),
-          priceDelta: Number(s.priceDelta) || 0,
-        }));
+        parsedSizes = parsed.map((s: Record<string, unknown>) => mapProductSizeRecord(s));
       }
     } catch {
       parsedSizes = undefined;
