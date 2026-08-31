@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Order, MenuItem } from '../types';
+import { Order, MenuItem, AdminPrincipal } from '../types';
 import { reportingService } from '../services/reportingService';
 import { orderService } from '../services/orderService';
 import {
@@ -13,6 +13,7 @@ interface StatsViewProps {
   menuItems?: MenuItem[];
   dailyGoal?: number;
   onRefresh?: () => Promise<void> | void;
+  admin?: AdminPrincipal | null;
 }
 
 export const StatsView: React.FC<StatsViewProps> = ({
@@ -20,7 +21,10 @@ export const StatsView: React.FC<StatsViewProps> = ({
   menuItems = [],
   dailyGoal = 100,
   onRefresh,
+  admin,
 }) => {
+  const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
+
   const [selectedPreset, setSelectedPreset] = useState<StatsDateRangePreset>('today');
   const [customStart, setCustomStart] = useState<string>(() => formatLocalDateToInput(new Date()));
   const [customEnd, setCustomEnd] = useState<string>(() => formatLocalDateToInput(new Date()));
@@ -30,10 +34,21 @@ export const StatsView: React.FC<StatsViewProps> = ({
   const [rangeOrders, setRangeOrders] = useState<Order[]>([]);
   const [isLoadingRange, setIsLoadingRange] = useState<boolean>(false);
 
+  // Ensure Admin role cannot remain on an unauthorized preset
+  useEffect(() => {
+    if (!isSuperAdmin && selectedPreset !== 'today' && selectedPreset !== 'yesterday') {
+      setSelectedPreset('today');
+    }
+  }, [isSuperAdmin, selectedPreset]);
+
   // Compute active date boundaries
   const boundary = useMemo(() => {
-    return computeDateRangeBoundaries(selectedPreset, customStart, customEnd);
-  }, [selectedPreset, customStart, customEnd]);
+    const effectivePreset =
+      !isSuperAdmin && selectedPreset !== 'today' && selectedPreset !== 'yesterday'
+        ? 'today'
+        : selectedPreset;
+    return computeDateRangeBoundaries(effectivePreset, customStart, customEnd);
+  }, [isSuperAdmin, selectedPreset, customStart, customEnd]);
 
   // Fetch orders from PostgreSQL when date range changes
   const fetchRangeOrders = useCallback(async () => {
@@ -128,14 +143,29 @@ export const StatsView: React.FC<StatsViewProps> = ({
     return `${boundary.startDisplay} to ${boundary.endDisplay}`;
   }, [selectedPreset, boundary.startDisplay, boundary.endDisplay]);
 
-  const presets: { key: StatsDateRangePreset; label: string }[] = [
-    { key: 'today', label: 'Today' },
-    { key: 'yesterday', label: 'Yesterday' },
-    { key: 'last7days', label: 'Last 7 Days' },
-    { key: 'thismonth', label: 'This Month' },
-    { key: 'alltime', label: 'All Time' },
-    { key: 'custom', label: 'Custom Range' },
-  ];
+  const presets: { key: StatsDateRangePreset; label: string }[] = useMemo(() => {
+    if (isSuperAdmin) {
+      return [
+        { key: 'today', label: 'Today' },
+        { key: 'yesterday', label: 'Yesterday' },
+        { key: 'last7days', label: 'Last 7 Days' },
+        { key: 'thismonth', label: 'This Month' },
+        { key: 'alltime', label: 'All Time' },
+        { key: 'custom', label: 'Custom Range' },
+      ];
+    }
+    return [
+      { key: 'today', label: 'Today' },
+      { key: 'yesterday', label: 'Yesterday' },
+    ];
+  }, [isSuperAdmin]);
+
+  const handleSelectPreset = (presetKey: StatsDateRangePreset) => {
+    if (!isSuperAdmin && presetKey !== 'today' && presetKey !== 'yesterday') {
+      return;
+    }
+    setSelectedPreset(presetKey);
+  };
 
   return (
     <div className="pt-20 px-3.5 sm:px-5 max-w-2xl mx-auto pb-28">
@@ -186,7 +216,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
               <button
                 key={preset.key}
                 type="button"
-                onClick={() => setSelectedPreset(preset.key)}
+                onClick={() => handleSelectPreset(preset.key)}
                 className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-[#26170c] text-white shadow-xs'
@@ -200,7 +230,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
         </div>
 
         {/* Custom Date Range Inputs */}
-        {selectedPreset === 'custom' && (
+        {isSuperAdmin && selectedPreset === 'custom' && (
           <div className="pt-2 border-t border-[#dec1af]/30 space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>

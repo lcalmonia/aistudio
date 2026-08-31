@@ -12,6 +12,10 @@ import {
   readJsonObject,
   RequestError,
 } from './_shared/http.mts';
+import {
+  enforceStatsDateRangeAccess,
+  requireAuthenticatedAdmin,
+} from './_shared/auth.mts';
 
 export default async function handler(request: Request): Promise<Response> {
   try {
@@ -24,8 +28,22 @@ export default async function handler(request: Request): Promise<Response> {
       const statusParam = url.searchParams.get('status') || undefined;
       const startDate = url.searchParams.get('startDate') || url.searchParams.get('start_date') || undefined;
       const endDate = url.searchParams.get('endDate') || url.searchParams.get('end_date') || undefined;
+      const preset = url.searchParams.get('preset') || undefined;
+      const isAllTime = url.searchParams.get('allTime') === 'true' || url.searchParams.get('all_time') === 'true';
       const limitParam = url.searchParams.get('limit');
       const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+
+      const isStatsOrDateQuery = Boolean(startDate || endDate || preset || isAllTime || (limit !== undefined && limit > 200));
+      if (isStatsOrDateQuery) {
+        const admin = await requireAuthenticatedAdmin(request);
+        enforceStatsDateRangeAccess(admin, {
+          startDate,
+          endDate,
+          preset,
+          limit,
+          isAllTime,
+        });
+      }
 
       const orders = await fetchOrdersFromDatabase({
         customerId,

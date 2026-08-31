@@ -1056,6 +1056,7 @@ export default function App() {
                 menuItems={menuItems}
                 dailyGoal={dailyGoal}
                 onRefresh={refreshOrders}
+                admin={adminPrincipal}
               />
             )}
 

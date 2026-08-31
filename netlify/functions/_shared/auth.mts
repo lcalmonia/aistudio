@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Context } from '@netlify/functions';
 import { database } from './database.mts';
 import { RequestError } from './http.mts';
+import { computeDateRangeBoundaries } from './dateRange.mts';
 
 export const ADMIN_SESSION_COOKIE = 'iluvkeyks_admin_session';
 export const ADMIN_SESSION_SECONDS = 8 * 60 * 60;
@@ -275,6 +276,67 @@ export function enforceAdminCreationRole(
     throw new RequestError(403, 'Only ADMIN accounts can be created.');
   }
   return 'ADMIN';
+}
+
+export function enforceStatsDateRangeAccess(
+  admin: AuthenticatedAdmin,
+  options: {
+    startDate?: string;
+    endDate?: string;
+    preset?: string;
+    limit?: number;
+    isAllTime?: boolean;
+  },
+): void {
+  if (admin.isSuperAdmin) {
+    return;
+  }
+
+  if (admin.isAdmin) {
+    if (options.preset) {
+      if (options.preset !== 'today' && options.preset !== 'yesterday') {
+        throw new RequestError(403, 'Admins are restricted to viewing stats for Today and Yesterday only.');
+      }
+    }
+
+    if (options.isAllTime || (options.limit && options.limit > 200 && !options.startDate && !options.endDate)) {
+      throw new RequestError(403, 'Admins are restricted to viewing stats for Today and Yesterday only.');
+    }
+
+    if (options.startDate || options.endDate) {
+      const today = computeDateRangeBoundaries('today');
+      const yesterday = computeDateRangeBoundaries('yesterday');
+
+      const startMs = options.startDate ? new Date(options.startDate).getTime() : NaN;
+      const endMs = options.endDate ? new Date(options.endDate).getTime() : NaN;
+
+      const todayStartMs = new Date(today.startDate!).getTime();
+      const todayEndMs = new Date(today.endDate!).getTime();
+      const yesterdayStartMs = new Date(yesterday.startDate!).getTime();
+      const yesterdayEndMs = new Date(yesterday.endDate!).getTime();
+
+      const MARGIN_MS = 5 * 60 * 1000;
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+      const isToday =
+        (!isNaN(startMs) ? startMs >= todayStartMs - MARGIN_MS : true) &&
+        (!isNaN(endMs) ? endMs <= todayEndMs + MARGIN_MS : true) &&
+        (!isNaN(startMs) && !isNaN(endMs) ? endMs >= startMs && (endMs - startMs) <= (ONE_DAY_MS + MARGIN_MS) : true);
+
+      const isYesterday =
+        (!isNaN(startMs) ? startMs >= yesterdayStartMs - MARGIN_MS && startMs <= yesterdayEndMs + MARGIN_MS : true) &&
+        (!isNaN(endMs) ? endMs <= yesterdayEndMs + MARGIN_MS && endMs >= yesterdayStartMs - MARGIN_MS : true) &&
+        (!isNaN(startMs) && !isNaN(endMs) ? endMs >= startMs && (endMs - startMs) <= (ONE_DAY_MS + MARGIN_MS) : true);
+
+      if (!isToday && !isYesterday) {
+        throw new RequestError(403, 'Admins are restricted to viewing stats for Today and Yesterday only.');
+      }
+    }
+
+    return;
+  }
+
+  throw new RequestError(403, 'Administrator access required.');
 }
 
 export function canViewAdminAccount(
