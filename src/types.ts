@@ -20,7 +20,7 @@ export interface AdminAccount {
   id: string;
   username: string;
   displayName: string;
-  role: 'ADMIN';
+  role: AdminRole;
   active: boolean;
   hasProfilePicture: boolean;
   createdAt: string;

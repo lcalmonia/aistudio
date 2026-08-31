@@ -15,7 +15,7 @@ export default async function handler(request: Request): Promise<Response> {
     const db = database();
 
     if (request.method === 'GET') {
-      const rows = admin.isSuperAdmin
+      const rows = admin.userId === null
         ? ((await db.sql`
             SELECT profile_picture, profile_picture_content_type
             FROM super_admin_profile
@@ -24,7 +24,7 @@ export default async function handler(request: Request): Promise<Response> {
         : ((await db.sql`
             SELECT profile_picture, profile_picture_content_type
             FROM staff_users
-            WHERE id = ${admin.userId} AND role = 'admin'
+            WHERE id = ${admin.userId} AND role IN ('admin', 'super_admin')
           `) as ProfilePictureRow[]);
       const picture = rows[0];
       if (!picture?.profile_picture || !picture.profile_picture_content_type) {
@@ -52,7 +52,7 @@ export default async function handler(request: Request): Promise<Response> {
       const contentType = validateProfilePicture(request.headers.get('content-type'), data);
       const image = Buffer.from(data);
 
-      if (admin.isSuperAdmin) {
+      if (admin.userId === null) {
         await db.sql`
           INSERT INTO super_admin_profile (
             id, profile_picture, profile_picture_content_type, profile_picture_size,
@@ -74,7 +74,7 @@ export default async function handler(request: Request): Promise<Response> {
               profile_picture_size = ${data.length},
               profile_picture_updated_at = NOW(),
               updated_at = NOW()
-          WHERE id = ${admin.userId} AND role = 'admin'
+          WHERE id = ${admin.userId} AND role IN ('admin', 'super_admin')
         `;
       }
       return json({ updated: true, profilePictureUrl: '/api/auth/profile-picture' });
@@ -82,7 +82,7 @@ export default async function handler(request: Request): Promise<Response> {
 
     if (request.method === 'DELETE') {
       enforceSameOrigin(request);
-      if (admin.isSuperAdmin) {
+      if (admin.userId === null) {
         await db.sql`
           UPDATE super_admin_profile
           SET profile_picture = NULL,
@@ -100,7 +100,7 @@ export default async function handler(request: Request): Promise<Response> {
               profile_picture_size = NULL,
               profile_picture_updated_at = NOW(),
               updated_at = NOW()
-          WHERE id = ${admin.userId} AND role = 'admin'
+          WHERE id = ${admin.userId} AND role IN ('admin', 'super_admin')
         `;
       }
       return json({ removed: true });

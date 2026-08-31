@@ -25,6 +25,7 @@ interface AdminAccountRow {
   id: string;
   username: string;
   name: string;
+  role: 'admin' | 'super_admin';
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -41,6 +42,7 @@ function validateUsername(value: unknown): string {
 }
 
 function accountResponse(row: AdminAccountRow, actorId: string | null, isSuperAdmin: boolean) {
+  const mappedRole = row.role === 'super_admin' ? ('SUPER_ADMIN' as const) : ('ADMIN' as const);
   const actor = {
     authenticated: true as const,
     userId: actorId,
@@ -56,7 +58,7 @@ function accountResponse(row: AdminAccountRow, actorId: string | null, isSuperAd
     id: row.id,
     username: row.username,
     displayName: row.name,
-    role: 'ADMIN' as const,
+    role: mappedRole,
     active: row.active,
     hasProfilePicture: row.has_profile_picture,
     createdAt: row.created_at,
@@ -75,17 +77,17 @@ export default async function handler(request: Request): Promise<Response> {
     if (request.method === 'GET') {
       const rows = actor.isSuperAdmin
         ? ((await db.sql`
-            SELECT id, username, name, active, created_at, updated_at, created_by_staff_user_id,
+            SELECT id, username, name, role, active, created_at, updated_at, created_by_staff_user_id,
               profile_picture IS NOT NULL AS has_profile_picture
             FROM staff_users
-            WHERE role = 'admin'
+            WHERE role IN ('admin', 'super_admin')
             ORDER BY created_at DESC
           `) as AdminAccountRow[])
         : ((await db.sql`
-            SELECT id, username, name, active, created_at, updated_at, created_by_staff_user_id,
+            SELECT id, username, name, role, active, created_at, updated_at, created_by_staff_user_id,
               profile_picture IS NOT NULL AS has_profile_picture
             FROM staff_users
-            WHERE role = 'admin'
+            WHERE role IN ('admin', 'super_admin')
               AND (id = ${actor.userId} OR created_by_staff_user_id = ${actor.userId})
             ORDER BY created_at DESC
           `) as AdminAccountRow[]);
@@ -95,8 +97,12 @@ export default async function handler(request: Request): Promise<Response> {
 
     if (request.method === 'POST') {
       enforceSameOrigin(request);
+      if (!actor.isSuperAdmin) {
+        throw new RequestError(403, 'Only Super Admin can create administrative accounts.');
+      }
       const body = await readJsonObject(request);
-      enforceAdminCreationRole(body.role);
+      const targetRole = enforceAdminCreationRole(actor, body.role);
+      const dbRole = targetRole === 'SUPER_ADMIN' ? 'super_admin' : 'admin';
 
       const username = validateUsername(body.username);
       const superAdminCredentials = getSuperAdminCredentials();
@@ -112,7 +118,7 @@ export default async function handler(request: Request): Promise<Response> {
       if (typeof active !== 'boolean') throw new RequestError(400, 'Active must be a boolean.');
 
       const passwordHash = await hashPassword(password);
-      const id = `admin_${randomBytes(12).toString('hex')}`;
+      const id = targetRole === 'SUPER_ADMIN' ? `super_${randomBytes(12).toString('hex')}` : `admin_${randomBytes(12).toString('hex')}`;
 
       try {
         const rows = (await db.sql`
@@ -120,9 +126,9 @@ export default async function handler(request: Request): Promise<Response> {
             id, username, name, role, active, passcode_hash, created_by_staff_user_id
           )
           VALUES (
-            ${id}, ${username}, ${displayName}, 'admin', ${active}, ${passwordHash}, ${actor.userId}
+            ${id}, ${username}, ${displayName}, ${dbRole}, ${active}, ${passwordHash}, ${actor.userId}
           )
-          RETURNING id, username, name, active, created_at, updated_at, created_by_staff_user_id,
+          RETURNING id, username, name, role, active, created_at, updated_at, created_by_staff_user_id,
             profile_picture IS NOT NULL AS has_profile_picture
         `) as AdminAccountRow[];
         return json({ account: accountResponse(rows[0], actor.userId, actor.isSuperAdmin) }, 201);

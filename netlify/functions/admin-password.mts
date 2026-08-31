@@ -27,7 +27,7 @@ export default async function handler(request: Request, context: Context): Promi
     const targets = (await db.sql`
       SELECT id, created_by_staff_user_id
       FROM staff_users
-      WHERE id = ${accountId} AND role = 'admin'
+      WHERE id = ${accountId} AND role IN ('admin', 'super_admin')
       LIMIT 1
     `) as ManagedAccountRow[];
     const target = targets[0];

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { adminAuthService } from '../../services/adminAuthService';
-import { AdminAccount, AdminPrincipal } from '../../types';
+import { AdminAccount, AdminPrincipal, AdminRole } from '../../types';
 
 interface AdminAccountManagementViewProps {
   principal: AdminPrincipal;
@@ -8,12 +8,22 @@ interface AdminAccountManagementViewProps {
   onShowNotification: (message: string) => void;
 }
 
-const EMPTY_FORM = {
+interface AccountFormState {
+  username: string;
+  displayName: string;
+  password: string;
+  confirmPassword: string;
+  active: boolean;
+  role: AdminRole;
+}
+
+const EMPTY_FORM: AccountFormState = {
   username: '',
   displayName: '',
   password: '',
   confirmPassword: '',
   active: true,
+  role: 'ADMIN',
 };
 
 export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProps> = ({
@@ -22,7 +32,7 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
   onShowNotification,
 }) => {
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<AccountFormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +69,13 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
         displayName: form.displayName,
         password: form.password,
         active: form.active,
+        role: form.role,
       });
       setAccounts((current) => [account, ...current]);
       setForm(EMPTY_FORM);
-      onShowNotification(`Admin account ${account.username} created.`);
+      onShowNotification(`${account.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'} account ${account.username} created.`);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Unable to create Admin account.');
+      setError(createError instanceof Error ? createError.message : 'Unable to create account.');
     } finally {
       setSaving(false);
     }
@@ -79,7 +90,7 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
       );
       onShowNotification(`${account.username} ${account.active ? 'deactivated' : 'activated'}.`);
     } catch (statusError) {
-      setError(statusError instanceof Error ? statusError.message : 'Unable to update Admin status.');
+      setError(statusError instanceof Error ? statusError.message : 'Unable to update account status.');
     }
   };
 
@@ -113,30 +124,57 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
 
       {error && <div className="p-3 rounded-xl bg-[#ffdad6] text-[#93000a] text-sm border border-[#ba1a1a]/20">{error}</div>}
 
-      <section className="bg-[#f9f2f0] border border-[#f3ecea] rounded-2xl p-4 sm:p-5 shadow-sm">
-        <h3 className="font-serif text-lg font-bold text-[#26170c]">Create Admin</h3>
-        <p className="text-xs text-[#81756e] mt-1 mb-4">New accounts always receive the ADMIN role.</p>
-        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" required />
-          <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" placeholder="Display name" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} required />
-          <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Password (12+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" minLength={12} required />
-          <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} autoComplete="new-password" minLength={12} required />
-          <label className="flex items-center gap-2 text-sm font-semibold text-[#4f453f]">
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
-            Account active immediately
-          </label>
-          <button disabled={saving} className="px-4 py-2.5 rounded-xl bg-[#26170c] text-white text-sm font-bold disabled:opacity-60">
-            {saving ? 'Creating…' : 'Create Admin Account'}
-          </button>
-        </form>
-      </section>
+      {principal.role === 'SUPER_ADMIN' && (
+        <section className="bg-[#f9f2f0] border border-[#f3ecea] rounded-2xl p-4 sm:p-5 shadow-sm">
+          <h3 className="font-serif text-lg font-bold text-[#26170c]">Create Administrative Account</h3>
+          <p className="text-xs text-[#81756e] mt-1 mb-3">Configure credentials and role for the new administrative user.</p>
+
+          <div className="mb-4">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#81756e] mb-1.5">Account Role</label>
+            <div className="inline-flex rounded-xl bg-white border border-[#dec1af] p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, role: 'ADMIN' }))}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  form.role === 'ADMIN' ? 'bg-[#26170c] text-white shadow-sm' : 'text-[#4f453f] hover:text-[#26170c]'
+                }`}
+              >
+                ADMIN
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, role: 'SUPER_ADMIN' }))}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  form.role === 'SUPER_ADMIN' ? 'bg-[#26170c] text-white shadow-sm' : 'text-[#4f453f] hover:text-[#26170c]'
+                }`}
+              >
+                SUPER ADMIN
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" required />
+            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" placeholder="Display name" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} required />
+            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Password (12+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" minLength={12} required />
+            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} autoComplete="new-password" minLength={12} required />
+            <label className="flex items-center gap-2 text-sm font-semibold text-[#4f453f]">
+              <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+              Account active immediately
+            </label>
+            <button disabled={saving} className="px-4 py-2.5 rounded-xl bg-[#26170c] text-white text-sm font-bold disabled:opacity-60">
+              {saving ? 'Creating…' : `Create ${form.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'} Account`}
+            </button>
+          </form>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h3 className="font-serif text-lg font-bold text-[#26170c]">Authorized Accounts</h3>
         {loading ? (
           <div className="h-28 rounded-2xl bg-[#f3ecea] animate-pulse" />
         ) : accounts.length === 0 ? (
-          <div className="p-6 rounded-2xl bg-[#f9f2f0] border border-[#f3ecea] text-sm text-[#81756e]">No Admin accounts are available to manage.</div>
+          <div className="p-6 rounded-2xl bg-[#f9f2f0] border border-[#f3ecea] text-sm text-[#81756e]">No administrative accounts are available to manage.</div>
         ) : (
           accounts.map((account) => (
             <article key={account.id} className="p-4 rounded-2xl bg-[#f9f2f0] border border-[#f3ecea] shadow-sm">
@@ -147,11 +185,14 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-bold text-[#26170c]">{account.displayName}</h4>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${account.role === 'SUPER_ADMIN' ? 'bg-[#fbddca] text-[#552000]' : 'bg-[#e8e1df] text-[#4f453f]'}`}>
+                      {account.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : 'ADMIN'}
+                    </span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${account.active ? 'bg-[#e1e1c9] text-[#636451]' : 'bg-[#ffdad6] text-[#93000a]'}`}>
                       {account.active ? 'ACTIVE' : 'INACTIVE'}
                     </span>
                   </div>
-                  <p className="text-xs text-[#81756e]">@{account.username} · ADMIN</p>
+                  <p className="text-xs text-[#81756e]">@{account.username} · {account.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : 'ADMIN'}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {account.canResetPassword && (

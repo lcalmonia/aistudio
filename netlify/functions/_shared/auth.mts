@@ -136,7 +136,7 @@ export async function setAdminAccountActive(
     const result = await client.query(
       `UPDATE staff_users
        SET active = $1, updated_at = NOW()
-       WHERE id = $2 AND role = 'admin'
+       WHERE id = $2 AND role IN ('admin', 'super_admin')
        RETURNING id, username, name, active, updated_at`,
       [active, staffUserId],
     );
@@ -166,7 +166,7 @@ export async function changeAdminPassword(staffUserId: string, passwordHash: str
     await client.query(
       `UPDATE staff_users
        SET passcode_hash = $1, updated_at = NOW()
-       WHERE id = $2 AND role = 'admin'`,
+       WHERE id = $2 AND role IN ('admin', 'super_admin')`,
       [passwordHash, staffUserId],
     );
     await client.query(
@@ -198,7 +198,7 @@ export async function getAuthenticatedAdmin(request: Request): Promise<Authentic
       staff.name AS display_name,
       staff.active,
       CASE
-        WHEN sessions.role = 'SUPER_ADMIN' THEN super_profile.profile_picture IS NOT NULL
+        WHEN sessions.role = 'SUPER_ADMIN' AND sessions.staff_user_id IS NULL THEN super_profile.profile_picture IS NOT NULL
         ELSE staff.profile_picture IS NOT NULL
       END AS has_profile_picture
     FROM admin_sessions AS sessions
@@ -211,24 +211,28 @@ export async function getAuthenticatedAdmin(request: Request): Promise<Authentic
   `) as SessionRow[];
 
   const session = rows[0];
-  if (!session || (session.role === 'ADMIN' && (!session.staff_user_id || !session.active || !session.username))) {
+  if (!session) return null;
+
+  if (session.staff_user_id && (!session.active || !session.username)) {
     return null;
   }
 
-  if (session.role === 'SUPER_ADMIN' && !getSuperAdminCredentials()) {
+  if (session.staff_user_id === null && (!getSuperAdminCredentials() || session.role !== 'SUPER_ADMIN')) {
     return null;
   }
 
   await db.sql`UPDATE admin_sessions SET last_seen_at = NOW() WHERE id = ${session.session_id}`;
 
-  const superCredentials = session.role === 'SUPER_ADMIN' ? getSuperAdminCredentials() : null;
-  const username = session.role === 'SUPER_ADMIN' ? superCredentials!.username : session.username!;
+  const isEnvSuperAdmin = session.role === 'SUPER_ADMIN' && session.staff_user_id === null;
+  const superCredentials = isEnvSuperAdmin ? getSuperAdminCredentials() : null;
+  const username = superCredentials ? superCredentials.username : session.username!;
+  const displayName = superCredentials ? superCredentials.username : session.display_name || username;
   return {
     authenticated: true,
     userId: session.staff_user_id,
     role: session.role,
     username,
-    displayName: session.role === 'SUPER_ADMIN' ? username : session.display_name || username,
+    displayName,
     hasProfilePicture: Boolean(session.has_profile_picture),
     isSuperAdmin: session.role === 'SUPER_ADMIN',
     isAdmin: session.role === 'ADMIN',
@@ -248,10 +252,29 @@ export function requireAdminAccountManager(admin: AuthenticatedAdmin): void {
   }
 }
 
-export function enforceAdminCreationRole(requestedRole: unknown): void {
-  if (requestedRole !== undefined && requestedRole !== 'ADMIN') {
+export function enforceAdminCreationRole(
+  actorOrRole?: AuthenticatedAdmin | unknown,
+  requestedRole?: unknown,
+): AdminRole {
+  if (actorOrRole && typeof actorOrRole === 'object' && 'isSuperAdmin' in actorOrRole) {
+    const actor = actorOrRole as AuthenticatedAdmin;
+    if (!actor.isSuperAdmin) {
+      throw new RequestError(403, 'Only Super Admin can create administrative accounts.');
+    }
+    if (requestedRole === undefined || requestedRole === null || requestedRole === 'ADMIN') {
+      return 'ADMIN';
+    }
+    if (requestedRole === 'SUPER_ADMIN') {
+      return 'SUPER_ADMIN';
+    }
+    throw new RequestError(400, 'Invalid account role. Allowed roles: ADMIN, SUPER_ADMIN.');
+  }
+
+  const role = actorOrRole;
+  if (role !== undefined && role !== 'ADMIN') {
     throw new RequestError(403, 'Only ADMIN accounts can be created.');
   }
+  return 'ADMIN';
 }
 
 export function canViewAdminAccount(

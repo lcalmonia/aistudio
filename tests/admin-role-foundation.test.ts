@@ -90,16 +90,23 @@ describe('Phase A-1: Admin & Super Admin Role Foundation Audit & Security', () =
   });
 
   it('5. Client-side role manipulation cannot elevate Admin to Super Admin', () => {
-    // Attempting to pass SUPER_ADMIN into creation role check throws RequestError 403
+    // Admin actor cannot create accounts (throws RequestError 403)
     assert.throws(() => {
-      enforceAdminCreationRole('SUPER_ADMIN');
+      enforceAdminCreationRole(mockAdmin, 'ADMIN');
     }, (err: unknown) => {
       return err instanceof RequestError && err.status === 403;
     });
 
-    // Valid role 'ADMIN' or undefined passes
-    assert.doesNotThrow(() => enforceAdminCreationRole('ADMIN'));
-    assert.doesNotThrow(() => enforceAdminCreationRole(undefined));
+    assert.throws(() => {
+      enforceAdminCreationRole(mockAdmin, 'SUPER_ADMIN');
+    }, (err: unknown) => {
+      return err instanceof RequestError && err.status === 403;
+    });
+
+    // Super Admin can create ADMIN or SUPER_ADMIN
+    assert.equal(enforceAdminCreationRole(mockSuperAdmin, 'ADMIN'), 'ADMIN');
+    assert.equal(enforceAdminCreationRole(mockSuperAdmin, 'SUPER_ADMIN'), 'SUPER_ADMIN');
+    assert.equal(enforceAdminCreationRole(mockSuperAdmin, undefined), 'ADMIN');
   });
 
   it('6. Admin cannot modify their own status or manage accounts outside authorization hierarchy', () => {

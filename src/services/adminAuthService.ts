@@ -1,4 +1,4 @@
-import { AdminAccount, AdminPrincipal } from '../types';
+import { AdminAccount, AdminPrincipal, AdminRole } from '../types';
 
 class AdminApiError extends Error {
   constructor(
@@ -60,10 +60,11 @@ export const adminAuthService = {
     displayName: string;
     password: string;
     active: boolean;
+    role?: AdminRole;
   }): Promise<AdminAccount> {
     const result = await api<{ account: AdminAccount }>('/api/admin/accounts', {
       method: 'POST',
-      body: JSON.stringify({ ...input, role: 'ADMIN' }),
+      body: JSON.stringify({ ...input, role: input.role || 'ADMIN' }),
     });
     return result.account;
   },

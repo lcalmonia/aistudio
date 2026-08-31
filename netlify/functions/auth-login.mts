@@ -17,6 +17,7 @@ interface AdminLoginRow {
   id: string;
   username: string;
   name: string;
+  role: 'admin' | 'super_admin';
   passcode_hash: string | null;
   active: boolean;
   has_profile_picture: boolean;
@@ -32,23 +33,8 @@ export default async function handler(request: Request, context: Context): Promi
     const password = requireString(body.password, 'Password', { max: 128, trim: false });
     const normalizedUsername = normalizeUsername(username);
     const db = database();
-    const rows = (await db.sql`
-      SELECT
-        id,
-        username,
-        name,
-        passcode_hash,
-        active,
-        profile_picture IS NOT NULL AS has_profile_picture
-      FROM staff_users
-      WHERE role = 'admin' AND LOWER(username) = ${normalizedUsername}
-      LIMIT 1
-    `) as AdminLoginRow[];
-    const account = rows[0];
 
-    const adminPasswordValid = await verifyPassword(password, account?.passcode_hash || DUMMY_PASSWORD_HASH);
     const superAdminValid = verifySuperAdminCredentials(username, password);
-
     if (superAdminValid) {
       const profileRows = await db.sql`
         SELECT profile_picture IS NOT NULL AS has_profile_picture
@@ -69,22 +55,41 @@ export default async function handler(request: Request, context: Context): Promi
       });
     }
 
-    if (!account || !account.active || !adminPasswordValid) {
+    const rows = (await db.sql`
+      SELECT
+        id,
+        username,
+        name,
+        role,
+        passcode_hash,
+        active,
+        profile_picture IS NOT NULL AS has_profile_picture
+      FROM staff_users
+      WHERE role IN ('admin', 'super_admin') AND LOWER(username) = ${normalizedUsername}
+      LIMIT 1
+    `) as AdminLoginRow[];
+    const account = rows[0];
+
+    const accountPasswordValid = await verifyPassword(password, account?.passcode_hash || DUMMY_PASSWORD_HASH);
+
+    if (!account || !account.active || !accountPasswordValid) {
       return json({ error: 'Invalid username or password.' }, 401);
     }
 
-    const token = await createAdminSession('ADMIN', account.id);
+    const sessionRole = account.role === 'super_admin' ? 'SUPER_ADMIN' : 'ADMIN';
+    const isSuperAdmin = sessionRole === 'SUPER_ADMIN';
+    const token = await createAdminSession(sessionRole, account.id);
     setAdminSessionCookie(context, request, token);
     return json(
       publicAdmin({
         authenticated: true,
         userId: account.id,
-        role: 'ADMIN',
+        role: sessionRole,
         username: account.username,
         displayName: account.name,
         hasProfilePicture: account.has_profile_picture,
-        isSuperAdmin: false,
-        isAdmin: true,
+        isSuperAdmin,
+        isAdmin: !isSuperAdmin,
         sessionId: '',
       }),
     );
