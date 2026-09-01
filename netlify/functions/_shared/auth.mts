@@ -247,8 +247,8 @@ export async function requireAuthenticatedAdmin(request: Request): Promise<Authe
   return admin;
 }
 
-export function requireSuperAdmin(admin: AuthenticatedAdmin): void {
-  if (!admin.isSuperAdmin) {
+export function requireSuperAdmin(admin: AuthenticatedAdmin | null | undefined): asserts admin is AuthenticatedAdmin {
+  if (!admin || !admin.isSuperAdmin) {
     throw new RequestError(403, 'Super Admin access required for catalog and modifier configuration.');
   }
 }

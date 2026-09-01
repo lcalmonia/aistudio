@@ -9,6 +9,10 @@ interface AdminMenuViewProps {
   modifierCategories?: ModifierCategory[];
   promoBundles?: PromoBundle[];
   categories?: string[];
+  copiedProduct?: MenuItem | null;
+  isPastingProduct?: boolean;
+  onCopyProduct?: (product: MenuItem) => void;
+  onPasteProduct?: () => void;
   onAddProduct?: () => void;
   onOpenAddProduct?: () => void;
   onEditProduct?: (product: MenuItem) => void;
@@ -43,6 +47,10 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   modifierCategories = [],
   promoBundles = [],
   categories = [],
+  copiedProduct,
+  isPastingProduct = false,
+  onCopyProduct,
+  onPasteProduct,
   onAddProduct,
   onOpenAddProduct,
   onEditProduct,
@@ -379,16 +387,46 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <button
-                  onClick={handleAddProduct}
-                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>
-                  Add New Product
-                </button>
+              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
+                {isSuperAdmin && copiedProduct && onPasteProduct && (
+                  <button
+                    type="button"
+                    onClick={onPasteProduct}
+                    disabled={isPastingProduct}
+                    className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#5e604d] hover:bg-[#4f503e] disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    title={`Paste copied item "${copiedProduct.name}" as new product`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">content_paste</span>
+                    <span>{isPastingProduct ? 'Pasting...' : `Paste (${copiedProduct.name})`}</span>
+                  </button>
+                )}
+
+                {isSuperAdmin && (
+                  <button
+                    onClick={handleAddProduct}
+                    className="flex-1 sm:flex-initial px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>
+                    Add New Product
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Read-Only Notice for Admin Role */}
+            {isAdminOnly && (
+              <div className="bg-[#f3ecea] border border-[#d2c4bc] text-[#4f453f] px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-[#81756e]">lock</span>
+                  <span>
+                    <strong>Admin Mode:</strong> Menu item creation, copying, editing, and deletion require Super Admin privileges. Availability toggles remain active.
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold bg-[#e8e1df] px-2 py-0.5 rounded uppercase tracking-wider text-[#636451]">
+                  Read-Only
+                </span>
+              </div>
+            )}
 
             {/* Dynamic Filter Pills */}
             <div className="pt-2 border-t border-[#f3ecea] space-y-2">
@@ -612,26 +650,41 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                         <span className="material-symbols-outlined text-[17px] sm:text-[18px]">visibility</span>
                       </button>
 
-                      <button
-                        onClick={() => handleEditProduct(product)}
-                        className="px-2.5 sm:px-3 py-1 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[15px] sm:text-[16px]">edit</span>
-                        <span className="hidden xs:inline">Edit Product</span>
-                        <span className="xs:hidden">Edit</span>
-                      </button>
+                      {isSuperAdmin && (
+                        <>
+                          {onCopyProduct && (
+                            <button
+                              type="button"
+                              onClick={() => onCopyProduct(product)}
+                              title={`Copy "${product.name}"`}
+                              className="p-1 sm:p-1.5 rounded-lg text-[#4f453f] hover:bg-[#e8e1df] transition-colors cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[17px] sm:text-[18px]">content_copy</span>
+                            </button>
+                          )}
 
-                      <button
-                        onClick={() => {
-                          if (confirm(`Remove "${product.name}" from the menu?`)) {
-                            onDeleteProduct(product.id);
-                          }
-                        }}
-                        title="Delete Product"
-                        className="p-1 sm:p-1.5 rounded-lg text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[17px] sm:text-[18px]">delete</span>
-                      </button>
+                          <button
+                            onClick={() => handleEditProduct(product)}
+                            className="px-2.5 sm:px-3 py-1 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">edit</span>
+                            <span className="hidden xs:inline">Edit Product</span>
+                            <span className="xs:hidden">Edit</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (confirm(`Remove "${product.name}" from the menu?`)) {
+                                onDeleteProduct(product.id);
+                              }
+                            }}
+                            title="Delete Product"
+                            className="p-1 sm:p-1.5 rounded-lg text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[17px] sm:text-[18px]">delete</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

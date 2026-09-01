@@ -1,5 +1,5 @@
 import type { Config, Context } from '@netlify/functions';
-import { requireAuthenticatedAdmin } from './_shared/auth.mts';
+import { requireAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts';
 import {
   deleteMenuItemFromDatabase,
   fetchMenuItemById,
@@ -21,7 +21,7 @@ export default async function handler(request: Request, context: Context): Promi
 
     if (request.method === 'PATCH') {
       enforceSameOrigin(request);
-      await requireAuthenticatedAdmin(request);
+      const admin = await requireAuthenticatedAdmin(request);
       const body = await readJsonObject(request);
 
       if (body.toggleAvailability === true) {
@@ -29,13 +29,15 @@ export default async function handler(request: Request, context: Context): Promi
         return json({ menuItem, message: 'Availability updated.' });
       }
 
+      requireSuperAdmin(admin);
       const menuItem = await updateMenuItemInDatabase(menuItemId, body);
       return json({ menuItem, message: 'Menu item updated successfully.' });
     }
 
     if (request.method === 'DELETE') {
       enforceSameOrigin(request);
-      await requireAuthenticatedAdmin(request);
+      const admin = await requireAuthenticatedAdmin(request);
+      requireSuperAdmin(admin);
       const deleted = await deleteMenuItemFromDatabase(menuItemId);
       if (!deleted) throw new RequestError(404, 'Menu item not found.');
       return json({ success: true, message: 'Menu item deleted successfully.' });

@@ -54,6 +54,7 @@ import { EditBundleModal } from './components/EditBundleModal';
 import { EditAddonModal } from './components/EditAddonModal';
 import { adminAuthService } from './services/adminAuthService';
 import { parseRouteFromPath, syncBrowserUrl } from './services/routeService';
+import { generateCopiedProductName, cloneProductForPaste } from './utils/productCopy';
 
 export default function App() {
   // -------------------------------------------------------------
@@ -113,6 +114,8 @@ export default function App() {
   // Modals for Admin CRUD
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
   const [productToEdit, setProductToEdit] = useState<MenuItem | null>(null);
+  const [copiedProduct, setCopiedProduct] = useState<MenuItem | null>(null);
+  const [isPastingProduct, setIsPastingProduct] = useState<boolean>(false);
 
   const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
   const [bundleToEdit, setBundleToEdit] = useState<PromoBundle | null>(null);
@@ -621,6 +624,41 @@ export default function App() {
     }
   };
 
+  const handleCopyProduct = (item: MenuItem) => {
+    if (adminPrincipal?.role !== 'SUPER_ADMIN') {
+      showNotification('⚠️ Only Super Admin can copy menu items.');
+      return;
+    }
+    setCopiedProduct(item);
+    showNotification(`${item.name} copied.`);
+  };
+
+  const handlePasteProduct = async () => {
+    if (adminPrincipal?.role !== 'SUPER_ADMIN') {
+      showNotification('⚠️ Only Super Admin can paste menu items.');
+      return;
+    }
+    if (!copiedProduct) return;
+
+    setIsPastingProduct(true);
+    try {
+      const newName = generateCopiedProductName(copiedProduct.name, menuItems);
+      const clonedData = cloneProductForPaste(copiedProduct, newName);
+
+      const createdItem = await menuService.createMenuItem(clonedData);
+      const updatedList = await menuService.listMenuItems();
+      setMenuItems(updatedList);
+
+      showNotification(`${createdItem.name} created.`);
+      handleOpenEditProduct(createdItem);
+    } catch (err: any) {
+      console.error('[Product Copy/Paste] Failed to paste item:', err);
+      showNotification(`⚠️ Failed to create copied item: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsPastingProduct(false);
+    }
+  };
+
   // -------------------------------------------------------------
   // Bundle CRUD Handlers
   // -------------------------------------------------------------
@@ -965,6 +1003,10 @@ export default function App() {
                 addons={addons}
                 modifierCategories={modifierCategories}
                 promoBundles={promoBundles}
+                copiedProduct={copiedProduct}
+                isPastingProduct={isPastingProduct}
+                onCopyProduct={handleCopyProduct}
+                onPasteProduct={handlePasteProduct}
                 onOpenAddProduct={handleOpenAddProduct}
                 onOpenEditProduct={handleOpenEditProduct}
                 onToggleAvailability={handleToggleProductAvailability}
