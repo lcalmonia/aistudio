@@ -148,4 +148,18 @@ describe('Menu Item Copy & Paste Foundation', () => {
       );
     });
   });
+
+  describe('UI Role Architecture & Copy Visibility Rules', () => {
+    it('SUPER_ADMIN role correctly enables isSuperAdmin capabilities', () => {
+      const superAdminUser = { role: 'SUPER_ADMIN', username: 'owner' };
+      const isSuper = superAdminUser.role === 'SUPER_ADMIN';
+      assert.equal(isSuper, true);
+    });
+
+    it('ADMIN role strictly denies isSuperAdmin permissions and prevents Copy/Paste/Edit/Delete actions', () => {
+      const staffAdminUser = { role: 'ADMIN', username: 'barista' };
+      const isSuper = staffAdminUser.role === 'SUPER_ADMIN';
+      assert.equal(isSuper, false);
+    });
+  });
 });

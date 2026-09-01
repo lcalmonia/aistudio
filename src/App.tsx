@@ -625,16 +625,26 @@ export default function App() {
   };
 
   const handleCopyProduct = (item: MenuItem) => {
-    if (adminPrincipal?.role !== 'SUPER_ADMIN') {
+    const isSuper =
+      adminPrincipal?.role === 'SUPER_ADMIN' ||
+      (adminPrincipal as any)?.isSuperAdmin === true ||
+      (adminPrincipal as any)?.role === 'super_admin';
+    if (!isSuper) {
       showNotification('⚠️ Only Super Admin can copy menu items.');
       return;
     }
-    setCopiedProduct(item);
-    showNotification(`${item.name} copied.`);
+    // Deep clone the full configuration
+    const cloned = cloneProductForPaste(item, item.name);
+    setCopiedProduct({ ...cloned, id: item.id } as MenuItem);
+    showNotification('Product copied. Click Paste to create a duplicate.');
   };
 
   const handlePasteProduct = async () => {
-    if (adminPrincipal?.role !== 'SUPER_ADMIN') {
+    const isSuper =
+      adminPrincipal?.role === 'SUPER_ADMIN' ||
+      (adminPrincipal as any)?.isSuperAdmin === true ||
+      (adminPrincipal as any)?.role === 'super_admin';
+    if (!isSuper) {
       showNotification('⚠️ Only Super Admin can paste menu items.');
       return;
     }
@@ -649,7 +659,7 @@ export default function App() {
       const updatedList = await menuService.listMenuItems();
       setMenuItems(updatedList);
 
-      showNotification(`${createdItem.name} created.`);
+      showNotification(`"${createdItem.name}" created. Opening editor...`);
       handleOpenEditProduct(createdItem);
     } catch (err: any) {
       console.error('[Product Copy/Paste] Failed to paste item:', err);
