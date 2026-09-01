@@ -696,7 +696,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                             <span>Edit</span>
                           </button>
 
-                          {onCopyProduct && (
+                         {isSuperAdmin && onCopyProduct && (
                             <button
                               type="button"
                               onClick={() => onCopyProduct(product)}
