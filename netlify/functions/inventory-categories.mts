@@ -81,3 +81,4 @@ export default async function handler(request: Request): Promise<Response> {
 export const config: Config = {
   path: '/api/inventory/categories',
  method: ['GET', 'POST', 'PATCH', 'DELETE'],
+};
