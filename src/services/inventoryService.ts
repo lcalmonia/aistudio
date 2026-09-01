@@ -318,7 +318,7 @@ async deleteCategory(category: string): Promise<string[]> {
     {
       method: 'DELETE',
       body: JSON.stringify({
-        categoryName: cleanCategory,
+        category: cleanCategory,
       }),
     }
   );
