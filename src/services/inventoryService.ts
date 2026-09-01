@@ -274,6 +274,64 @@ export const inventoryService = {
 
     throw new InventoryApiError('Failed to add inventory category on server.');
   },
+  async renameCategory(
+  oldCategory: string,
+  newCategory: string
+): Promise<string[]> {
+  const cleanOld = oldCategory.trim();
+  const cleanNew = newCategory.trim();
+
+  if (!cleanOld || !cleanNew) {
+    return this.listCategories();
+  }
+
+  const response = await api<{ categories: string[] }>(
+    '/api/inventory/categories',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        oldCategory: cleanOld,
+        newCategory: cleanNew,
+      }),
+    }
+  );
+
+  if (response && Array.isArray(response.categories)) {
+    storageAdapter.setInventoryCategories(response.categories);
+    return response.categories;
+  }
+
+  throw new InventoryApiError(
+    'Failed to rename inventory category on server.'
+  );
+},
+
+async deleteCategory(category: string): Promise<string[]> {
+  const cleanCategory = category.trim();
+
+  if (!cleanCategory) {
+    return this.listCategories();
+  }
+
+  const response = await api<{ categories: string[] }>(
+    '/api/inventory/categories',
+    {
+      method: 'DELETE',
+      body: JSON.stringify({
+        categoryName: cleanCategory,
+      }),
+    }
+  );
+
+  if (response && Array.isArray(response.categories)) {
+    storageAdapter.setInventoryCategories(response.categories);
+    return response.categories;
+  }
+
+  throw new InventoryApiError(
+    'Failed to delete inventory category on server.'
+  );
+},
 
   async listMovements(inventoryItemId?: string): Promise<InventoryMovement[]> {
     const movements = storageAdapter.getInventoryMovements();
