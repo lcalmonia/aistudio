@@ -867,6 +867,43 @@ export default function App() {
       showNotification(`⚠️ Failed to add inventory category: ${err?.message || 'Server error'}`);
     }
   };
+  const handleEditInventoryCategory = async (
+  oldCategory: string,
+  newCategory: string
+) => {
+  try {
+    const updated = await inventoryService.renameCategory(
+      oldCategory,
+      newCategory
+    );
+
+    setInventoryCategories(updated);
+    showNotification(`Inventory category renamed to "${newCategory}".`);
+  } catch (err: any) {
+    console.error('[Inventory] Rename category error:', err);
+    showNotification(
+      `⚠️ Failed to rename inventory category: ${
+        err?.message || 'Server error'
+      }`
+    );
+  }
+};
+
+const handleDeleteInventoryCategory = async (category: string) => {
+  try {
+    const updated = await inventoryService.deleteCategory(category);
+
+    setInventoryCategories(updated);
+    showNotification(`Inventory category "${category}" deleted.`);
+  } catch (err: any) {
+    console.error('[Inventory] Delete category error:', err);
+    showNotification(
+      `⚠️ Failed to delete inventory category: ${
+        err?.message || 'Server error'
+      }`
+    );
+  }
+};
 
   const handleLogBrew = () => {
     setExtraLoggedCups((prev) => prev + 1);
@@ -1122,15 +1159,16 @@ export default function App() {
 
             {/* Inventory View */}
             {currentTab === 'inventory' && (
-              <InventoryView
+             <InventoryView
   items={inventoryItems}
   categories={inventoryCategories}
   onSaveItem={handleSaveInventoryItem}
   onDeleteItem={handleDeleteInventoryItem}
   onAddCategory={handleAddInventoryCategory}
-  onEditCategory={handleSaveCategory}
-  onDeleteCategory={handleDeleteCategory}
+  onEditCategory={handleEditInventoryCategory}
+  onDeleteCategory={handleDeleteInventoryCategory}
   onShowNotification={showNotification}
+  admin={adminPrincipal}
 />
             )}
 
