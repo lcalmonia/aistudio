@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { MenuItem, ProductAddon, PromoBundle, ProductTemperature, ModifierCategory, ModifierCategoryType } from '../types';
+import { MenuItem, ProductAddon, PromoBundle, ProductTemperature, ModifierCategory, ModifierCategoryType, AdminPrincipal } from '../types';
 import { ModifierCategoryModal } from './ModifierCategoryModal';
 
 interface AdminMenuViewProps {
+  admin?: AdminPrincipal | null;
   menuItems?: MenuItem[];
   addons?: ProductAddon[];
   modifierCategories?: ModifierCategory[];
@@ -21,8 +22,8 @@ interface AdminMenuViewProps {
   onOpenEditBundle?: (bundle: PromoBundle) => void;
   onDeleteBundle?: (bundleId: string) => void;
   onToggleBundleStock?: (bundleId: string) => void;
-  onAddAddon?: () => void;
-  onOpenAddAddon?: () => void;
+  onAddAddon?: (categoryName?: string, itemType?: ModifierCategoryType) => void;
+  onOpenAddAddon?: (categoryName?: string, itemType?: ModifierCategoryType) => void;
   onEditAddon?: (addon: ProductAddon) => void;
   onOpenEditAddon?: (addon: ProductAddon) => void;
   onDeleteAddon?: (addonId: string) => void;
@@ -36,6 +37,7 @@ interface AdminMenuViewProps {
 }
 
 export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
+  admin,
   menuItems = [],
   addons = [],
   modifierCategories = [],
@@ -65,6 +67,9 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   onSaveModifierCategory,
   onDeleteModifierCategory,
 }) => {
+  const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
+  const isAdminOnly = admin?.role === 'ADMIN';
+
   // Defensive fallbacks for aliased handlers
   const handleAddProduct = onAddProduct || onOpenAddProduct || (() => {});
   const handleEditProduct = onEditProduct || onOpenEditProduct || (() => {});
@@ -72,7 +77,10 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   const handleAddBundle = onAddBundle || onOpenAddBundle || (() => {});
   const handleEditBundle = onEditBundle || onOpenEditBundle || (() => {});
   const handleToggleBundle = onToggleBundleStock || (() => {});
-  const handleAddAddon = onAddAddon || onOpenAddAddon || (() => {});
+  const handleAddAddon = (categoryName?: string, itemType?: ModifierCategoryType) => {
+    if (onAddAddon) onAddAddon(categoryName, itemType);
+    else if (onOpenAddAddon) onOpenAddAddon(categoryName, itemType);
+  };
   const handleEditAddon = onEditAddon || onOpenEditAddon || (() => {});
   // Navigation sub-tabs within Menu Admin
   const [adminTab, setAdminTab] = useState<'products' | 'bundles' | 'addons' | 'preview'>('products');
@@ -85,6 +93,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
 
   // Modifiers & Add-ons filters and modal state
   const [isModCatModalOpen, setIsModCatModalOpen] = useState(false);
+  const [categoryToEditForModal, setCategoryToEditForModal] = useState<ModifierCategory | null>(null);
   const [addonTypeFilter, setAddonTypeFilter] = useState<'All' | 'modifier' | 'addon'>('All');
   const [addonCategoryFilter, setAddonCategoryFilter] = useState<string>('All');
   const [addonSearchQuery, setAddonSearchQuery] = useState<string>('');
@@ -777,6 +786,21 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
       {/* ========================================================================= */}
       {adminTab === 'addons' && (
         <div className="space-y-4">
+          {/* Read-Only Notice for Admin Role */}
+          {isAdminOnly && (
+            <div className="bg-[#f3ecea] border border-[#d2c4bc] text-[#4f453f] px-4 py-3 rounded-2xl flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-[#81756e]">lock</span>
+                <span>
+                  <strong>Admin Mode:</strong> Modifier groups, options, and pricing configurations can only be created or modified by Super Admin. Availability toggles remain active.
+                </span>
+              </div>
+              <span className="text-[10px] font-bold bg-[#e8e1df] px-2 py-0.5 rounded uppercase tracking-wider text-[#636451]">
+                Read-Only Settings
+              </span>
+            </div>
+          )}
+
           {/* Top Control Bar */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-[#fff8f5] p-3.5 sm:p-4 rounded-2xl border border-[#e8e1df]">
             <div>
@@ -793,25 +817,30 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
-              <button
-                type="button"
-                onClick={() => setIsModCatModalOpen(true)}
-                className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] border border-[#d2c4bc] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">folder_special</span>
-                <span>Manage Categories</span>
-              </button>
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryToEditForModal(null);
+                    setIsModCatModalOpen(true);
+                  }}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] border border-[#d2c4bc] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">folder_special</span>
+                  <span>Manage Categories</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={handleAddAddon}
-                className="flex-1 sm:flex-initial px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                <span>Add New Item</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => handleAddAddon()}
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                  <span>Add New Item</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Filter Bar: Classification, Search & Category */}
@@ -933,13 +962,15 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                 >
                   Reset Filters
                 </button>
-                <button
-                  type="button"
-                  onClick={handleAddAddon}
-                  className="px-3 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-lg"
-                >
-                  Add Item
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleAddAddon()}
+                    className="px-3 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-bold rounded-lg"
+                  >
+                    Add Item
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -989,14 +1020,61 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                       <span className="text-[11px] text-[#81756e] font-semibold">
                         {group.items.length} {group.items.length === 1 ? 'option' : 'options'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={handleAddAddon}
-                        className="text-[11px] font-bold text-[#636451] hover:underline flex items-center gap-0.5 cursor-pointer ml-1"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">add</span>
-                        <span>Add Option</span>
-                      </button>
+
+                      {isSuperAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const catToEdit: ModifierCategory = def || {
+                                id: `modcat-${group.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+                                name: group.name,
+                                itemType: isModifierGroup ? 'modifier' : 'addon',
+                                required: false,
+                                selectionType: 'single',
+                                applicableTemperature: 'Both',
+                                applicableCategories: [],
+                                sortOrder: 0,
+                                active: true,
+                              };
+                              setCategoryToEditForModal(catToEdit);
+                              setIsModCatModalOpen(true);
+                            }}
+                            className="text-[11px] font-bold text-[#26170c] bg-white hover:bg-[#e8e1df] border border-[#d2c4bc] px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                            title={`Edit configuration for "${group.name}"`}
+                          >
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
+                            <span>Edit Group</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddAddon(group.name, isModifierGroup ? 'modifier' : 'addon')}
+                            className="text-[11px] font-bold text-[#636451] bg-[#e1e1c9]/60 hover:bg-[#e1e1c9] border border-[#5e604d]/20 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                            title={`Add option to ${group.name}`}
+                          >
+                            <span className="material-symbols-outlined text-[14px]">add</span>
+                            <span>Add Option</span>
+                          </button>
+
+                          {def?.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Delete modifier group "${group.name}"? Existing options will remain categorized unless changed.`)) {
+                                  if (onDeleteModifierCategory) {
+                                    onDeleteModifierCategory(def.id);
+                                  }
+                                }
+                              }}
+                              className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md cursor-pointer transition-all"
+                              title={`Delete group "${group.name}"`}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">delete</span>
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1004,13 +1082,15 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                   {group.items.length === 0 ? (
                     <div className="bg-white/60 p-4 rounded-xl border border-dashed border-[#d2c4bc] text-center">
                       <p className="text-xs text-[#81756e]">No active options in this category.</p>
-                      <button
-                        type="button"
-                        onClick={handleAddAddon}
-                        className="mt-2 text-xs font-bold text-[#26170c] underline cursor-pointer"
-                      >
-                        + Create option for {group.name}
-                      </button>
+                      {isSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleAddAddon(group.name, isModifierGroup ? 'modifier' : 'addon')}
+                          className="mt-2 text-xs font-bold text-[#26170c] underline cursor-pointer"
+                        >
+                          + Create option for {group.name}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -1056,6 +1136,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                             </div>
 
                             <div className="flex items-center gap-1 flex-shrink-0">
+                              {/* Toggle Availability / Stock: accessible to ALL authenticated staff/admins */}
                               <button
                                 type="button"
                                 onClick={() => onToggleAddonStock(addon.id)}
@@ -1068,24 +1149,30 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                                   {addon.available ? 'toggle_on' : 'toggle_off'}
                                 </span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleEditAddon(addon)}
-                                title="Edit Item"
-                                className="p-1 text-[#4f453f] hover:bg-[#f3ecea] rounded-md cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">edit</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirm(`Delete option "${addon.name}"?`)) onDeleteAddon(addon.id);
-                                }}
-                                title="Delete Item"
-                                className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
-                              </button>
+
+                              {/* Edit / Delete only accessible to SUPER_ADMIN */}
+                              {isSuperAdmin && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditAddon(addon)}
+                                    title="Edit Item"
+                                    className="p-1 text-[#4f453f] hover:bg-[#f3ecea] rounded-md cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`Delete option "${addon.name}"?`)) onDeleteAddon(addon.id);
+                                    }}
+                                    title="Delete Item"
+                                    className="p-1 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
@@ -1342,7 +1429,11 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
       {isModCatModalOpen && (
         <ModifierCategoryModal
           isOpen={isModCatModalOpen}
-          onClose={() => setIsModCatModalOpen(false)}
+          categoryToEdit={categoryToEditForModal}
+          onClose={() => {
+            setIsModCatModalOpen(false);
+            setCategoryToEditForModal(null);
+          }}
           categories={modifierCategories}
           productCategories={categories}
           onSaveCategory={(cat) => {

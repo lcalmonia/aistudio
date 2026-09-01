@@ -1,5 +1,5 @@
 import type { Config, Context } from '@netlify/functions';
-import { requireAuthenticatedAdmin } from './_shared/auth.mts';
+import { requireAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts';
 import { deleteAddonFromDatabase, fetchAddonById, toggleAddonStockInDatabase, updateAddonInDatabase } from './_shared/catalog.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject, RequestError } from './_shared/http.mts';
 
@@ -16,7 +16,7 @@ export default async function handler(request: Request, context: Context): Promi
 
     if (request.method === 'PATCH') {
       enforceSameOrigin(request);
-      await requireAuthenticatedAdmin(request);
+      const admin = await requireAuthenticatedAdmin(request);
       const body = await readJsonObject(request);
 
       if (body.toggleStock === true) {
@@ -24,13 +24,15 @@ export default async function handler(request: Request, context: Context): Promi
         return json({ addon, message: 'Add-on stock toggled.' });
       }
 
+      requireSuperAdmin(admin);
       const addon = await updateAddonInDatabase(addonId, body);
       return json({ addon, message: 'Add-on updated successfully.' });
     }
 
     if (request.method === 'DELETE') {
       enforceSameOrigin(request);
-      await requireAuthenticatedAdmin(request);
+      const admin = await requireAuthenticatedAdmin(request);
+      requireSuperAdmin(admin);
       const deleted = await deleteAddonFromDatabase(addonId);
       if (!deleted) throw new RequestError(404, 'Add-on not found.');
       return json({ success: true, message: 'Add-on deleted successfully.' });

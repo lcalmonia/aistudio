@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions';
-import { requireAuthenticatedAdmin } from './_shared/auth.mts';
+import { requireAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts';
 import { fetchModifierCategoriesFromDatabase, insertModifierCategoryToDatabase, ModifierCategory } from './_shared/catalog.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject, requireString } from './_shared/http.mts';
 
@@ -12,7 +12,8 @@ export default async function handler(request: Request): Promise<Response> {
 
     if (request.method === 'POST') {
       enforceSameOrigin(request);
-      await requireAuthenticatedAdmin(request);
+      const admin = await requireAuthenticatedAdmin(request);
+      requireSuperAdmin(admin);
       const body = await readJsonObject(request);
       const name = requireString(body.name, 'Category name', { min: 1, max: 128 });
       const modifierCategory = await insertModifierCategoryToDatabase({

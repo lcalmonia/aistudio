@@ -12,6 +12,8 @@ interface EditAddonModalProps {
   onSave: (addon: ProductAddon) => Promise<void> | void;
   onDelete?: (addonId: string) => Promise<void> | void;
   addonToEdit: ProductAddon | null;
+  initialCategory?: string;
+  initialItemType?: ModifierCategoryType;
   modifierCategories?: ModifierCategory[];
   productCategories?: string[];
 }
@@ -22,6 +24,8 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
   onSave,
   onDelete,
   addonToEdit,
+  initialCategory,
+  initialItemType,
   modifierCategories = [],
   productCategories = [],
 }) => {
@@ -29,7 +33,7 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
 
   // Initial base snapshot for clean vs. dirty draft detection
   const [baseDraft, setBaseDraft] = useState<AddonFormDraft>(() =>
-    createInitialAddonDraft(addonToEdit, modifierCategories)
+    createInitialAddonDraft(addonToEdit, modifierCategories, initialCategory, initialItemType)
   );
 
   // Active form states
@@ -90,7 +94,7 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
     const switchedAddon = isOpen && prevAddonIdRef.current !== addonToEdit?.id;
 
     if (wasClosed || switchedAddon) {
-      const freshDraft = createInitialAddonDraft(addonToEdit, modifierCategories);
+      const freshDraft = createInitialAddonDraft(addonToEdit, modifierCategories, initialCategory, initialItemType);
       setBaseDraft(freshDraft);
       setName(freshDraft.name);
       setCategory(freshDraft.category);
@@ -107,7 +111,7 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
 
     prevIsOpenRef.current = isOpen;
     prevAddonIdRef.current = addonToEdit?.id;
-  }, [isOpen, addonToEdit?.id, modifierCategories]);
+  }, [isOpen, addonToEdit?.id, modifierCategories, initialCategory, initialItemType]);
 
   // Live cross-device & background synchronization:
   // If the form is clean (hasChanges === false), safely update baseDraft and form fields from latest server props.
@@ -116,7 +120,7 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
     if (!isOpen) return;
 
     if (!hasChanges) {
-      const freshDraft = createInitialAddonDraft(addonToEdit, modifierCategories);
+      const freshDraft = createInitialAddonDraft(addonToEdit, modifierCategories, initialCategory, initialItemType);
       setBaseDraft(freshDraft);
       setName(freshDraft.name);
       setCategory(freshDraft.category);
@@ -130,7 +134,7 @@ export const EditAddonModal: React.FC<EditAddonModalProps> = ({
       setSelectionType(freshDraft.selectionType);
       setApplicableCategories(freshDraft.applicableCategories);
     }
-  }, [addonToEdit, modifierCategories, hasChanges, isOpen]);
+  }, [addonToEdit, modifierCategories, hasChanges, isOpen, initialCategory, initialItemType]);
 
   const toggleCategorySelection = (catName: string) => {
     setApplicableCategories((prev) =>

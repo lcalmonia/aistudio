@@ -16,7 +16,9 @@ export interface AddonFormDraft {
 
 export function createInitialAddonDraft(
   addonToEdit?: ProductAddon | null,
-  modifierCategories: ModifierCategory[] = []
+  modifierCategories: ModifierCategory[] = [],
+  initialCategory?: string,
+  initialItemType?: ModifierCategoryType
 ): AddonFormDraft {
   if (addonToEdit) {
     const existingInList = modifierCategories.some(
@@ -40,19 +42,26 @@ export function createInitialAddonDraft(
     };
   }
 
-  const defaultCategory = modifierCategories[0]?.name || 'Syrup & Sweetener';
+  const matchedCategoryDef = initialCategory
+    ? modifierCategories.find((mc) => mc.name.toLowerCase() === initialCategory.toLowerCase())
+    : null;
+
+  const defaultCategory = initialCategory || modifierCategories[0]?.name || 'Syrup & Sweetener';
+  const itemType = initialItemType || matchedCategoryDef?.itemType || 'addon';
+  const defaultPrice = itemType === 'modifier' ? 0.0 : 25.0;
+
   return {
     name: '',
     category: defaultCategory,
     customCategory: '',
     isCustomCategory: false,
-    itemType: 'addon',
-    price: 25.0,
-    applicableTemperature: 'Both',
+    itemType,
+    price: defaultPrice,
+    applicableTemperature: matchedCategoryDef?.applicableTemperature || 'Both',
     available: true,
-    required: false,
-    selectionType: 'single',
-    applicableCategories: [],
+    required: matchedCategoryDef?.required ?? false,
+    selectionType: matchedCategoryDef?.selectionType || 'single',
+    applicableCategories: matchedCategoryDef?.applicableCategories ? [...matchedCategoryDef.applicableCategories] : [],
   };
 }
 

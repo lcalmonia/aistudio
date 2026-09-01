@@ -10,6 +10,7 @@ import {
   CustomerUser,
   AdminPrincipal,
   ModifierCategory,
+  ModifierCategoryType,
 } from './types';
 import {
   authService,
@@ -118,6 +119,8 @@ export default function App() {
 
   const [isAddonModalOpen, setIsAddonModalOpen] = useState<boolean>(false);
   const [addonToEdit, setAddonToEdit] = useState<ProductAddon | null>(null);
+  const [initialAddonCategory, setInitialAddonCategory] = useState<string | undefined>(undefined);
+  const [initialAddonType, setInitialAddonType] = useState<ModifierCategoryType | undefined>(undefined);
 
   // Live metrics calculation from real orders data via reportingService
   const [extraLoggedCups, setExtraLoggedCups] = useState<number>(0);
@@ -674,13 +677,17 @@ export default function App() {
   // -------------------------------------------------------------
   // Addon / Modifier CRUD Handlers
   // -------------------------------------------------------------
-  const handleOpenAddAddon = () => {
+  const handleOpenAddAddon = (categoryName?: string, itemType?: ModifierCategoryType) => {
     setAddonToEdit(null);
+    setInitialAddonCategory(categoryName);
+    setInitialAddonType(itemType);
     setIsAddonModalOpen(true);
   };
 
   const handleOpenEditAddon = (addon: ProductAddon) => {
     setAddonToEdit(addon);
+    setInitialAddonCategory(undefined);
+    setInitialAddonType(undefined);
     setIsAddonModalOpen(true);
   };
 
@@ -952,6 +959,7 @@ export default function App() {
             {/* Menu Management View */}
             {currentTab === 'admin-menu' && (
               <AdminMenuView
+                admin={adminPrincipal}
                 menuItems={menuItems}
                 categories={categories}
                 addons={addons}
@@ -1137,10 +1145,16 @@ export default function App() {
           {/* Admin: Edit/Add Modifier Modal */}
           <EditAddonModal
             isOpen={isAddonModalOpen}
-            onClose={() => setIsAddonModalOpen(false)}
+            onClose={() => {
+              setIsAddonModalOpen(false);
+              setInitialAddonCategory(undefined);
+              setInitialAddonType(undefined);
+            }}
             onSave={handleSaveAddon}
             onDelete={handleDeleteAddon}
             addonToEdit={addonToEdit}
+            initialCategory={initialAddonCategory}
+            initialItemType={initialAddonType}
             modifierCategories={modifierCategories}
             productCategories={categories}
           />
