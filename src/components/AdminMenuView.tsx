@@ -696,17 +696,19 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                             <span>Edit</span>
                           </button>
 
-                       {onCopyProduct && (
-                            <button
-                              type="button"
-                              onClick={() => onCopyProduct(product)}
-                              title={`Copy "${product.name}" configuration`}
-                              className="px-2.5 py-1 bg-white hover:bg-[#f0ebe1] text-[#26170c] border border-[#b8ab9e] text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs active:scale-95"
-                            >
-                              <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-[#5e604d]">content_copy</span>
-                              <span>Copy</span>
-                            </button>
-                          )}
+                      {isSuperAdmin && (
+  <button
+    type="button"
+    onClick={() => onCopyProduct?.(product)}
+    title={`Copy "${product.name}"`}
+    className="px-2.5 py-1 bg-white hover:bg-[#f0ebe1] text-[#26170c] border border-[#d2c4bc] rounded-lg transition-all flex items-center gap-1.5"
+  >
+    <span className="material-symbols-outlined text-[16px]">
+      content_copy
+    </span>
+    <span>Copy</span>
+  </button>
+)}
 
                           <button
                             type="button"
