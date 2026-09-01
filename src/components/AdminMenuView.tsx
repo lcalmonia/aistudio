@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MenuItem, ProductAddon, PromoBundle, ProductTemperature, ModifierCategory, ModifierCategoryType, AdminPrincipal } from '../types';
 import { ModifierCategoryModal } from './ModifierCategoryModal';
+import { ManageModifierCategoriesModal } from './ManageModifierCategoriesModal';
 
 interface AdminMenuViewProps {
   admin?: AdminPrincipal | null;
@@ -101,6 +102,8 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
 
   // Modifiers & Add-ons filters and modal state
   const [isModCatModalOpen, setIsModCatModalOpen] = useState(false);
+  const [isManageModCatsModalOpen, setIsManageModCatsModalOpen] = useState(false);
+  const [initialCategoryTypeForModal, setInitialCategoryTypeForModal] = useState<ModifierCategoryType>('modifier');
   const [categoryToEditForModal, setCategoryToEditForModal] = useState<ModifierCategory | null>(null);
   const [addonTypeFilter, setAddonTypeFilter] = useState<'All' | 'modifier' | 'addon'>('All');
   const [addonCategoryFilter, setAddonCategoryFilter] = useState<string>('All');
@@ -876,8 +879,18 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                   type="button"
                   onClick={() => {
                     setCategoryToEditForModal(null);
+                    setInitialCategoryTypeForModal('modifier');
                     setIsModCatModalOpen(true);
                   }}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#e1e1c9] hover:bg-[#d6d6bd] text-[#636451] border border-[#5e604d]/20 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[18px]">tune</span>
+                  <span>+ Add Modifier Group</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsManageModCatsModalOpen(true)}
                   className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] border border-[#d2c4bc] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">folder_special</span>
@@ -1091,6 +1104,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                                 active: true,
                               };
                               setCategoryToEditForModal(catToEdit);
+                              setInitialCategoryTypeForModal(catToEdit.itemType);
                               setIsModCatModalOpen(true);
                             }}
                             className="text-[11px] font-bold text-[#26170c] bg-white hover:bg-[#e8e1df] border border-[#d2c4bc] px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
@@ -1114,7 +1128,13 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(`Delete modifier group "${group.name}"? Existing options will remain categorized unless changed.`)) {
+                                if (group.items.length > 0) {
+                                  alert(
+                                    `Cannot delete "${group.name}" because ${group.items.length} option(s) are currently assigned to it. Please reassign or delete those options first.`
+                                  );
+                                  return;
+                                }
+                                if (confirm(`Delete modifier group "${group.name}"? This action cannot be undone.`)) {
                                   if (onDeleteModifierCategory) {
                                     onDeleteModifierCategory(def.id);
                                   }
@@ -1479,10 +1499,37 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
       )}
 
       {/* Modifier Categories Management Modal */}
+      {isManageModCatsModalOpen && (
+        <ManageModifierCategoriesModal
+          isOpen={isManageModCatsModalOpen}
+          categories={modifierCategories}
+          addons={addons}
+          onClose={() => setIsManageModCatsModalOpen(false)}
+          onOpenCreateCategory={(initialType = 'modifier') => {
+            setCategoryToEditForModal(null);
+            setInitialCategoryTypeForModal(initialType);
+            setIsModCatModalOpen(true);
+          }}
+          onOpenEditCategory={(cat) => {
+            setCategoryToEditForModal(cat);
+            setInitialCategoryTypeForModal(cat.itemType);
+            setIsModCatModalOpen(true);
+          }}
+          onDeleteCategory={async (catId) => {
+            if (onDeleteModifierCategory) {
+              await onDeleteModifierCategory(catId);
+            }
+          }}
+        />
+      )}
+
+      {/* Modifier Category Create/Edit Modal */}
       {isModCatModalOpen && (
         <ModifierCategoryModal
           isOpen={isModCatModalOpen}
           categoryToEdit={categoryToEditForModal}
+          initialItemType={initialCategoryTypeForModal}
+          addons={addons}
           onClose={() => {
             setIsModCatModalOpen(false);
             setCategoryToEditForModal(null);

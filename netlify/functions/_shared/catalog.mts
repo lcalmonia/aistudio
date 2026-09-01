@@ -505,12 +505,47 @@ export async function updateModifierCategoryInDatabase(id: string, updates: Part
      RETURNING *`,
     [name, itemType, required, selectionType, applicableCats, applicableTemp, sortOrder, active, id]
   );
+
+  // If category was renamed, propagate new name to existing add_ons
+  if (name !== current.name) {
+    await db.pool.query(
+      `UPDATE add_ons SET category = $1, updated_at = NOW() WHERE LOWER(category) = LOWER($2)`,
+      [name, current.name]
+    );
+  }
+
   return mapModifierCategoryRecord(result.rows[0]);
 }
 
 export async function deleteModifierCategoryFromDatabase(id: string): Promise<boolean> {
   const db = database();
+  const currentResult = await db.pool.query(`SELECT * FROM modifier_categories WHERE id = $1 LIMIT 1`, [id]);
+  if (currentResult.rows.length === 0) throw new RequestError(404, `Modifier category "${id}" not found.`);
+
+  const current = mapModifierCategoryRecord(currentResult.rows[0]);
+
+  // Check for dependent add_ons / modifier options
+  const dependentAddons = await db.pool.query(
+    `SELECT COUNT(*) AS count FROM add_ons WHERE LOWER(category) = LOWER($1) OR category = $2`,
+    [current.name, id]
+  );
+  const count = Number(dependentAddons.rows[0]?.count) || 0;
+  if (count > 0) {
+    throw new RequestError(
+      400,
+      `Cannot delete category "${current.name}" because ${count} option(s) are currently assigned to it. Please reassign or delete those options first.`
+    );
+  }
+
+  // Safe to delete
   const result = await db.pool.query(`DELETE FROM modifier_categories WHERE id = $1`, [id]);
+
+  // Clean up any product assignments
+  await db.pool.query(
+    `UPDATE menu_items SET modifier_category_ids = array_remove(modifier_category_ids, $1), updated_at = NOW() WHERE $1 = ANY(modifier_category_ids)`,
+    [id]
+  );
+
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -591,6 +626,10 @@ export async function updateAddonInDatabase(id: string, updates: Partial<Product
 export async function deleteAddonFromDatabase(id: string): Promise<boolean> {
   const db = database();
   const result = await db.pool.query(`DELETE FROM add_ons WHERE id = $1`, [id]);
+  await db.pool.query(
+    `UPDATE menu_items SET add_on_ids = array_remove(add_on_ids, $1), updated_at = NOW() WHERE $1 = ANY(add_on_ids)`,
+    [id]
+  );
   return (result.rowCount ?? 0) > 0;
 }
 

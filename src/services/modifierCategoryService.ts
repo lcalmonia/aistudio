@@ -38,7 +38,7 @@ export const modifierCategoryService = {
   async listCategories(): Promise<ModifierCategory[]> {
     try {
       const response = await api<{ modifierCategories: ModifierCategory[] }>('/api/modifier-categories', { method: 'GET' });
-      if (response && Array.isArray(response.modifierCategories) && response.modifierCategories.length > 0) {
+      if (response && Array.isArray(response.modifierCategories)) {
         storageAdapter.setModifierCategories(response.modifierCategories);
         return response.modifierCategories;
       }
@@ -69,6 +69,9 @@ export const modifierCategoryService = {
         return response.modifierCategory;
       }
     } catch (err) {
+      if (err instanceof ModifierCategoryApiError) {
+        throw err;
+      }
       console.warn('[ModifierCategoryService] Failed to create on server, persisting locally:', err);
     }
 
@@ -87,20 +90,39 @@ export const modifierCategoryService = {
         const cats = storageAdapter.getModifierCategories();
         const index = cats.findIndex((c) => c.id === id);
         if (index !== -1) {
+          const oldName = cats[index].name;
           cats[index] = response.category;
           storageAdapter.setModifierCategories(cats);
+          if (response.category.name && response.category.name !== oldName) {
+            const addons = storageAdapter.getAddons();
+            const updatedAddons = addons.map((a) =>
+              a.category.toLowerCase() === oldName.toLowerCase() ? { ...a, category: response.category.name } : a
+            );
+            storageAdapter.setAddons(updatedAddons);
+          }
         }
         return response.category;
       }
     } catch (err) {
+      if (err instanceof ModifierCategoryApiError) {
+        throw err;
+      }
       console.warn(`[ModifierCategoryService] Failed to update category ${id} on server, saving locally:`, err);
     }
 
     const cats = storageAdapter.getModifierCategories();
     const index = cats.findIndex((c) => c.id === id);
     if (index !== -1) {
+      const oldName = cats[index].name;
       cats[index] = { ...cats[index], ...updates, updatedAt: new Date().toISOString() };
       storageAdapter.setModifierCategories(cats);
+      if (updates.name && updates.name !== oldName) {
+        const addons = storageAdapter.getAddons();
+        const updatedAddons = addons.map((a) =>
+          a.category.toLowerCase() === oldName.toLowerCase() ? { ...a, category: updates.name! } : a
+        );
+        storageAdapter.setAddons(updatedAddons);
+      }
       return cats[index];
     }
     return null;
@@ -112,6 +134,9 @@ export const modifierCategoryService = {
         method: 'DELETE',
       });
     } catch (err) {
+      if (err instanceof ModifierCategoryApiError) {
+        throw err;
+      }
       console.warn(`[ModifierCategoryService] Failed to delete category ${id} on server, removing locally:`, err);
     }
 

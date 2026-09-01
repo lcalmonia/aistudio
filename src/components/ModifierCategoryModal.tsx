@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ModifierCategory, ModifierCategoryType } from '../types';
+import { ModifierCategory, ModifierCategoryType, ProductAddon } from '../types';
 import {
   ModifierCategoryDraft,
   createInitialModifierCategoryDraft,
@@ -14,7 +14,9 @@ interface ModifierCategoryModalProps {
   onDelete?: (categoryId: string) => Promise<void> | void;
   onDeleteCategory?: (categoryId: string) => Promise<void> | void;
   categoryToEdit?: ModifierCategory | null;
+  initialItemType?: ModifierCategoryType;
   categories?: ModifierCategory[];
+  addons?: ProductAddon[];
   productCategories?: string[];
 }
 
@@ -26,14 +28,20 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
   onDelete,
   onDeleteCategory,
   categoryToEdit = null,
+  initialItemType,
+  addons = [],
   productCategories = [],
 }) => {
   const isEditing = Boolean(categoryToEdit);
 
   // Initial base snapshot for clean vs. dirty draft detection
-  const [baseDraft, setBaseDraft] = useState<ModifierCategoryDraft>(() =>
-    createInitialModifierCategoryDraft(categoryToEdit)
-  );
+  const [baseDraft, setBaseDraft] = useState<ModifierCategoryDraft>(() => {
+    const draft = createInitialModifierCategoryDraft(categoryToEdit);
+    if (!categoryToEdit && initialItemType) {
+      draft.itemType = initialItemType;
+    }
+    return draft;
+  });
 
   // Active form states
   const [name, setName] = useState<string>(baseDraft.name);
@@ -47,6 +55,7 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
     baseDraft.selectedProductCategories
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Current active draft representation
   const currentDraft: ModifierCategoryDraft = useMemo(
@@ -81,6 +90,9 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
 
     if (wasClosed || switchedCategory) {
       const freshDraft = createInitialModifierCategoryDraft(categoryToEdit);
+      if (!categoryToEdit && initialItemType) {
+        freshDraft.itemType = initialItemType;
+      }
       setBaseDraft(freshDraft);
       setName(freshDraft.name);
       setItemType(freshDraft.itemType);
@@ -88,11 +100,12 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
       setSelectionType(freshDraft.selectionType);
       setApplicableTemperature(freshDraft.applicableTemperature);
       setSelectedProductCategories(freshDraft.selectedProductCategories);
+      setDeleteError(null);
     }
 
     prevIsOpenRef.current = isOpen;
     prevCategoryIdRef.current = categoryToEdit?.id;
-  }, [isOpen, categoryToEdit?.id]);
+  }, [isOpen, categoryToEdit?.id, initialItemType]);
 
   // Live cross-device & background synchronization:
   // If the form is clean (hasChanges === false), safely update baseDraft and form fields from latest server props.
@@ -102,6 +115,9 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
 
     if (!hasChanges) {
       const freshDraft = createInitialModifierCategoryDraft(categoryToEdit);
+      if (!categoryToEdit && initialItemType) {
+        freshDraft.itemType = initialItemType;
+      }
       setBaseDraft(freshDraft);
       setName(freshDraft.name);
       setItemType(freshDraft.itemType);
@@ -110,7 +126,7 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
       setApplicableTemperature(freshDraft.applicableTemperature);
       setSelectedProductCategories(freshDraft.selectedProductCategories);
     }
-  }, [categoryToEdit, hasChanges, isOpen]);
+  }, [categoryToEdit, hasChanges, isOpen, initialItemType]);
 
   const toggleProductCategory = (cat: string) => {
     setSelectedProductCategories((prev) =>
@@ -161,12 +177,27 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
 
   const handleDelete = async () => {
     if (!categoryToEdit) return;
-    if (confirm(`Delete modifier category "${categoryToEdit.name}"?`)) {
-      const deleteHandler = onDelete || onDeleteCategory;
-      if (deleteHandler) {
-        await deleteHandler(categoryToEdit.id);
+
+    // Check for dependent addons
+    const catNameKey = (categoryToEdit.name || '').trim().toLowerCase();
+    const dependentCount = addons.filter((a) => (a.category || '').trim().toLowerCase() === catNameKey).length;
+    if (dependentCount > 0) {
+      setDeleteError(
+        `Cannot delete "${categoryToEdit.name}" because ${dependentCount} option(s) are assigned to it. Please delete or reassign those options first.`
+      );
+      return;
+    }
+
+    if (confirm(`Delete modifier category "${categoryToEdit.name}"? This action cannot be undone.`)) {
+      try {
+        const deleteHandler = onDelete || onDeleteCategory;
+        if (deleteHandler) {
+          await deleteHandler(categoryToEdit.id);
+        }
+        onClose();
+      } catch (err: any) {
+        setDeleteError(err?.message || 'Failed to delete modifier category.');
       }
-      onClose();
     }
   };
 
@@ -196,6 +227,25 @@ export const ModifierCategoryModal: React.FC<ModifierCategoryModalProps> = ({
 
         {/* Scrollable Form */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1 space-y-4">
+          {deleteError && (
+            <div className="p-3 bg-[#ffdad6] border border-[#ba1a1a]/30 rounded-xl flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-[#ba1a1a] text-[18px] mt-0.5">warning</span>
+                <div>
+                  <h5 className="text-xs font-bold text-[#ba1a1a]">Cannot Delete</h5>
+                  <p className="text-[11px] text-[#410002] mt-0.5">{deleteError}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteError(null)}
+                className="p-1 text-[#ba1a1a] hover:bg-[#ffb4ab] rounded-lg transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          )}
+
           {/* Classification: Modifier vs Add-on */}
           <div>
             <label className="block text-xs font-bold text-[#26170c] mb-1.5">
