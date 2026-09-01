@@ -324,3 +324,123 @@ export async function insertInventoryCategoryToDatabase(name: string): Promise<s
   );
   return fetchInventoryCategoriesFromDatabase();
 }
+export async function renameInventoryCategoryInDatabase(
+  oldName: string,
+  newName: string,
+): Promise<string[]> {
+  const cleanOldName = oldName.trim();
+  const cleanNewName = newName.trim();
+
+  if (!cleanOldName || !cleanNewName) {
+    throw new RequestError(400, 'Both old and new category names are required.');
+  }
+
+  if (cleanOldName.toLowerCase() === cleanNewName.toLowerCase()) {
+    return fetchInventoryCategoriesFromDatabase();
+  }
+
+  const db = database();
+
+  const client = await db.pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const duplicate = await client.query(
+      `SELECT 1
+       FROM inventory_categories
+       WHERE LOWER(name) = LOWER($1)
+       LIMIT 1`,
+      [cleanNewName],
+    );
+
+    if (duplicate.rowCount) {
+      throw new RequestError(409, 'A category with that name already exists.');
+    }
+
+    const result = await client.query(
+      `UPDATE inventory_categories
+       SET name = $1
+       WHERE LOWER(name) = LOWER($2)`,
+      [cleanNewName, cleanOldName],
+    );
+
+    if (!result.rowCount) {
+      throw new RequestError(404, 'Inventory category not found.');
+    }
+
+    await client.query(
+      `UPDATE inventory_items
+       SET category = $1
+       WHERE LOWER(category) = LOWER($2)`,
+      [cleanNewName, cleanOldName],
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return fetchInventoryCategoriesFromDatabase();
+}
+
+export async function deleteInventoryCategoryFromDatabase(
+  categoryName: string,
+  fallbackCategory: string = 'Coffee Beans',
+): Promise<string[]> {
+  const cleanCategory = categoryName.trim();
+  const cleanFallback = fallbackCategory.trim();
+
+  if (!cleanCategory) {
+    throw new RequestError(400, 'Category name is required.');
+  }
+
+  if (cleanCategory.toLowerCase() === cleanFallback.toLowerCase()) {
+    throw new RequestError(400, 'The fallback category cannot be deleted.');
+  }
+
+  const db = database();
+
+  const client = await db.pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const categoryResult = await client.query(
+      `SELECT 1
+       FROM inventory_categories
+       WHERE LOWER(name) = LOWER($1)
+       LIMIT 1`,
+      [cleanCategory],
+    );
+
+    if (!categoryResult.rowCount) {
+      throw new RequestError(404, 'Inventory category not found.');
+    }
+
+    await client.query(
+      `UPDATE inventory_items
+       SET category = $1
+       WHERE LOWER(category) = LOWER($2)`,
+      [cleanFallback, cleanCategory],
+    );
+
+    await client.query(
+      `DELETE FROM inventory_categories
+       WHERE LOWER(name) = LOWER($1)`,
+      [cleanCategory],
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return fetchInventoryCategoriesFromDatabase();
+}
