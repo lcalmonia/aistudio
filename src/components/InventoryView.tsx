@@ -8,6 +8,8 @@ interface InventoryViewProps {
   onSaveItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
   onAddCategory: (category: string) => Promise<void> | void;
+  onEditCategory: (oldCategory: string, newCategory: string) => Promise<void> | void;
+onDeleteCategory: (category: string) => Promise<void> | void;
   onShowNotification: (msg: string) => void;
 }
 
@@ -17,7 +19,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onSaveItem,
   onDeleteItem,
   onAddCategory,
-  onShowNotification,
+onEditCategory,
+onDeleteCategory,
+onShowNotification,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -340,31 +344,106 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             >
               All Categories ({items.length})
             </button>
-            {categories.map((cat) => {
-              const count = items.filter((it) => it.category.toLowerCase() === cat.toLowerCase()).length;
-              const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
-              return (
-                <button
-                  type="button"
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-[#26170c] text-white shadow-xs'
-                      : 'bg-white text-[#4f453f] hover:bg-[#eae2e0] border border-[#dec1af]/40'
-                  }`}
-                >
-                  <span>{cat}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-[#f3ecea] text-[#81756e]'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
+{categories.map((cat) => {
+  const count = items.filter(
+    (it) => it.category.toLowerCase() === cat.toLowerCase()
+  ).length;
+
+  const isSelected =
+    selectedCategory.toLowerCase() === cat.toLowerCase();
+
+  return (
+    <div
+      key={cat}
+      className={`flex items-center rounded-full transition-all ${
+        isSelected
+          ? 'bg-[#26170c] text-white shadow-xs'
+          : 'bg-white text-[#4f453f] border border-[#dec1af]/40'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setSelectedCategory(cat)}
+        className={`px-3 py-1.5 rounded-l-full text-xs font-bold cursor-pointer flex items-center gap-1.5 ${
+          isSelected
+            ? 'hover:bg-[#3d2b1f]'
+            : 'hover:bg-[#eae2e0]'
+        }`}
+      >
+        <span>{cat}</span>
+
+        <span
+          className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+            isSelected
+              ? 'bg-white/20 text-white'
+              : 'bg-[#f3ecea] text-[#81756e]'
+          }`}
+        >
+          {count}
+        </span>
+      </button>
+
+      {admin?.role === 'SUPER_ADMIN' && (
+        <div className="flex items-center pr-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+
+              const newName = window.prompt(
+                `Rename "${cat}" to:`,
+                cat
               );
-            })}
+
+              if (
+                newName &&
+                newName.trim() &&
+                newName.trim() !== cat
+              ) {
+                onEditCategory(cat, newName.trim());
+              }
+            }}
+            className={`p-1 rounded-full cursor-pointer ${
+              isSelected
+                ? 'text-white/80 hover:text-white hover:bg-white/10'
+                : 'text-[#81756e] hover:text-[#26170c] hover:bg-[#f3ecea]'
+            }`}
+            title={`Edit ${cat}`}
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              edit
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+
+              if (
+                window.confirm(
+                  `Delete "${cat}"?\n\nProducts in this category will be moved to the fallback category.`
+                )
+              ) {
+                onDeleteCategory(cat);
+              }
+            }}
+            className={`p-1 rounded-full cursor-pointer ${
+              isSelected
+                ? 'text-white/80 hover:text-red-200 hover:bg-white/10'
+                : 'text-[#ba1a1a] hover:bg-[#fff0f0]'
+            }`}
+            title={`Delete ${cat}`}
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              delete
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+})}
             {!isAddingCategory && (
               <button
                 type="button"
