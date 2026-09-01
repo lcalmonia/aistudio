@@ -19,6 +19,7 @@ interface EditInventoryModalProps {
 const COMMON_UNITS = [
   'kg',
   'g',
+  'mg',
   'liters',
   'ml',
   'bottles',
@@ -30,6 +31,12 @@ const COMMON_UNITS = [
   'cups',
   'jars',
   'rolls',
+  'bags',
+  'sachets',
+  'tubs',
+  'containers',
+  'pieces',
+  'dozen',
 ];
 
 export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
