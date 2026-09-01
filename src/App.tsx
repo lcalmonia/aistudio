@@ -1123,13 +1123,15 @@ export default function App() {
             {/* Inventory View */}
             {currentTab === 'inventory' && (
               <InventoryView
-                items={inventoryItems}
-                categories={inventoryCategories}
-                onSaveItem={handleSaveInventoryItem}
-                onDeleteItem={handleDeleteInventoryItem}
-                onAddCategory={handleAddInventoryCategory}
-                onShowNotification={showNotification}
-              />
+  items={inventoryItems}
+  categories={inventoryCategories}
+  onSaveItem={handleSaveInventoryItem}
+  onDeleteItem={handleDeleteInventoryItem}
+  onAddCategory={handleAddInventoryCategory}
+  onEditCategory={handleSaveCategory}
+  onDeleteCategory={handleDeleteCategory}
+  onShowNotification={showNotification}
+/>
             )}
 
             {/* Rewards View */}
