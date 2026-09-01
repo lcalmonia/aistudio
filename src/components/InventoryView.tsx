@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { InventoryItem } from '../types';
+import { InventoryItem, AdminPrincipal } from '../types';
 import { EditInventoryModal } from './EditInventoryModal';
 
 interface InventoryViewProps {
@@ -11,6 +11,7 @@ interface InventoryViewProps {
   onEditCategory: (oldCategory: string, newCategory: string) => Promise<void> | void;
 onDeleteCategory: (category: string) => Promise<void> | void;
   onShowNotification: (msg: string) => void;
+  admin: AdminPrincipal | null;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -22,6 +23,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 onEditCategory,
 onDeleteCategory,
 onShowNotification,
+  admin,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
