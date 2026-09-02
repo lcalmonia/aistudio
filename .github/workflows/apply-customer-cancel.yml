@@ -1,0 +1,89 @@
+name: Apply Customer Order Cancellation Patch
+
+on:
+  push:
+    branches:
+      - customer-delete-pending-orders
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'chore: apply customer order cancellation patch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Apply patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Pattern not found in {path}: {old[:120]!r}')
+              if text.count(old) != 1:
+                  raise SystemExit(f'Pattern occurs {text.count(old)} times in {path}, expected exactly 1')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          # Backend: allow a customer to cancel only their own customer order while status is New.
+          replace_once(
+              'netlify/functions/order-detail.mts',
+              """    if (request.method === 'PATCH') {\n      enforceSameOrigin(request);\n      await requireAuthenticatedAdmin(request);\n\n      const body = await readJsonObject(request);\n      const status = body.status as OrderStatus;\n\n      if (!status || typeof status !== 'string') {\n        throw new RequestError(400, 'Status is required.');\n      }\n\n      if (!VALID_ORDER_STATUSES.includes(status)) {\n        throw new RequestError(\n          400,\n          `Invalid order status \\\"${status}\\\". Must be one of: ${VALID_ORDER_STATUSES.join(', ')}`\n        );\n      }\n\n      const updatedOrder = await updateOrderStatusInDatabase(orderId, status);\n      return json({ order: updatedOrder });\n    }\n""",
+              """    if (request.method === 'PATCH') {\n      enforceSameOrigin(request);\n      const body = await readJsonObject(request);\n\n      // Customer self-cancellation: only the customer who owns the order may\n      // cancel it, and only while it is still New. Admin status updates remain\n      // protected by the existing admin authentication below.\n      if (body.action === 'customer-cancel') {\n        const customerId = typeof body.customerId === 'string' ? body.customerId.trim() : '';\n        const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim().toLowerCase() : '';\n        if (!customerId) {\n          throw new RequestError(400, 'Customer ID is required.');\n        }\n\n        const existingOrder = await fetchOrderById(orderId);\n        if (!existingOrder) {\n          throw new RequestError(404, `Order \\\"${orderId}\\\" not found.`);\n        }\n\n        if (!existingOrder.isCustomerOrder || existingOrder.customerId !== customerId) {\n          throw new RequestError(403, 'You can only cancel your own customer order.');\n        }\n\n        if (customerEmail && (existingOrder.customerEmail || '').toLowerCase() !== customerEmail) {\n          throw new RequestError(403, 'Customer verification failed.');\n        }\n\n        if (existingOrder.status !== 'New') {\n          throw new RequestError(409, 'This order can no longer be cancelled because preparation has started.');\n        }\n\n        const cancelledOrder = await updateOrderStatusInDatabase(orderId, 'Cancelled');\n        return json({ order: cancelledOrder });\n      }\n\n      await requireAuthenticatedAdmin(request);\n\n      const status = body.status as OrderStatus;\n\n      if (!status || typeof status !== 'string') {\n        throw new RequestError(400, 'Status is required.');\n      }\n\n      if (!VALID_ORDER_STATUSES.includes(status)) {\n        throw new RequestError(\n          400,\n          `Invalid order status \\\"${status}\\\". Must be one of: ${VALID_ORDER_STATUSES.join(', ')}`\n        );\n      }\n\n      const updatedOrder = await updateOrderStatusInDatabase(orderId, status);\n      return json({ order: updatedOrder });\n    }\n"""
+          )
+
+          # Frontend service: add a dedicated customer cancellation call.
+          replace_once(
+              'src/services/orderService.ts',
+              """  /**\n   * Delete or archive order\n   */\n""",
+              """  /**\n   * Cancel a customer order while it is still New.\n   * The server verifies ownership and prevents cancellation after preparation starts.\n   */\n  async cancelCustomerOrder(orderId: string, customerId: string, customerEmail?: string): Promise<Order | null> {\n    try {\n      const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, {\n        method: 'PATCH',\n        body: JSON.stringify({\n          action: 'customer-cancel',\n          customerId,\n          customerEmail,\n        }),\n      });\n\n      if (response && response.order) {\n        const updated = response.order;\n        const local = storageAdapter.getOrders();\n        const updatedList = local.map((o) =>\n          o.id === updated.id || o.orderNumber === updated.orderNumber ? updated : o\n        );\n        storageAdapter.setOrders(updatedList);\n        return updated;\n      }\n    } catch (err) {\n      console.warn(`[OrderService] Customer cancellation failed for ${orderId}:`, err);\n      throw err;\n    }\n\n    return null;\n  },\n\n  /**\n   * Delete or archive order\n   */\n"""
+          )
+
+          # Customer portal: import service and add cancellation state/handler.
+          replace_once(
+              'src/components/customer/CustomerOrderPortal.tsx',
+              "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';\n",
+              "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';\nimport { orderService } from '../../services/orderService';\n"
+          )
+
+          replace_once(
+              'src/components/customer/CustomerOrderPortal.tsx',
+              """  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);\n  const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);\n""",
+              """  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);\n  const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);\n  const [cancelledOrders, setCancelledOrders] = useState<Record<string, Order>>({});\n  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);\n"""
+          )
+
+          replace_once(
+              'src/components/customer/CustomerOrderPortal.tsx',
+              """    return orders.filter(\n      (o) =>\n        o &&\n        (o.customerId === currentCustomer.id ||\n          (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||\n          (customerName && o.customerName && o.customerName.toLowerCase() === customerName))\n    );\n  }, [orders, currentCustomer]);\n""",
+              """    return orders\n      .map((o) => cancelledOrders[o.id] || o)\n      .filter(\n        (o) =>\n          o &&\n          (o.customerId === currentCustomer.id ||\n            (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||\n            (customerName && o.customerName && o.customerName.toLowerCase() === customerName))\n      );\n  }, [orders, currentCustomer, cancelledOrders]);\n"""
+          )
+
+          replace_once(
+              'src/components/customer/CustomerOrderPortal.tsx',
+              """  const handleFinalizeOrder = (newOrder: Order) => {\n    onPlaceCustomerOrder(newOrder);\n    setActiveTrackingOrder(newOrder);\n    setIsSuccessModalOpen(true);\n  };\n\n  const handleSaveProfile""",
+              """  const handleFinalizeOrder = (newOrder: Order) => {\n    onPlaceCustomerOrder(newOrder);\n    setActiveTrackingOrder(newOrder);\n    setIsSuccessModalOpen(true);\n  };\n\n  const handleCancelOrder = async (order: Order) => {\n    if (order.status !== 'New') return;\n\n    const confirmed = window.confirm(\n      `Cancel order #${order.orderNumber}?\\n\\nThis can only be cancelled while the order is still New.`\n    );\n    if (!confirmed) return;\n\n    setCancellingOrderId(order.id);\n    try {\n      const cancelled = await orderService.cancelCustomerOrder(\n        order.id,\n        currentCustomer.id,\n        currentCustomer.email\n      );\n\n      if (cancelled) {\n        setCancelledOrders((prev) => ({ ...prev, [cancelled.id]: cancelled }));\n        setActiveTrackingOrder(cancelled);\n      }\n    } catch (error) {\n      const message = error instanceof Error ? error.message : 'Unable to cancel the order.';\n      window.alert(message);\n    } finally {\n      setCancellingOrderId(null);\n    }\n  };\n\n  const handleSaveProfile"""
+          )
+
+          replace_once(
+              'src/components/customer/CustomerOrderPortal.tsx',
+              """                      {/* Footer Actions */}\n                      <div className=\"flex justify-between items-center pt-1\">\n                        <span className=\"text-[11px] text-[#81756e]\">\n                          {ord.deliveryAddress ? `Deliver to: ${ord.deliveryAddress}` : ord.tableNumber ? `Table: ${ord.tableNumber}` : 'Takeout'}\n                        </span>\n                        <button\n                          onClick={() => {\n                            setActiveTrackingOrder(ord);\n                            setIsSuccessModalOpen(true);\n                          }}\n                          className=\"px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1\"\n                        >\n                          <span className=\"material-symbols-outlined text-[15px]\">visibility</span>\n                          <span>Track Order</span>\n                        </button>\n                      </div>\n""",
+              """                      {/* Footer Actions */}\n                      <div className=\"flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-1\">\n                        <span className=\"text-[11px] text-[#81756e]\">\n                          {ord.deliveryAddress ? `Deliver to: ${ord.deliveryAddress}` : ord.tableNumber ? `Table: ${ord.tableNumber}` : 'Takeout'}\n                        </span>\n                        <div className=\"flex items-center gap-2 self-end sm:self-auto\">\n                          {ord.status === 'New' && (\n                            <button\n                              type=\"button\"\n                              onClick={() => handleCancelOrder(ord)}\n                              disabled={cancellingOrderId === ord.id}\n                              className=\"px-3.5 py-1.5 bg-[#ffdad6] text-[#93000a] text-xs font-bold rounded-xl border border-[#ffb4ab] hover:bg-[#ffb4ab] disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1\"\n                            >\n                              <span className=\"material-symbols-outlined text-[15px]\">{cancellingOrderId === ord.id ? 'hourglass_top' : 'cancel'}</span>\n                              <span>{cancellingOrderId === ord.id ? 'Cancelling...' : 'Cancel Order'}</span>\n                            </button>\n                          )}\n                          <button\n                            onClick={() => {\n                              setActiveTrackingOrder(ord);\n                              setIsSuccessModalOpen(true);\n                            }}\n                            className=\"px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1\"\n                          >\n                            <span className=\"material-symbols-outlined text-[15px]\">visibility</span>\n                            <span>Track Order</span>\n                          </button>\n                        </div>\n                      </div>\n"""
+          )
+
+          # Remove this one-time workflow after the patch is committed.
+          workflow = Path('.github/workflows/apply-customer-cancel.yml')\n          workflow.unlink(missing_ok=True)
+
+      - name: Commit patched files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add netlify/functions/order-detail.mts src/services/orderService.ts src/components/customer/CustomerOrderPortal.tsx .github/workflows/apply-customer-cancel.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: apply customer order cancellation patch"
+          git push
