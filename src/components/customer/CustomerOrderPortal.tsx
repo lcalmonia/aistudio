@@ -16,6 +16,7 @@ import { loyaltyConfigService } from '../../services/loyaltyConfigService';
 import { LoyaltyPerk, LoyaltySettings } from '../../types';
 import { CustomerCartDrawer } from './CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';
+import { rewardClaimService } from '../../services/rewardClaimService';
 
 interface CustomerOrderPortalProps {
   menuItems: MenuItem[];
@@ -329,7 +330,14 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   const currentStamps = currentCustomer.stamps || 0;
   const stampCycle = loyaltySettings?.stampCycle || 10;
   const stampsArray = Array.from({ length: stampCycle }, (_, i) => i < currentStamps);
-  const handleRedeemPerk = async (perk: LoyaltyPerk) => { const { loyaltyService } = await import('../../services/loyaltyService'); const result = perk.redemptionType === 'points' ? await loyaltyService.redeemPoints(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`) : await loyaltyService.redeemStamps(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`); if (!result.success) { window.alert(result.error || 'Unable to redeem this perk.'); return; } window.location.reload(); };
+  const handleRedeemPerk = async (perk: LoyaltyPerk) => {
+  try {
+    await rewardClaimService.requestClaim(currentCustomer.id, perk.id);
+    window.alert(`Reward claim sent! Please see the counter/barista to claim: ${perk.name}.`);
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : 'Unable to request this reward.');
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#fff8f5] text-[#1d1b1a] flex flex-col font-sans pb-24 selection:bg-[#fbddca] selection:text-[#26170c] w-full max-w-full overflow-x-hidden">

@@ -18,3 +18,4 @@ export * from './reportingService';
 export * from './statsResetService';
 export * from './routeService';
 export * from './modifierCategoryService';
+export * from './rewardClaimService';

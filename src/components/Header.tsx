@@ -1,5 +1,6 @@
 import React from 'react';
 import { AdminPrincipal, StoreSettings } from '../types';
+import { RewardClaimsBanner } from './RewardClaimsBanner';
 
 interface HeaderProps {
   onOpenDrawer: () => void;
@@ -29,7 +30,8 @@ export const Header: React.FC<HeaderProps> = ({
   const branchName = storeSettings?.branchName || 'Main St. Live';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-4 sm:px-5 h-16 bg-[#fff8f5] border-b border-[#f3ecea]/80 shadow-[0_2px_8px_rgba(61,43,31,0.04)]">
+    <>
+      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-4 sm:px-5 h-16 bg-[#fff8f5] border-b border-[#f3ecea]/80 shadow-[0_2px_8px_rgba(61,43,31,0.04)]">
       <div className="flex items-center gap-3">
         <button
           id="menu-drawer-button"
@@ -118,5 +120,8 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
     </header>
+
+      <RewardClaimsBanner currentTab={currentTab} admin={admin} />
+    </>
   );
 };

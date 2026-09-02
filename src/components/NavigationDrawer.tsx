@@ -209,22 +209,6 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
             <span className="text-sm font-semibold">Customer Directory</span>
           </button>
 
-          {/* Rewards & Loyalty */}
-          <button
-            onClick={() => {
-              onSelectTab('rewards');
-              onClose();
-            }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
-              currentTab === 'rewards'
-                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
-                : 'text-[#4f453f] hover:bg-[#e8e1df]'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[22px]">stars</span>
-            <span className="text-sm font-semibold">Rewards & Loyalty</span>
-          </button>
-
           {/* Analytics / Stats */}
           <button
             onClick={() => {
