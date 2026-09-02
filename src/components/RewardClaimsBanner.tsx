@@ -53,7 +53,7 @@ export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentT
   };
 
   return (
-    <div className="fixed top-16 left-0 right-0 z-40 px-3 sm:px-5 pointer-events-none">
+    <div className="relative mt-16 z-40 px-3 sm:px-5 pointer-events-none">
       <div className="w-full max-w-[1400px] mx-auto pointer-events-auto rounded-b-2xl border border-[#d2c4bc] border-t-0 bg-[#f3ecea] shadow-lg p-3">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 min-w-0">
