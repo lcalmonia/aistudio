@@ -34,13 +34,6 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
-function requireSuperAdminForCatalogMutation(): void {
-  const session = storageAdapter.getStaffSession();
-  if (session?.role !== 'super_admin') {
-    throw new MenuApiError('Only Super Admin can create, edit, delete, or otherwise modify menu products.', 403);
-  }
-}
-
 export const menuService = {
   async listMenuItems(): Promise<MenuItem[]> {
     try {
@@ -76,8 +69,6 @@ export const menuService = {
   },
 
   async createMenuItem(item: Omit<MenuItem, 'id'> & { id?: string }): Promise<MenuItem> {
-    requireSuperAdminForCatalogMutation();
-
     const newItem: MenuItem = {
       ...item,
       id: item.id || generateEntityId('menu'),
@@ -98,8 +89,6 @@ export const menuService = {
   },
 
   async updateMenuItem(id: string, updates: Partial<MenuItem>): Promise<MenuItem | null> {
-    requireSuperAdminForCatalogMutation();
-
     const response = await api<{ menuItem: MenuItem }>(`/api/menu-items/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
@@ -121,8 +110,6 @@ export const menuService = {
   },
 
   async deleteMenuItem(id: string): Promise<boolean> {
-    requireSuperAdminForCatalogMutation();
-
     await api<{ success: boolean }>(`/api/menu-items/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
@@ -134,7 +121,6 @@ export const menuService = {
   },
 
   async toggleAvailability(id: string): Promise<MenuItem | null> {
-    requireSuperAdminForCatalogMutation();
     const response = await api<{ menuItem: MenuItem }>(`/api/menu-items/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ toggleAvailability: true }),
@@ -156,7 +142,6 @@ export const menuService = {
   },
 
   async saveMenuItems(items: MenuItem[]): Promise<MenuItem[]> {
-    requireSuperAdminForCatalogMutation();
     storageAdapter.setMenuItems(items);
     return items;
   },
