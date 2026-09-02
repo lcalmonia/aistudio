@@ -29,7 +29,16 @@ export const customerService = {
   async approvePasswordReset(requestId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'approve',requestId})});},
   async rejectPasswordReset(requestId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'reject',requestId})});},
   async resetCustomerPassword(customerId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'reset',customerId})});},
-  async deleteCustomer(customerId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'delete',customerId})});const customers=storageAdapter.getCustomers();storageAdapter.setCustomers(customers.filter(c=>c.id!==customerId));if(storageAdapter.getCurrentCustomer()?.id===customerId)storageAdapter.setCurrentCustomer(null);},
+  async deleteCustomer(customerId:string):Promise<void>{
+    try {
+      await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'delete',customerId})});
+    } catch (error) {
+      if (!(error instanceof CustomerApiError) || error.status !== 404) throw error;
+    }
+    const customers=storageAdapter.getCustomers();
+    storageAdapter.setCustomers(customers.filter(c=>c.id!==customerId));
+    if(storageAdapter.getCurrentCustomer()?.id===customerId) storageAdapter.setCurrentCustomer(null);
+  },
   async updateCustomer(id:string,updates:Partial<CustomerUser>):Promise<{success:boolean;customer?:CustomerUser;error?:string}>{const customers=storageAdapter.getCustomers();const index=customers.findIndex(c=>c.id===id);if(index===-1)return {success:false,error:'Customer not found.'};const updatedCustomer={...customers[index],...updates};customers[index]=updatedCustomer;storageAdapter.setCustomers(customers);const current=storageAdapter.getCurrentCustomer();if(current&&current.id===id)storageAdapter.setCurrentCustomer(updatedCustomer);return {success:true,customer:updatedCustomer};},
   async deactivateCustomer(id:string):Promise<{success:boolean;error?:string}>{const updated=storageAdapter.getCustomers().map(c=>c.id===id?{...c,status:'inactive' as const}:c);storageAdapter.setCustomers(updated);return {success:true};},
   async saveCustomers(customers:CustomerUser[]):Promise<CustomerUser[]>{storageAdapter.setCustomers(customers);return customers;},
