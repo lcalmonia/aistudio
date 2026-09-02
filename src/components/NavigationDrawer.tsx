@@ -86,13 +86,17 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
               className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-[#26170c] to-[#3d2b1f] text-white rounded-xl shadow-md hover:opacity-95 transition-all cursor-pointer group active:scale-98"
             >
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-[20px] text-[#dec1af] group-hover:scale-110 transition-transform">storefront</span>
+                <span className="material-symbols-outlined text-[20px] text-[#dec1af] group-hover:scale-110 transition-transform">
+                  storefront
+                </span>
                 <div className="text-left">
                   <p className="text-xs font-bold leading-tight">Customer Portal</p>
                   <p className="text-[10px] text-[#dec1af]">Open online order view</p>
                 </div>
               </div>
-              <span className="material-symbols-outlined text-[16px] text-[#dec1af]">arrow_forward</span>
+              <span className="material-symbols-outlined text-[16px] text-[#dec1af]">
+                arrow_forward
+              </span>
             </button>
           </div>
         )}
@@ -101,75 +105,155 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
         <div className="flex flex-col gap-1.5 overflow-y-auto">
           {/* Menu Management (Admin Highlight) */}
           <button
-            onClick={() => { onSelectTab('admin-menu'); onClose(); }}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'admin-menu' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('admin-menu');
+              onClose();
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'admin-menu'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <div className="flex items-center gap-3"><span className="material-symbols-outlined text-[22px] text-[#26170c]">restaurant_menu</span><span className="text-sm font-semibold">Menu Management</span></div>
-            <span className="px-1.5 py-0.5 bg-[#26170c] text-white text-[9px] font-bold rounded">ADMIN</span>
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[22px] text-[#26170c]">restaurant_menu</span>
+              <span className="text-sm font-semibold">Menu Management</span>
+            </div>
+            <span className="px-1.5 py-0.5 bg-[#26170c] text-white text-[9px] font-bold rounded">
+              ADMIN
+            </span>
           </button>
 
           {/* Store Settings & Rebranding (Admin Highlight) */}
           <button
-            onClick={() => { onSelectTab('settings'); onClose(); }}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'settings' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('settings');
+              onClose();
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'settings'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <div className="flex items-center gap-3"><span className="material-symbols-outlined text-[22px] text-[#26170c]">tune</span><span className="text-sm font-semibold">Store & Logo Settings</span></div>
-            <span className="px-1.5 py-0.5 bg-[#26170c] text-white text-[9px] font-bold rounded">ADMIN</span>
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[22px] text-[#26170c]">tune</span>
+              <span className="text-sm font-semibold">Store & Logo Settings</span>
+            </div>
+            <span className="px-1.5 py-0.5 bg-[#26170c] text-white text-[9px] font-bold rounded">
+              ADMIN
+            </span>
           </button>
 
           {/* Sales Overview / Dashboard */}
           <button
-            onClick={() => { onSelectTab('home'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'home' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('home');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'home'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">monitoring</span><span className="text-sm font-semibold">Sales Overview</span>
+            <span className="material-symbols-outlined text-[22px]">monitoring</span>
+            <span className="text-sm font-semibold">Sales Overview</span>
           </button>
 
           {/* Active Orders */}
           <button
-            onClick={() => { onSelectTab('orders'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'orders' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('orders');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'orders'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">assignment</span><span className="text-sm font-semibold">Barista Orders</span>
+            <span className="material-symbols-outlined text-[22px]">assignment</span>
+            <span className="text-sm font-semibold">Barista Orders</span>
           </button>
 
           {/* Inventory */}
           <button
-            onClick={() => { onSelectTab('inventory'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'inventory' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('inventory');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'inventory'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">inventory_2</span><span className="text-sm font-semibold">Inventory & Stock</span>
+            <span className="material-symbols-outlined text-[22px]">inventory_2</span>
+            <span className="text-sm font-semibold">Inventory & Stock</span>
           </button>
 
           {/* Customer Directory */}
           <button
-            onClick={() => { onSelectTab('customers'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'customers' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('customers');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'customers'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">group</span><span className="text-sm font-semibold">Customer Directory</span>
+            <span className="material-symbols-outlined text-[22px]">group</span>
+            <span className="text-sm font-semibold">Customer Directory</span>
           </button>
 
           {/* Analytics / Stats */}
           <button
-            onClick={() => { onSelectTab('stats'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'stats' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('stats');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'stats'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">bar_chart</span><span className="text-sm font-semibold">Analytics & Reports</span>
+            <span className="material-symbols-outlined text-[22px]">bar_chart</span>
+            <span className="text-sm font-semibold">Analytics & Reports</span>
           </button>
 
           {/* Admin Profile */}
           <button
-            onClick={() => { onSelectTab('profile'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'profile' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('profile');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'profile'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">account_circle</span><span className="text-sm font-semibold">Admin Profile</span>
+            <span className="material-symbols-outlined text-[22px]">account_circle</span>
+            <span className="text-sm font-semibold">Admin Profile</span>
           </button>
 
           <button
-            onClick={() => { onSelectTab('admins'); onClose(); }}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${currentTab === 'admins' ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm' : 'text-[#4f453f] hover:bg-[#e8e1df]'}`}
+            onClick={() => {
+              onSelectTab('admins');
+              onClose();
+            }}
+            className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-medium text-left transition-all cursor-pointer ${
+              currentTab === 'admins'
+                ? 'text-[#26170c] font-bold bg-[#e1e1c9] translate-x-1 shadow-sm'
+                : 'text-[#4f453f] hover:bg-[#e8e1df]'
+            }`}
           >
-            <span className="material-symbols-outlined text-[22px]">admin_panel_settings</span><span className="text-sm font-semibold">Admin Accounts</span>
+            <span className="material-symbols-outlined text-[22px]">admin_panel_settings</span>
+            <span className="text-sm font-semibold">Admin Accounts</span>
           </button>
         </div>
 
@@ -178,10 +262,14 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           <p className="font-medium text-[#26170c] truncate">{storeName}</p>
           <p className="text-[11px]">Protected Admin Portal • PHP (₱)</p>
           <button
-            onClick={() => { onClose(); onLogout(); }}
+            onClick={() => {
+              onClose();
+              onLogout();
+            }}
             className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#26170c] text-white text-xs font-bold"
           >
-            <span className="material-symbols-outlined text-[17px]">logout</span>Logout
+            <span className="material-symbols-outlined text-[17px]">logout</span>
+            Logout
           </button>
         </div>
       </nav>
