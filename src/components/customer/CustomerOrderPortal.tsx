@@ -71,6 +71,8 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);
+  const [cancelledOrders, setCancelledOrders] = useState<Record<string, Order>>({});
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (lastCustomerOrder) {
@@ -128,14 +130,16 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
     if (!currentCustomer) return [];
     const customerEmail = (currentCustomer.email || '').toLowerCase();
     const customerName = (currentCustomer.name || '').toLowerCase();
-    return orders.filter(
-      (o) =>
-        o &&
-        (o.customerId === currentCustomer.id ||
-          (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||
-          (customerName && o.customerName && o.customerName.toLowerCase() === customerName))
-    );
-  }, [orders, currentCustomer]);
+    return orders
+      .map((o) => cancelledOrders[o.id] || o)
+      .filter(
+        (o) =>
+          o &&
+          (o.customerId === currentCustomer.id ||
+            (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||
+            (customerName && o.customerName && o.customerName.toLowerCase() === customerName))
+      );
+  }, [orders, currentCustomer, cancelledOrders]);
 
   // Cart calculations
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -231,6 +235,45 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
     onPlaceCustomerOrder(newOrder);
     setActiveTrackingOrder(newOrder);
     setIsSuccessModalOpen(true);
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (order.status !== 'New') return;
+
+    const confirmed = window.confirm(
+      `Cancel order #${order.orderNumber}?\n\nThis can only be cancelled while the order is still New.`
+    );
+
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+
+    try {
+      const cancelled = await orderService.cancelCustomerOrder(
+        order.id,
+        currentCustomer.id,
+        currentCustomer.email
+      );
+
+      if (cancelled) {
+        setCancelledOrders((prev) => ({
+          ...prev,
+          [cancelled.id]: cancelled,
+        }));
+
+        setActiveTrackingOrder(cancelled);
+        setIsSuccessModalOpen(true);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to cancel the order.';
+
+      window.alert(message);
+    } finally {
+      setCancellingOrderId(null);
+    }
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -758,20 +801,40 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
                       </div>
 
                       {/* Footer Actions */}
-                      <div className="flex justify-between items-center pt-1">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-1">
                         <span className="text-[11px] text-[#81756e]">
                           {ord.deliveryAddress ? `Deliver to: ${ord.deliveryAddress}` : ord.tableNumber ? `Table: ${ord.tableNumber}` : 'Takeout'}
                         </span>
-                        <button
-                          onClick={() => {
-                            setActiveTrackingOrder(ord);
-                            setIsSuccessModalOpen(true);
-                          }}
-                          className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">visibility</span>
-                          <span>Track Order</span>
-                        </button>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          {ord.status === 'New' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrder(ord)}
+                              disabled={cancellingOrderId === ord.id}
+                              className="px-3.5 py-1.5 bg-[#ffdad6] text-[#93000a] text-xs font-bold rounded-xl border border-[#ffb4ab] hover:bg-[#ffb4ab] disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">
+                                {cancellingOrderId === ord.id ? 'hourglass_top' : 'cancel'}
+                              </span>
+                              <span>
+                                {cancellingOrderId === ord.id ? 'Cancelling...' : 'Cancel Order'}
+                              </span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTrackingOrder(ord);
+                              setIsSuccessModalOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">visibility</span>
+                            <span>Track Order</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
