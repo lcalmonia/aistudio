@@ -87,3 +87,18 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Customer portal: keep every menu category visible instead of hiding the
+   remaining categories in a horizontal scrolling strip. The selector targets
+   the category row specifically (pt-1 + pb-1 + border-t), leaving the other
+   intentionally scrollable filter/navigation rows unchanged. */
+div[class~="overflow-x-auto"][class~="pt-1"][class~="pb-1"][class~="border-t"] {
+  flex-wrap: wrap;
+  overflow-x: visible !important;
+  overflow-y: visible;
+  row-gap: 0.5rem;
+}
+
+div[class~="overflow-x-auto"][class~="pt-1"][class~="pb-1"][class~="border-t"] > button {
+  flex-shrink: 0;
+}
