@@ -1,0 +1,67 @@
+name: Fix menu category management
+
+on:
+  push:
+    branches: [fix-responsive-admin-views]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-responsive-admin-views
+          fetch-depth: 1
+
+      - name: Update menu category UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/components/AdminMenuView.tsx')
+          text = path.read_text()
+
+          text = text.replace(
+              '  const filterCategoriesList = [\'All\', ...categories];',
+              '''  const filterCategoriesList = ['All', ...categories];\n\n  const getCategoryProductCount = (category: string) =>\n    category === 'All' ? menuItems.length : menuItems.filter((item) => item.category === category).length;\n\n  const handleEditMenuCategory = (category: string) => {\n    if (!isSuperAdmin || !onSaveCategory) return;\n    const nextName = window.prompt(`Edit category "${category}"`, category)?.trim();\n    if (!nextName || nextName === category) return;\n    onSaveCategory(nextName, category);\n    if (selectedCategory === category) setSelectedCategory(nextName);\n  };\n\n  const handleDeleteMenuCategory = (category: string) => {\n    if (!isSuperAdmin || !onDeleteCategory) return;\n    const productCount = getCategoryProductCount(category);\n    const message = productCount > 0\n      ? `Delete category "${category}"? ${productCount} product(s) will be moved to another category.`\n      : `Delete category "${category}"?`;\n    if (!window.confirm(message)) return;\n    onDeleteCategory(category);\n    if (selectedCategory === category) setSelectedCategory('All');\n  };'''
+          )
+
+          old = '''              {/* Category Pills Bar */}\n              <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">\n                {filterCategoriesList.map((cat) => (\n                  <button\n                    key={cat}\n                    onClick={() => setSelectedCategory(cat)}\n                    className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 ${\n                      selectedCategory === cat\n                        ? 'bg-[#26170c] text-white shadow-xs'\n                        : 'bg-white text-[#4f453f] border border-[#d2c4bc] hover:bg-[#f3ecea]'\n                    }`}\n                  >\n                    {cat}\n                  </button>\n                ))}\n              </div>'''
+
+          new = '''              {/* Category Pills Bar - wraps on narrow screens so every category remains reachable */}\n              <div className="flex flex-wrap items-center gap-1.5 pb-1 max-w-full">\n                {filterCategoriesList.map((cat) => {\n                  const count = getCategoryProductCount(cat);\n                  const isAll = cat === 'All';\n                  return (\n                    <div\n                      key={cat}\n                      className={`inline-flex items-center rounded-full border transition-all ${\n                        selectedCategory === cat\n                          ? 'bg-[#26170c] border-[#26170c] text-white shadow-xs'\n                          : 'bg-white border-[#d2c4bc] text-[#4f453f]'\n                      }`}\n                    >\n                      <button\n                        type="button"\n                        onClick={() => setSelectedCategory(cat)}\n                        className="px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"\n                        title={`Show ${count} product${count === 1 ? '' : 's'} in ${cat}`}\n                      >\n                        {cat} <span className={selectedCategory === cat ? 'opacity-80' : 'text-[#81756e]'}>({count})</span>\n                      </button>\n\n                      {isSuperAdmin && !isAll && (\n                        <div className="flex items-center pr-1">\n                          <button\n                            type="button"\n                            onClick={(e) => {\n                              e.stopPropagation();\n                              handleEditMenuCategory(cat);\n                            }}\n                            className={`p-1 rounded-full transition-colors cursor-pointer ${\n                              selectedCategory === cat\n                                ? 'text-[#e1e1c9] hover:bg-white/10'\n                                : 'text-[#81756e] hover:text-[#26170c] hover:bg-[#f3ecea]'\n                            }`}\n                            title={`Edit ${cat}`}\n                            aria-label={`Edit ${cat} category`}\n                          >\n                            <span className="material-symbols-outlined text-[15px]">edit</span>\n                          </button>\n                          <button\n                            type="button"\n                            onClick={(e) => {\n                              e.stopPropagation();\n                              handleDeleteMenuCategory(cat);\n                            }}\n                            className={`p-1 rounded-full transition-colors cursor-pointer ${\n                              selectedCategory === cat\n                                ? 'text-[#ffb4ab] hover:bg-white/10'\n                                : 'text-[#ba1a1a] hover:bg-[#ffdad6]'\n                            }`}\n                            title={`Delete ${cat}`}\n                            aria-label={`Delete ${cat} category`}\n                          >\n                            <span className="material-symbols-outlined text-[15px]">delete</span>\n                          </button>\n                        </div>\n                      )}\n                    </div>\n                  );\n                })}\n              </div>'''
+
+          if old not in text:
+              raise SystemExit('Category pills block not found; refusing to modify file.')
+          text = text.replace(old, new, 1)
+
+          old_root = '    <div className="pb-28 pt-20 px-3 sm:px-4 max-w-5xl mx-auto space-y-4">'
+          new_root = '    <div className="pb-28 pt-20 px-3 sm:px-4 w-full max-w-[1400px] mx-auto space-y-4">'
+          if old_root in text:
+              text = text.replace(old_root, new_root, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/AdminMenuView.tsx
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "fix: wrap menu categories and add category management"
+          git push origin fix-responsive-admin-views
+
+      - name: Remove temporary workflow
+        if: always()
+        run: |
+          rm -f .github/workflows/fix-menu-category-management.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/fix-menu-category-management.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: remove temporary category update workflow"
+          git push origin fix-responsive-admin-views
