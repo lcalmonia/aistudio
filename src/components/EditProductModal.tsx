@@ -1091,8 +1091,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             </div>
 
             {/* Dynamic Category Filter Pills */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex gap-1 overflow-x-auto scrolling-hide py-0.5 flex-1">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-1 py-0.5 w-full">
                 <button
                   type="button"
                   onClick={() => setAddonCategoryFilter('All')}
@@ -1121,7 +1121,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               </div>
 
               {/* Quick Select All / Clear for this filtered set */}
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1 flex-wrap justify-end">
                 <button
                   type="button"
                   onClick={handleSelectAllFilteredAddons}
