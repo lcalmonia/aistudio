@@ -11,6 +11,7 @@ import {
 } from '../../types';
 import { CustomerProductModal } from './CustomerProductModal';
 import { orderService } from '../../services/orderService';
+import { customerService } from '../../services/customerService';
 import { CustomerCartDrawer } from './CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';
 
@@ -92,6 +93,12 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   const [editMobile, setEditMobile] = useState(currentCustomer.mobile);
   const [editAddress, setEditAddress] = useState(currentCustomer.address);
   const [profileSavedToast, setProfileSavedToast] = useState(false);
+  const [showPasswordEditor, setShowPasswordEditor] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordChangeMessage, setPasswordChangeMessage] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Filter available items
   const availableItems = useMemo(() => {
@@ -285,6 +292,33 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
     });
     setProfileSavedToast(true);
     setTimeout(() => setProfileSavedToast(false), 3000);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordChangeMessage(null);
+
+    if (newPassword.length < 6 || newPassword.length > 128) {
+      setPasswordChangeMessage('New password must be 6 to 128 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeMessage('New password and confirmation do not match.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await customerService.changeCustomerPassword(currentCustomer.id, currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordChangeMessage('Password changed successfully.');
+    } catch (error) {
+      setPasswordChangeMessage(error instanceof Error ? error.message : 'Unable to change your password.');
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   // Stamp card calculation (10 stamps per reward)
@@ -1020,6 +1054,39 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
                 </button>
               </div>
             </form>
+
+            <div className="pt-4 border-t border-[#f3ecea]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-serif text-base font-bold text-[#26170c]">Password</h4>
+                  <p className="text-[11px] text-[#81756e] mt-0.5">Change your password anytime using your current password.</p>
+                </div>
+                <button type="button" onClick={() => { setShowPasswordEditor((value) => !value); setPasswordChangeMessage(null); }} className="px-4 py-2 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] font-bold rounded-xl border border-[#dec1af] transition-all cursor-pointer whitespace-nowrap">
+                  {showPasswordEditor ? 'Close' : 'Change Password'}
+                </button>
+              </div>
+
+              {showPasswordEditor && (
+                <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
+                  <div>
+                    <label className="block font-bold text-[#4f453f] mb-1">Current Password</label>
+                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-[#26170c] focus:ring-2 focus:ring-[#26170c]" autoComplete="current-password" required />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[#4f453f] mb-1">New Password</label>
+                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-[#26170c] focus:ring-2 focus:ring-[#26170c]" autoComplete="new-password" minLength={6} maxLength={128} required />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[#4f453f] mb-1">Confirm New Password</label>
+                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-[#26170c] focus:ring-2 focus:ring-[#26170c]" autoComplete="new-password" minLength={6} maxLength={128} required />
+                  </div>
+                  {passwordChangeMessage && <div className="p-3 bg-[#f9f2f0] border border-[#dec1af] rounded-xl text-xs font-semibold text-[#26170c]">{passwordChangeMessage}</div>}
+                  <button type="submit" disabled={isChangingPassword} className="w-full py-3 bg-[#26170c] hover:bg-[#3d2b1f] disabled:opacity-60 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer">
+                    {isChangingPassword ? 'Changing Password...' : 'Save New Password'}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         )}
       </main>

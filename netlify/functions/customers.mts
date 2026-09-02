@@ -1,13 +1,8 @@
 import type { Config } from '@netlify/functions';
 import { requireAuthenticatedAdmin } from './_shared/auth.mts';
 import { database } from './_shared/database.mts';
-import {
-  enforceSameOrigin,
-  errorResponse,
-  json,
-  readJsonObject,
-  RequestError,
-} from './_shared/http.mts';
+import { enforceSameOrigin, errorResponse, json, readJsonObject, RequestError } from './_shared/http.mts';
+import { hashPassword } from './_shared/password.mts';
 
 function mapCustomer(row: Record<string, unknown>) {
   const rawCreatedAt = row.created_at;
@@ -47,6 +42,10 @@ export default async function handler(request: Request): Promise<Response> {
     if (request.method === 'POST') {
       enforceSameOrigin(request);
       const body = await readJsonObject(request);
+      const password = typeof body.password === 'string' ? body.password : '';
+      if (password && (password.length < 6 || password.length > 128)) {
+        throw new RequestError(400, 'Password must be between 6 and 128 characters.');
+      }
 
       const id = typeof body.id === 'string' ? body.id.trim() : '';
       const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -74,12 +73,13 @@ export default async function handler(request: Request): Promise<Response> {
         throw new RequestError(409, 'A customer account with this email or ID already exists.');
       }
 
+      const passwordHash = password ? await hashPassword(password) : null;
       const result = await db.pool.query(
         `INSERT INTO customers (
-          id, name, email, mobile, address, status, role, stamps, points, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, 'active', 'customer', $6, $7, NOW(), NOW())
+          id, name, email, mobile, address, status, role, stamps, points, password_hash, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, 'active', 'customer', $6, $7, $8, NOW(), NOW())
         RETURNING id, name, email, mobile, address, status, role, stamps, points, created_at`,
-        [id, name, email, mobile, address, stamps, points]
+        [id, name, email, mobile, address, stamps, points, passwordHash]
       );
 
       return json({ customer: mapCustomer(result.rows[0]) }, 201);
