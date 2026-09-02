@@ -290,7 +290,7 @@ onShowNotification,
                 try {
                   setIsSubmittingCategory(true);
                   await onAddCategory(trimmed);
-                  setSelectedCategory(trimmed);
+                  setSelectedCategory('All');
                   setNewCategoryName('');
                   setIsAddingCategory(false);
                 } catch (err) {
