@@ -1,0 +1,30 @@
+name: One-time customer type patch
+on:
+  push:
+    branches: [feature/customer-username-login]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/customer-username-login
+          fetch-depth: 0
+      - run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/types.ts'); s=p.read_text()
+          old='export interface CustomerUser {\n  id: string;\n  name: string;\n  email: string;'
+          new='export interface CustomerUser {\n  id: string;\n  name: string;\n  username?: string;\n  email: string;'
+          assert old in s
+          p.write_text(s.replace(old,new,1))
+          PY
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/types.ts
+          git rm .github/workflows/one-time-customer-type.yml
+          git commit -m "Add customer username to type model"
+          git push origin feature/customer-username-login
