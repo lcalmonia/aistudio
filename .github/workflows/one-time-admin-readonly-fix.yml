@@ -1,0 +1,64 @@
+name: One-time admin menu readonly fix
+
+on:
+  push:
+    branches:
+      - fix/barista-category-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  patch-admin-menu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch admin menu permissions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/AdminMenuView.tsx')
+          s = p.read_text()
+
+          replacements = [
+            (
+              '''                <button\n                  onClick={() => setIsQuickAddCategoryOpen(!isQuickAddCategoryOpen)}\n                  className="text-[11px] font-bold text-[#5e604d] hover:text-[#26170c] flex items-center gap-1 hover:underline cursor-pointer"\n                >\n                  <span className="material-symbols-outlined text-[14px]">add_circle</span>\n                  + Add Category\n                </button>''',
+              '''                {isSuperAdmin && (\n                  <button\n                    onClick={() => setIsQuickAddCategoryOpen(!isQuickAddCategoryOpen)}\n                    className="text-[11px] font-bold text-[#5e604d] hover:text-[#26170c] flex items-center gap-1 hover:underline cursor-pointer"\n                  >\n                    <span className="material-symbols-outlined text-[14px]">add_circle</span>\n                    + Add Category\n                  </button>\n                )}'''
+            ),
+            (
+              '''              <button\n                onClick={handleAddProduct}\n                className="mt-2 px-4 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f]"\n              >\n                + Add New Product\n              </button>''',
+              '''              {isSuperAdmin && (\n                <button\n                  onClick={handleAddProduct}\n                  className="mt-2 px-4 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f]"\n                >\n                  + Add New Product\n                </button>\n              )}'''
+            ),
+            (
+              '''                <button\n                  onClick={() => handleEditProduct(previewProduct)}\n                  className="px-3 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-lg hover:bg-[#3d2b1f] flex items-center gap-1 cursor-pointer"\n                >\n                  <span className="material-symbols-outlined text-[16px]">edit</span>\n                  Edit This Item\n                </button>''',
+              '''                {isSuperAdmin && (\n                  <button\n                    onClick={() => handleEditProduct(previewProduct)}\n                    className="px-3 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-lg hover:bg-[#3d2b1f] flex items-center gap-1 cursor-pointer"\n                  >\n                    <span className="material-symbols-outlined text-[16px]">edit</span>\n                    Edit This Item\n                  </button>\n                )}'''
+            ),
+            (
+              '''                              {/* Toggle Availability / Stock: accessible to ALL authenticated staff/admins */}\n                              <button\n                                type="button"\n                                onClick={() => onToggleAddonStock(addon.id)}\n                                title={addon.available ? 'In Stock (Click to toggle)' : 'Out of Stock (Click to toggle)'}\n                                className={`p-1 rounded-md text-xs font-bold cursor-pointer ${\n                                  addon.available ? 'text-[#636451] hover:bg-[#e1e1c9]' : 'text-[#ba1a1a] hover:bg-[#ffdad6]'\n                                }`}\n                              >\n                                <span className="material-symbols-outlined text-[18px]">\n                                  {addon.available ? 'toggle_on' : 'toggle_off'}\n                                </span>\n                              </button>''',
+              '''                              {/* Modifier availability is configuration: SUPER_ADMIN only. Admin users have read-only access. */}\n                              {isSuperAdmin && (\n                                <button\n                                  type="button"\n                                  onClick={() => onToggleAddonStock(addon.id)}\n                                  title={addon.available ? 'In Stock (Click to toggle)' : 'Out of Stock (Click to toggle)'}\n                                  className={`p-1 rounded-md text-xs font-bold cursor-pointer ${\n                                    addon.available ? 'text-[#636451] hover:bg-[#e1e1c9]' : 'text-[#ba1a1a] hover:bg-[#ffdad6]'\n                                  }`}\n                                >\n                                  <span className="material-symbols-outlined text-[18px]">\n                                    {addon.available ? 'toggle_on' : 'toggle_off'}\n                                  </span>\n                                </button>\n                              )}'''
+            ),
+            (
+              '''                  <strong>Admin Mode:</strong> Modifier groups, options, and pricing configurations can only be created or modified by Super Admin. Availability toggles remain active.''',
+              '''                  <strong>Admin Mode:</strong> Menu products, modifier groups, modifier options, pricing, categories, and availability settings are read-only. Only Super Admin can modify them.'''
+            ),
+          ]
+
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'Missing expected block:\n{old[:120]}')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Commit and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/AdminMenuView.tsx .github/workflows/one-time-admin-readonly-fix.yml
+          git rm .github/workflows/one-time-admin-readonly-fix.yml
+          git commit -m "Make admin menu product and modifier settings read-only"
+          git push
