@@ -31,7 +31,21 @@ export const customerService = {
   async rejectPasswordReset(requestId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'reject',requestId})});},
   async resetCustomerPassword(customerId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'reset',customerId})});},
   async deleteCustomer(customerId:string):Promise<void>{await api('/api/customer-password',{method:'POST',body:JSON.stringify({action:'delete',customerId})});const customers=storageAdapter.getCustomers();storageAdapter.setCustomers(customers.filter(c=>c.id!==customerId));if(storageAdapter.getCurrentCustomer()?.id===customerId)storageAdapter.setCurrentCustomer(null);},
-  async updateCustomer(id:string,updates:Partial<CustomerUser>):Promise<{success:boolean;customer?:CustomerUser;error?:string}>{const customers=storageAdapter.getCustomers();const index=customers.findIndex(c=>c.id===id);if(index===-1)return {success:false,error:'Customer not found.'};const updatedCustomer={...customers[index],...updates};customers[index]=updatedCustomer;storageAdapter.setCustomers(customers);const current=storageAdapter.getCurrentCustomer();if(current&&current.id===id)storageAdapter.setCurrentCustomer(updatedCustomer);return {success:true,customer:updatedCustomer};},
+  async updateCustomer(id:string,updates:Partial<CustomerUser>):Promise<{success:boolean;customer?:CustomerUser;error?:string}>{
+    const current=storageAdapter.getCurrentCustomer();
+    const email=(current?.id===id?current.email:storageAdapter.getCustomers().find(c=>c.id===id)?.email)||'';
+    try {
+      const response=await api<{success:boolean;customer?:CustomerUser}>('/api/customers',{method:'POST',body:JSON.stringify({action:'update-profile',id,email,name:updates.name,mobile:updates.mobile,address:updates.address})});
+      if(!response?.success||!response.customer)return {success:false,error:'Profile update failed.'};
+      const savedCustomer=response.customer;
+      const customers=storageAdapter.getCustomers();
+      storageAdapter.setCustomers([savedCustomer,...customers.filter(c=>c.id!==savedCustomer.id)]);
+      if(storageAdapter.getCurrentCustomer()?.id===savedCustomer.id)storageAdapter.setCurrentCustomer(savedCustomer);
+      return {success:true,customer:savedCustomer};
+    } catch(err) {
+      return {success:false,error:err instanceof Error?err.message:'Profile update failed.'};
+    }
+  },
   async deactivateCustomer(id:string):Promise<{success:boolean;error?:string}>{const updated=storageAdapter.getCustomers().map(c=>c.id===id?{...c,status:'inactive' as const}:c);storageAdapter.setCustomers(updated);return {success:true};},
   async saveCustomers(customers:CustomerUser[]):Promise<CustomerUser[]>{storageAdapter.setCustomers(customers);return customers;},
 };
