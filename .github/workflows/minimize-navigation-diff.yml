@@ -1,0 +1,37 @@
+name: Minimize navigation diff
+on: push
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git fetch origin main
+          git checkout origin/main -- src/components/Header.tsx src/components/NavigationDrawer.tsx
+          python - <<'PY'
+          from pathlib import Path
+
+          h = Path('src/components/Header.tsx')
+          s = h.read_text()
+          s = s.replace("import { AdminPrincipal, StoreSettings } from '../types';", "import { AdminPrincipal, StoreSettings } from '../types';\nimport { RewardClaimsBanner } from './RewardClaimsBanner';", 1)
+          s = s.replace("    </header>\n  );", "    </header>\n\n      <RewardClaimsBanner currentTab={currentTab} admin={admin} />\n    </>\n  );", 1)
+          s = s.replace("  return (\n    <header", "  return (\n    <>\n      <header", 1)
+          h.write_text(s)
+
+          p = Path('src/components/NavigationDrawer.tsx')
+          s = p.read_text()
+          start = s.index('          {/* Rewards & Loyalty */}')
+          end = s.index('          {/* Analytics / Stats */}', start)
+          s = s[:start] + s[end:]
+          p.write_text(s)
+          PY
+      - run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/components/Header.tsx src/components/NavigationDrawer.tsx
+          git commit -m "Minimize navigation change diff"
+          git push
