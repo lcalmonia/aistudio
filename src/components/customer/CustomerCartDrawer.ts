@@ -18,6 +18,7 @@ interface CustomerCartDrawerProps {
 
 export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => {
   const [preparedBundles, setPreparedBundles] = useState<Record<string, CustomerCartItem[]>>({});
+  const [dismissedBundles, setDismissedBundles] = useState<Record<string, boolean>>({});
   const [pendingBundleCartItemId, setPendingBundleCartItemId] = useState<string | null>(null);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
 
@@ -83,6 +84,12 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
       );
       return Object.keys(next).length === Object.keys(prev).length ? prev : next;
     });
+    setDismissedBundles((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => activeIds.has(id))
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
 
     if (pendingBundleCartItemId && !activeIds.has(pendingBundleCartItemId)) {
       setPendingBundleCartItemId(null);
@@ -93,13 +100,17 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
   useEffect(() => {
     if (!props.isOpen) return;
     const firstUnprepared = props.cartItems.find(
-      (item) => item.isBundle && item.bundleData && !preparedBundles[item.id]
+      (item) =>
+        item.isBundle &&
+        item.bundleData &&
+        !preparedBundles[item.id] &&
+        !dismissedBundles[item.id]
     );
     if (firstUnprepared && !isBundleModalOpen) {
       setPendingBundleCartItemId(firstUnprepared.id);
       setIsBundleModalOpen(true);
     }
-  }, [props.isOpen, props.cartItems, preparedBundles, isBundleModalOpen]);
+  }, [props.isOpen, props.cartItems, preparedBundles, dismissedBundles, isBundleModalOpen]);
 
   const handleCompleteBundle = (selections: CustomerCartItem[]) => {
     if (!pendingBundleCartItemId) return;
@@ -107,6 +118,19 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
       ...prev,
       [pendingBundleCartItemId]: selections,
     }));
+    setDismissedBundles((prev) => {
+      const next = { ...prev };
+      delete next[pendingBundleCartItemId];
+      return next;
+    });
+    setPendingBundleCartItemId(null);
+    setIsBundleModalOpen(false);
+  };
+
+  const handleCloseBundleModal = () => {
+    if (pendingBundleCartItemId) {
+      setDismissedBundles((prev) => ({ ...prev, [pendingBundleCartItemId]: true }));
+    }
     setPendingBundleCartItemId(null);
     setIsBundleModalOpen(false);
   };
@@ -117,6 +141,11 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     );
     if (missingBundle) {
       setPendingBundleCartItemId(missingBundle.id);
+      setDismissedBundles((prev) => {
+        const next = { ...prev };
+        delete next[missingBundle.id];
+        return next;
+      });
       setIsBundleModalOpen(true);
       return;
     }
@@ -125,6 +154,12 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
 
   const handleRemoveItem = (cartItemId: string) => {
     setPreparedBundles((prev) => {
+      if (!prev[cartItemId]) return prev;
+      const next = { ...prev };
+      delete next[cartItemId];
+      return next;
+    });
+    setDismissedBundles((prev) => {
       if (!prev[cartItemId]) return prev;
       const next = { ...prev };
       delete next[cartItemId];
@@ -144,7 +179,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
 
       <BundleCustomizationModal
         isOpen={isBundleModalOpen}
-        onClose={() => setIsBundleModalOpen(false)}
+        onClose={handleCloseBundleModal}
         bundle={pendingBundle?.bundleData || null}
         menuItems={catalog.menuItems}
         addonsList={catalog.addons}
