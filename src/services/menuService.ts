@@ -134,6 +134,7 @@ export const menuService = {
   },
 
   async toggleAvailability(id: string): Promise<MenuItem | null> {
+    requireSuperAdminForCatalogMutation();
     const response = await api<{ menuItem: MenuItem }>(`/api/menu-items/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ toggleAvailability: true }),
