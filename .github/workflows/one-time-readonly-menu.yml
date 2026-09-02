@@ -1,0 +1,72 @@
+name: One-time menu permissions patch
+on:
+  push:
+    branches:
+      - fix/admin-menu-readonly
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-menu-readonly
+          fetch-depth: 0
+      - name: Patch menu permissions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/AdminMenuView.tsx')
+          s = p.read_text()
+          old = '''                  {/* Card Bottom Controls: In-Stock Toggle & Edit Actions */}
+                  <div className="p-2.5 sm:p-3 bg-[#fff8f5] flex justify-between items-center gap-1.5 flex-wrap">
+                    {/* Stock Switch */}
+                    <button
+                      onClick={() => handleToggleProduct(product.id)}
+                      className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 ${
+                        product.available
+                          ? 'bg-[#e1e1c9] text-[#636451] hover:bg-[#d5d5b8]'
+                          : 'bg-[#ffdad6] text-[#ba1a1a] hover:bg-[#ffb4ab]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {product.available ? 'check_circle' : 'do_not_disturb_on'}
+                      </span>
+                      <span>{product.available ? 'In Stock' : 'Mark In Stock'}</span>
+                    </button>
+
+                    {/* Actions: [ View ] [ Edit ] [ Copy ] [ Delete ] */}'''
+          new = '''                  {/* Card Bottom Controls: Stock/Availability & Edit Actions */}
+                  <div className="p-2.5 sm:p-3 bg-[#fff8f5] flex justify-between items-center gap-1.5 flex-wrap">
+                    {/* Stock Switch — Super Admin only */}
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleToggleProduct(product.id)}
+                        className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 ${
+                          product.available
+                            ? 'bg-[#e1e1c9] text-[#636451] hover:bg-[#d5d5b8]'
+                            : 'bg-[#ffdad6] text-[#ba1a1a] hover:bg-[#ffb4ab]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {product.available ? 'check_circle' : 'do_not_disturb_on'}
+                        </span>
+                        <span>{product.available ? 'In Stock' : 'Mark In Stock'}</span>
+                      </button>
+                    )}
+
+                    {/* Actions: [ View ] [ Edit ] [ Copy ] [ Delete ] */}'''
+          if old not in s:
+              raise SystemExit('stock control block not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/AdminMenuView.tsx
+          git rm .github/workflows/one-time-readonly-menu.yml
+          git commit -m "Restrict menu availability control to Super Admin"
+          git push origin fix/admin-menu-readonly
