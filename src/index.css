@@ -87,3 +87,8 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Hide the Admin Menu read-only notice without changing Admin permissions. */
+div[class~="bg-[#f3ecea]"][class~="border-[#d2c4bc]"][class~="text-[#4f453f]"][class~="px-3.5"][class~="py-2.5"][class~="rounded-xl"]:has(.material-symbols-outlined) {
+  display: none !important;
+}
