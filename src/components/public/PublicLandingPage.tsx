@@ -147,16 +147,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </button>
             )}
 
-            {/* Main Primary "ORDER ONLINE" Button */}
-            <button
-              id="landing-order-online-btn"
-              onClick={onOrderOnline}
-              className="px-4 sm:px-5 py-2.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer border border-[#26170c]"
-            >
-              <span className="material-symbols-outlined text-[18px] text-[#fbddca]">shopping_bag</span>
-              <span>ORDER ONLINE</span>
-            </button>
-
+          
             {/* Mobile Menu Hamburger */}
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
@@ -310,19 +301,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
               </div>
 
-              {/* Floating review badge */}
-              <div className="absolute -bottom-4 -left-4 bg-[#26170c] text-white p-3.5 rounded-2xl shadow-xl border border-white/20 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#fbddca] text-[#26170c] flex items-center justify-center font-bold text-base">
-                  ★ 4.9
-                </div>
-                <div>
-                  <p className="text-xs font-bold">1,800+ Happy Foodies</p>
-                  <p className="text-[10px] text-[#dec1af]">Rated Manila's Sweetest Cafe</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+             
       </section>
 
       {/* ========================================================================= */}
