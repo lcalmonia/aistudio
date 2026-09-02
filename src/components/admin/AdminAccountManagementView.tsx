@@ -156,8 +156,8 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
           <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" required />
             <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" placeholder="Display name" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} required />
-            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Password (12+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" minLength={12} required />
-            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} autoComplete="new-password" minLength={12} required />
+            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Password (6+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" minLength={6} required />
+            <input className="px-3 py-2.5 rounded-xl border border-[#dec1af] bg-white text-sm" type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} autoComplete="new-password" minLength={6} required />
             <label className="flex items-center gap-2 text-sm font-semibold text-[#4f453f]">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
               Account active immediately
@@ -207,7 +207,7 @@ export const AdminAccountManagementView: React.FC<AdminAccountManagementViewProp
               </div>
               {resetAccountId === account.id && (
                 <div className="mt-3 pt-3 border-t border-[#dec1af]/50 flex flex-col sm:flex-row gap-2">
-                  <input type="password" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} placeholder="New password (12+ characters)" minLength={12} autoComplete="new-password" className="flex-1 px-3 py-2 rounded-xl border border-[#dec1af] bg-white text-sm" />
+                  <input type="password" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} placeholder="New password (6+ characters)" minLength={6} autoComplete="new-password" className="flex-1 px-3 py-2 rounded-xl border border-[#dec1af] bg-white text-sm" />
                   <button onClick={() => void handlePasswordReset(account)} className="px-3 py-2 rounded-xl bg-[#26170c] text-white text-xs font-bold">Save Password</button>
                   <button onClick={() => { setResetAccountId(null); setResetPassword(''); }} className="px-3 py-2 rounded-xl bg-[#e8e1df] text-[#4f453f] text-xs font-bold">Cancel</button>
                 </div>
