@@ -289,25 +289,29 @@ export async function adjustInventoryStockInDatabase(
 
 export async function fetchInventoryCategoriesFromDatabase(): Promise<string[]> {
   const db = database();
+
   const [explicitCats, itemCats] = await Promise.all([
-    db.pool.query(`SELECT name FROM inventory_categories ORDER BY name ASC`),
-    db.pool.query(`SELECT DISTINCT category FROM inventory_items WHERE category IS NOT NULL AND category != ''`),
+    db.pool.query('SELECT name FROM inventory_categories ORDER BY name ASC'),
+    db.pool.query(
+      `SELECT DISTINCT category
+       FROM inventory_items
+       WHERE category IS NOT NULL
+         AND category != ''`,
+    ),
   ]);
 
-  const set = new Set<string>([
-    'Coffee Beans',
-    'Dairy & Plant Milk',
-    'Syrups & Flavors',
-    'Pastry Ingredients',
-    'Packaging & Cups',
-    'Tea & Infusions',
-  ]);
+  const set = new Set<string>();
 
   for (const row of explicitCats.rows) {
-    if (row.name) set.add(row.name);
+    if (row.name) {
+      set.add(row.name);
+    }
   }
+
   for (const row of itemCats.rows) {
-    if (row.category) set.add(row.category);
+    if (row.category) {
+      set.add(row.category);
+    }
   }
 
   return Array.from(set).sort();
