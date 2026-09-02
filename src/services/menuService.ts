@@ -36,7 +36,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 function requireSuperAdminForCatalogMutation(): void {
   const session = storageAdapter.getStaffSession();
-  if (session?.role !== 'super_admin') {
+  if (session?.role !== 'SUPER_ADMIN') {
     throw new MenuApiError('Only Super Admin can create, edit, delete, or otherwise modify menu products.', 403);
   }
 }
