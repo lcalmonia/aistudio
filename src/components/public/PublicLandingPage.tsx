@@ -509,7 +509,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
           <div className="relative">
             <img
-             src="/iluvkeyks-exterior.jpg"
+             src="/iluvkeyks-exterior.jpeg"
               alt="iLuvKeyks Cozy Cafe Atmosphere"
               className="rounded-3xl shadow-xl object-cover w-full h-80 sm:h-96 border-4 border-white"
             />
