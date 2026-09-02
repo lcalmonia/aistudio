@@ -711,6 +711,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                   {/* Card Bottom Controls: In-Stock Toggle & Edit Actions */}
                   <div className="p-2.5 sm:p-3 bg-[#fff8f5] flex justify-between items-center gap-1.5 flex-wrap">
                     {/* Stock Switch */}
+                    {isSuperAdmin && (
                     <button
                       onClick={() => handleToggleProduct(product.id)}
                       className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 ${
@@ -724,6 +725,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                       </span>
                       <span>{product.available ? 'In Stock' : 'Mark In Stock'}</span>
                     </button>
+                    )}
 
                     {/* Actions: [ View ] [ Edit ] [ Copy ] [ Delete ] */}
                     <div className="flex gap-1.5 items-center flex-wrap">
