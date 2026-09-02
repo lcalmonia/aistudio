@@ -91,19 +91,6 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           <span className="material-symbols-outlined text-[18px] xs:text-[20px]">inventory_2</span>
           <span className="text-[9px] xs:text-[10px] font-semibold tracking-tight truncate">Stock</span>
         </button>
-
-        {/* Settings */}
-        <button
-          onClick={() => onSelectTab('settings')}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 duration-150 cursor-pointer min-w-0 ${
-            currentTab === 'settings'
-              ? 'bg-[#26170c] text-white rounded-full px-1 xs:px-2 font-bold shadow-xs'
-              : 'text-[#4f453f] hover:text-[#26170c] px-0.5'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px] xs:text-[20px]">tune</span>
-          <span className="text-[9px] xs:text-[10px] font-semibold tracking-tight truncate">Settings</span>
-        </button>
       </nav>
     </>
   );
