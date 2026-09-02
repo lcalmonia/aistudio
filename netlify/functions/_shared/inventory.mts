@@ -409,18 +409,6 @@ export async function deleteInventoryCategoryFromDatabase(
   try {
     await client.query('BEGIN');
 
-    const categoryResult = await client.query(
-      `SELECT 1
-       FROM inventory_categories
-       WHERE LOWER(name) = LOWER($1)
-       LIMIT 1`,
-      [cleanCategory],
-    );
-
-    if (!categoryResult.rowCount) {
-      throw new RequestError(404, 'Inventory category not found.');
-    }
-
     await client.query(
       `UPDATE inventory_items
        SET category = $1
