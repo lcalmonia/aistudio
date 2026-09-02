@@ -1,0 +1,37 @@
+name: One-time admin menu notice fix
+
+on:
+  push:
+    branches:
+      - fix/barista-category-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  patch-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Align read-only notice
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/AdminMenuView.tsx')
+          s = p.read_text()
+          old = '<strong>Admin Mode:</strong> Menu products, modifier groups, modifier options, pricing, categories, and availability settings are read-only. Only Super Admin can modify them.'
+          new = '<strong>Admin Mode:</strong> Menu product details, modifier groups, modifier options, pricing, and categories are read-only. Only Super Admin can modify them.'
+          if old not in s:
+              raise SystemExit('Expected admin notice not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/AdminMenuView.tsx .github/workflows/one-time-admin-notice-fix.yml
+          git rm .github/workflows/one-time-admin-notice-fix.yml
+          git commit -m "Clarify admin menu read-only notice"
+          git push
