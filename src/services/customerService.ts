@@ -25,12 +25,22 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+export interface CustomerPasswordResetRequest {
+  id: string;
+  customerId: string;
+  customerName: string;
+  email: string;
+  mobile: string;
+  requestedAt: string;
+  status: string;
+  reviewedAt: string | null;
+}
+
 export const customerService = {
   async listCustomers(): Promise<CustomerUser[]> {
     return storageAdapter.getCustomers();
   },
 
-  /** Fetch the authoritative customer directory from the shared database. */
   async listCustomersFromServer(): Promise<CustomerUser[]> {
     const response = await api<{ customers: CustomerUser[] }>('/api/customers', { method: 'GET' });
     if (!response || !Array.isArray(response.customers)) {
@@ -49,6 +59,7 @@ export const customerService = {
     email: string;
     mobile: string;
     address: string;
+    password?: string;
   }): Promise<{ success: boolean; customer?: CustomerUser; error?: string }> {
     const customers = storageAdapter.getCustomers();
     const cleanEmail = data.email.trim().toLowerCase();
@@ -75,7 +86,7 @@ export const customerService = {
     try {
       const response = await api<{ customer: CustomerUser }>('/api/customers', {
         method: 'POST',
-        body: JSON.stringify(newCustomer),
+        body: JSON.stringify({ ...newCustomer, password: data.password }),
       });
 
       if (!response?.customer) {
@@ -89,6 +100,72 @@ export const customerService = {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed.';
       return { success: false, error: message };
+    }
+  },
+
+  async loginCustomer(identifier: string, password: string): Promise<CustomerUser> {
+    const response = await api<{ customer: CustomerUser }>('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'login', identifier, password }),
+    });
+
+    if (!response?.customer) throw new CustomerApiError('Invalid customer login response.');
+    storageAdapter.setCurrentCustomer(response.customer);
+
+    const customers = storageAdapter.getCustomers();
+    storageAdapter.setCustomers([
+      response.customer,
+      ...customers.filter((c) => c.id !== response.customer!.id),
+    ]);
+
+    return response.customer;
+  },
+
+  async requestPasswordReset(identifier: string): Promise<void> {
+    await api('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'request', identifier }),
+    });
+  },
+
+  async listPasswordResetRequests(): Promise<CustomerPasswordResetRequest[]> {
+    const response = await api<{ requests: CustomerPasswordResetRequest[] }>('/api/customer-password', {
+      method: 'GET',
+    });
+    return response.requests || [];
+  },
+
+  async approvePasswordReset(requestId: string): Promise<void> {
+    await api('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve', requestId }),
+    });
+  },
+
+  async rejectPasswordReset(requestId: string): Promise<void> {
+    await api('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reject', requestId }),
+    });
+  },
+
+  async resetCustomerPassword(customerId: string): Promise<void> {
+    await api('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reset', customerId }),
+    });
+  },
+
+  async deleteCustomer(customerId: string): Promise<void> {
+    await api('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', customerId }),
+    });
+
+    const customers = storageAdapter.getCustomers();
+    storageAdapter.setCustomers(customers.filter((c) => c.id !== customerId));
+    if (storageAdapter.getCurrentCustomer()?.id === customerId) {
+      storageAdapter.setCurrentCustomer(null);
     }
   },
 
