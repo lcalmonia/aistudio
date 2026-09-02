@@ -34,7 +34,34 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     () =>
       props.cartItems.map((item) => {
         const selections = preparedBundles[item.id];
-        return selections ? { ...item, bundleSelections: selections } : item;
+        if (!selections || !item.isBundle) return item;
+
+        const flattenedAddons = selections.flatMap((selection) => selection.selectedAddons || []);
+        const bundleNotes = selections
+          .map((selection) => {
+            const parts: string[] = [];
+            if (selection.selectedTemperature && selection.selectedTemperature !== 'N/A') {
+              parts.push(selection.selectedTemperature);
+            }
+            if (selection.selectedSize) parts.push(`Size: ${selection.selectedSize.name}`);
+            if (selection.sweetnessLevel) parts.push(`Sugar: ${selection.sweetnessLevel}`);
+            if (selection.iceLevel && selection.selectedTemperature === 'Iced') {
+              parts.push(selection.iceLevel);
+            }
+            if (selection.selectedAddons && selection.selectedAddons.length > 0) {
+              parts.push(`Add-ons: ${selection.selectedAddons.map((addon) => addon.name).join(', ')}`);
+            }
+            if (selection.specialInstructions) parts.push(`Note: ${selection.specialInstructions}`);
+            return `${selection.menuItem.name}: ${parts.length > 0 ? parts.join(' • ') : 'Standard Preparation'}`;
+          })
+          .join(' | ');
+
+        return {
+          ...item,
+          selectedAddons: flattenedAddons,
+          specialInstructions: bundleNotes || undefined,
+          bundleSelections: selections,
+        };
       }),
     [props.cartItems, preparedBundles]
   );
