@@ -1,0 +1,197 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { CustomerCartItem, Order, StoreSettings, CustomerUser } from '../../types';
+import { storageAdapter } from '../../services/storageAdapter';
+import { BundleCustomizationModal } from './BundleCustomizationModal';
+import { CustomerCartDrawer as LegacyCustomerCartDrawer } from './CustomerCartDrawer.tsx';
+
+interface CustomerCartDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cartItems: CustomerCartItem[];
+  onUpdateQuantity: (cartItemId: string, delta: number) => void;
+  onRemoveItem: (cartItemId: string) => void;
+  onClearCart: () => void;
+  onPlaceOrder: (order: Order) => void;
+  storeSettings?: StoreSettings;
+  currentCustomer?: CustomerUser | null;
+}
+
+export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => {
+  const [preparedBundles, setPreparedBundles] = useState<Record<string, CustomerCartItem[]>>({});
+  const [dismissedBundles, setDismissedBundles] = useState<Record<string, boolean>>({});
+  const [pendingBundleCartItemId, setPendingBundleCartItemId] = useState<string | null>(null);
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+
+  const catalog = useMemo(
+    () => ({
+      menuItems: storageAdapter.getMenuItems(),
+      addons: storageAdapter.getAddons(),
+      modifierCategories: storageAdapter.getModifierCategories(),
+    }),
+    [props.cartItems.length, props.isOpen]
+  );
+
+  const effectiveCartItems = useMemo(
+    () =>
+      props.cartItems.map((item) => {
+        const selections = preparedBundles[item.id];
+        if (!selections || !item.isBundle) return item;
+
+        const flattenedAddons = selections.flatMap((selection) => selection.selectedAddons || []);
+        const bundleNotes = selections
+          .map((selection) => {
+            const parts: string[] = [];
+            if (selection.selectedTemperature && selection.selectedTemperature !== 'N/A') {
+              parts.push(selection.selectedTemperature);
+            }
+            if (selection.selectedSize) parts.push(`Size: ${selection.selectedSize.name}`);
+            if (selection.sweetnessLevel) parts.push(`Sugar: ${selection.sweetnessLevel}`);
+            if (selection.iceLevel && selection.selectedTemperature === 'Iced') {
+              parts.push(selection.iceLevel);
+            }
+            if (selection.selectedAddons && selection.selectedAddons.length > 0) {
+              parts.push(`Add-ons: ${selection.selectedAddons.map((addon) => addon.name).join(', ')}`);
+            }
+            if (selection.specialInstructions) parts.push(`Note: ${selection.specialInstructions}`);
+            return `${selection.menuItem.name}: ${parts.length > 0 ? parts.join(' • ') : 'Standard Preparation'}`;
+          })
+          .join(' | ');
+
+        return {
+          ...item,
+          selectedAddons: flattenedAddons,
+          specialInstructions: bundleNotes || undefined,
+          bundleSelections: selections,
+        };
+      }),
+    [props.cartItems, preparedBundles]
+  );
+
+  const pendingBundle = useMemo(() => {
+    if (!pendingBundleCartItemId) return null;
+    return (
+      props.cartItems.find(
+        (item) => item.id === pendingBundleCartItemId && item.isBundle && item.bundleData
+      ) || null
+    );
+  }, [props.cartItems, pendingBundleCartItemId]);
+
+  useEffect(() => {
+    const activeIds = new Set(props.cartItems.map((item) => item.id));
+    setPreparedBundles((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => activeIds.has(id))
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+    setDismissedBundles((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => activeIds.has(id))
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+
+    if (pendingBundleCartItemId && !activeIds.has(pendingBundleCartItemId)) {
+      setPendingBundleCartItemId(null);
+      setIsBundleModalOpen(false);
+    }
+  }, [props.cartItems, pendingBundleCartItemId]);
+
+  useEffect(() => {
+    if (!props.isOpen) return;
+    const firstUnprepared = props.cartItems.find(
+      (item) =>
+        item.isBundle &&
+        item.bundleData &&
+        !preparedBundles[item.id] &&
+        !dismissedBundles[item.id]
+    );
+    if (firstUnprepared && !isBundleModalOpen) {
+      setPendingBundleCartItemId(firstUnprepared.id);
+      setIsBundleModalOpen(true);
+      // A combo opens the customization flow, not the Order Bag.
+      props.onClose();
+    }
+  }, [props.isOpen, props.cartItems, preparedBundles, dismissedBundles, isBundleModalOpen, props.onClose]);
+
+  const handleCompleteBundle = (selections: CustomerCartItem[]) => {
+    if (!pendingBundleCartItemId) return;
+    setPreparedBundles((prev) => ({
+      ...prev,
+      [pendingBundleCartItemId]: selections,
+    }));
+    setDismissedBundles((prev) => {
+      const next = { ...prev };
+      delete next[pendingBundleCartItemId];
+      return next;
+    });
+    setPendingBundleCartItemId(null);
+    setIsBundleModalOpen(false);
+    // Keep the Order Bag closed after customization. The customer can open it via View Order Bag.
+    props.onClose();
+  };
+
+  const handleCloseBundleModal = () => {
+    if (pendingBundleCartItemId) {
+      setDismissedBundles((prev) => ({ ...prev, [pendingBundleCartItemId]: true }));
+    }
+    setPendingBundleCartItemId(null);
+    setIsBundleModalOpen(false);
+    props.onClose();
+  };
+
+  const handlePlaceOrder = (order: Order) => {
+    const missingBundle = props.cartItems.find(
+      (item) => item.isBundle && item.bundleData && !preparedBundles[item.id]
+    );
+    if (missingBundle) {
+      setPendingBundleCartItemId(missingBundle.id);
+      setDismissedBundles((prev) => {
+        const next = { ...prev };
+        delete next[missingBundle.id];
+        return next;
+      });
+      setIsBundleModalOpen(true);
+      props.onClose();
+      return;
+    }
+    props.onPlaceOrder(order);
+  };
+
+  const handleRemoveItem = (cartItemId: string) => {
+    setPreparedBundles((prev) => {
+      if (!prev[cartItemId]) return prev;
+      const next = { ...prev };
+      delete next[cartItemId];
+      return next;
+    });
+    setDismissedBundles((prev) => {
+      if (!prev[cartItemId]) return prev;
+      const next = { ...prev };
+      delete next[cartItemId];
+      return next;
+    });
+    props.onRemoveItem(cartItemId);
+  };
+
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(LegacyCustomerCartDrawer, {
+      ...props,
+      isOpen: props.isOpen && !isBundleModalOpen,
+      cartItems: effectiveCartItems,
+      onRemoveItem: handleRemoveItem,
+      onPlaceOrder: handlePlaceOrder,
+    }),
+    React.createElement(BundleCustomizationModal, {
+      isOpen: isBundleModalOpen,
+      onClose: handleCloseBundleModal,
+      bundle: pendingBundle?.bundleData || null,
+      menuItems: catalog.menuItems,
+      addonsList: catalog.addons,
+      modifierCategories: catalog.modifierCategories,
+      onComplete: handleCompleteBundle,
+    })
+  );
+};
