@@ -31,9 +31,41 @@ export default async function handler(request: Request, context: Context): Promi
 
     if (request.method === 'PATCH') {
       enforceSameOrigin(request);
+      const body = await readJsonObject(request);
+
+      // Customer self-cancellation is allowed only for the customer who owns
+      // the order and only while the order is still New.
+      if (body.action === 'customer-cancel') {
+        const customerId = typeof body.customerId === 'string' ? body.customerId.trim() : '';
+        const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim().toLowerCase() : '';
+
+        if (!customerId) {
+          throw new RequestError(400, 'Customer ID is required.');
+        }
+
+        const existingOrder = await fetchOrderById(orderId);
+        if (!existingOrder) {
+          throw new RequestError(404, `Order "${orderId}" not found.`);
+        }
+
+        if (!existingOrder.isCustomerOrder || existingOrder.customerId !== customerId) {
+          throw new RequestError(403, 'You can only cancel your own customer order.');
+        }
+
+        if (customerEmail && (existingOrder.customerEmail || '').toLowerCase() !== customerEmail) {
+          throw new RequestError(403, 'Customer verification failed.');
+        }
+
+        if (existingOrder.status !== 'New') {
+          throw new RequestError(409, 'This order can no longer be cancelled because preparation has started.');
+        }
+
+        const cancelledOrder = await updateOrderStatusInDatabase(orderId, 'Cancelled');
+        return json({ order: cancelledOrder });
+      }
+
       await requireAuthenticatedAdmin(request);
 
-      const body = await readJsonObject(request);
       const status = body.status as OrderStatus;
 
       if (!status || typeof status !== 'string') {

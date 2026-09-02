@@ -56,7 +56,6 @@ export const orderService = {
       const response = await api<{ orders: Order[] }>(url, { method: 'GET' });
 
       if (response && Array.isArray(response.orders)) {
-        // Sync local storage cache for offline reliability only when querying standard unfiltered active set
         if (!options.customerId && !options.orderId && !options.status && !options.startDate && !options.endDate) {
           storageAdapter.setOrders(response.orders);
         }
@@ -66,31 +65,18 @@ export const orderService = {
       console.warn('[OrderService] Server listOrders failed, using local storage fallback:', err);
     }
 
-    // Fallback to local storage if network fails
     let local = storageAdapter.getOrders();
-    if (options.customerId) {
-      local = local.filter((o) => o.customerId === options.customerId);
-    }
-    if (options.orderId) {
-      local = local.filter((o) => o.id === options.orderId);
-    }
-    if (options.orderNumber) {
-      local = local.filter((o) => o.orderNumber === options.orderNumber || o.orderNumber === `#${options.orderNumber}`);
-    }
-    if (options.status) {
-      local = local.filter((o) => o.status === options.status);
-    }
+    if (options.customerId) local = local.filter((o) => o.customerId === options.customerId);
+    if (options.orderId) local = local.filter((o) => o.id === options.orderId);
+    if (options.orderNumber) local = local.filter((o) => o.orderNumber === options.orderNumber || o.orderNumber === `#${options.orderNumber}`);
+    if (options.status) local = local.filter((o) => o.status === options.status);
     if (options.startDate) {
       const startMs = new Date(options.startDate).getTime();
-      if (!isNaN(startMs)) {
-        local = local.filter((o) => o.timestamp >= startMs);
-      }
+      if (!isNaN(startMs)) local = local.filter((o) => o.timestamp >= startMs);
     }
     if (options.endDate) {
       const endMs = new Date(options.endDate).getTime();
-      if (!isNaN(endMs)) {
-        local = local.filter((o) => o.timestamp <= endMs);
-      }
+      if (!isNaN(endMs)) local = local.filter((o) => o.timestamp <= endMs);
     }
     return local;
   },
@@ -101,9 +87,7 @@ export const orderService = {
   async getOrder(id: string): Promise<Order | null> {
     try {
       const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(id)}`, { method: 'GET' });
-      if (response && response.order) {
-        return response.order;
-      }
+      if (response && response.order) return response.order;
     } catch (err) {
       console.warn(`[OrderService] Server getOrder(${id}) failed, trying local fallback:`, err);
     }
@@ -166,7 +150,6 @@ export const orderService = {
 
       if (response && response.order) {
         const saved = response.order;
-        // Merge into local storage cache
         const local = storageAdapter.getOrders();
         const updated = [saved, ...local.filter((o) => o.id !== saved.id && o.orderNumber !== saved.orderNumber)];
         storageAdapter.setOrders(updated);
@@ -176,7 +159,6 @@ export const orderService = {
       console.warn('[OrderService] Server createOrder failed, persisting to local storage:', err);
     }
 
-    // Fallback if offline
     const fallbackOrder: Order = {
       ...payload,
       id: payload.id,
@@ -216,7 +198,6 @@ export const orderService = {
       console.warn(`[OrderService] Server updateOrderStatus(${orderId}, ${status}) failed, applying locally:`, err);
     }
 
-    // Fallback if offline
     const local = storageAdapter.getOrders();
     const index = local.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
     if (index === -1) return null;
@@ -232,6 +213,34 @@ export const orderService = {
     local[index] = updatedOrder;
     storageAdapter.setOrders(local);
     return updatedOrder;
+  },
+
+  /**
+   * Cancel a customer order while it is still New.
+   * The server verifies ownership and prevents cancellation after preparation starts.
+   */
+  async cancelCustomerOrder(orderId: string, customerId: string, customerEmail?: string): Promise<Order | null> {
+    try {
+      const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'customer-cancel', customerId, customerEmail }),
+      });
+
+      if (response && response.order) {
+        const updated = response.order;
+        const local = storageAdapter.getOrders();
+        const updatedList = local.map((o) =>
+          o.id === updated.id || o.orderNumber === updated.orderNumber ? updated : o
+        );
+        storageAdapter.setOrders(updatedList);
+        return updated;
+      }
+    } catch (err) {
+      console.warn(`[OrderService] Customer cancellation failed for ${orderId}:`, err);
+      throw err;
+    }
+
+    return null;
   },
 
   /**
