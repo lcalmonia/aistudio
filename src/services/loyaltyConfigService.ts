@@ -1,6 +1,7 @@
 import { LoyaltyPerk, LoyaltySettings } from '../types';
 
 const CACHE_KEY='iluvkeyks-loyalty-config';
+// Shared cache keeps synchronous order-reward calculations aligned with admin settings.
 const api=async<T>(path:string,init?:RequestInit):Promise<T>=>{const response=await fetch(path,{...init,credentials:'same-origin',headers:{'Content-Type':'application/json',...(init?.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||'Loyalty request failed.');return data as T;};
 export const loyaltyConfigService={
  async get():Promise<{settings:LoyaltySettings;perks:LoyaltyPerk[]}>{const data=await api<{settings:LoyaltySettings;perks:LoyaltyPerk[]}>('/api/loyalty-config');try{localStorage.setItem(CACHE_KEY,JSON.stringify(data.settings));}catch{}return data;},
