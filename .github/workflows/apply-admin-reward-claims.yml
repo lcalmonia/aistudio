@@ -1,0 +1,102 @@
+name: Apply admin reward claims
+
+on:
+  push:
+    branches: [admin-reward-claims]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch customer reward claim flow and admin orders banner
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          customer = Path('src/components/customer/CustomerOrderPortal.tsx')
+          text = customer.read_text()
+          old_import = "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';\n"
+          new_import = old_import + "import { rewardClaimService } from '../../services/rewardClaimService';\n"
+          if "rewardClaimService" not in text:
+              text = text.replace(old_import, new_import, 1)
+
+          old_handler = "  const handleRedeemPerk = async (perk: LoyaltyPerk) => { const { loyaltyService } = await import('../../services/loyaltyService'); const result = perk.redemptionType === 'points' ? await loyaltyService.redeemPoints(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`) : await loyaltyService.redeemStamps(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`); if (!result.success) { window.alert(result.error || 'Unable to redeem this perk.'); return; } window.location.reload(); };"
+          new_handler = """  const handleRedeemPerk = async (perk: LoyaltyPerk) => {
+            try {
+              await rewardClaimService.requestClaim(currentCustomer.id, perk.id);
+              window.alert(`Reward claim sent! Please see the counter/barista to claim: ${perk.name}.`);
+            } catch (error) {
+              window.alert(error instanceof Error ? error.message : 'Unable to request this reward.');
+            }
+          };"""
+          if old_handler not in text:
+              raise SystemExit('Customer reward handler not found')
+          text = text.replace(old_handler, new_handler, 1)
+          customer.write_text(text)
+
+          orders = Path('src/components/ActiveOrdersView.tsx')
+          text = orders.read_text()
+          text = text.replace("import React, { useState } from 'react';", "import React, { useEffect, useState } from 'react';", 1)
+          text = text.replace("import confetti from 'canvas-confetti';\n", "import confetti from 'canvas-confetti';\nimport { RewardClaim, rewardClaimService } from '../services/rewardClaimService';\n", 1)
+          marker = "  const [activeMenuOrderId, setActiveMenuOrderId] = useState<string | null>(null);\n"
+          addition = marker + "  const [pendingRewardClaims, setPendingRewardClaims] = useState<RewardClaim[]>([]);\n\n  const refreshRewardClaims = async () => {\n    if (!admin) return;\n    try {\n      setPendingRewardClaims(await rewardClaimService.listPendingClaims());\n    } catch (error) {\n      console.warn('[ActiveOrdersView] Reward claim sync error:', error);\n    }\n  };\n\n  useEffect(() => {\n    if (!admin) {\n      setPendingRewardClaims([]);\n      return;\n    }\n    refreshRewardClaims();\n    const interval = setInterval(refreshRewardClaims, 3000);\n    return () => clearInterval(interval);\n  }, [admin?.id]);\n\n  const handleFulfillRewardClaim = async (claim: RewardClaim) => {\n    const confirmed = window.confirm(`Fulfill ${claim.customerName}'s reward claim for ${claim.perkName}?\\n\\nThis will deduct ${claim.redemptionCost} ${claim.redemptionType} from the customer's balance.`);\n    if (!confirmed) return;\n    try {\n      await rewardClaimService.fulfillClaim(claim.id);\n      await refreshRewardClaims();\n      onShowNotification(`Reward fulfilled for ${claim.customerName}: ${claim.perkName}.`);\n    } catch (error) {\n      onShowNotification(error instanceof Error ? error.message : 'Unable to fulfill reward claim.');\n    }\n  };\n\n  const handleRejectRewardClaim = async (claim: RewardClaim) => {\n    const confirmed = window.confirm(`Reject ${claim.customerName}'s reward claim for ${claim.perkName}?`);\n    if (!confirmed) return;\n    try {\n      await rewardClaimService.rejectClaim(claim.id);\n      await refreshRewardClaims();\n      onShowNotification(`Reward claim rejected for ${claim.customerName}.`);\n    } catch (error) {\n      onShowNotification(error instanceof Error ? error.message : 'Unable to reject reward claim.');\n    }\n  };\n"
+          if marker not in text:
+              raise SystemExit('Orders state marker not found')
+          if "pendingRewardClaims" not in text:
+              text = text.replace(marker, addition, 1)
+
+          root = "    <div className=\"pt-20 pb-28 px-3.5 sm:px-5 w-full max-w-[1400px] mx-auto\">\n      {/* Sub-header & Filter Tabs */}"
+          banner = """    <div className=\"pt-20 pb-28 px-3.5 sm:px-5 w-full max-w-[1400px] mx-auto\">
+      {pendingRewardClaims.length > 0 && (
+        <section className=\"mb-4 rounded-2xl border border-[#d2c4bc] bg-[#f3ecea] p-3.5 sm:p-4 shadow-[0_4px_12px_rgba(61,43,31,0.06)]\">
+          <div className=\"flex items-center justify-between gap-3 mb-3\">
+            <div className=\"flex items-center gap-2 min-w-0\">
+              <span className=\"material-symbols-outlined text-[22px] text-[#26170c]\">redeem</span>
+              <div className=\"min-w-0\">
+                <h3 className=\"font-serif text-lg sm:text-xl font-bold text-[#26170c]\">Reward Claims</h3>
+                <p className=\"text-[11px] text-[#81756e]\">Customers waiting to claim their preferred perks</p>
+              </div>
+            </div>
+            <span className=\"flex-shrink-0 px-2.5 py-1 rounded-full bg-[#26170c] text-white text-[10px] font-bold\">{pendingRewardClaims.length} PENDING</span>
+          </div>
+          <div className=\"space-y-2\">
+            {pendingRewardClaims.map((claim) => (
+              <div key={claim.id} className=\"bg-white rounded-xl border border-[#dec1af] px-3 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3\">
+                <div className=\"min-w-0\">
+                  <div className=\"flex items-center gap-2 flex-wrap\">
+                    <span className=\"font-bold text-sm text-[#26170c]\">{claim.customerName}</span>
+                    <span className=\"px-1.5 py-0.5 rounded bg-[#fbddca] text-[#26170c] text-[9px] font-mono font-bold\">{claim.customerId}</span>
+                  </div>
+                  <p className=\"text-xs text-[#4f453f] mt-0.5\">Preferred perk: <strong>{claim.perkName}</strong></p>
+                  <p className=\"text-[10px] text-[#81756e] mt-0.5\">Cost: {claim.redemptionCost} {claim.redemptionType} • Requested {new Date(claim.requestedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+                </div>
+                <div className=\"flex gap-2 flex-shrink-0\">
+                  <button type=\"button\" onClick={() => handleRejectRewardClaim(claim)} className=\"px-3 py-2 rounded-lg border border-[#d2c4bc] text-[#93000a] text-[10px] font-bold hover:bg-[#ffdad6] cursor-pointer\">Reject</button>
+                  <button type=\"button\" onClick={() => handleFulfillRewardClaim(claim)} className=\"px-3.5 py-2 rounded-lg bg-[#26170c] text-white text-[10px] font-bold hover:bg-[#3d2b1f] cursor-pointer\">Fulfill Reward</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Sub-header & Filter Tabs */}"""
+          if root not in text:
+              raise SystemExit('Orders root marker not found')
+          text = text.replace(root, banner, 1)
+          orders.write_text(text)
+          PY
+
+      - name: Remove this temporary workflow
+        run: |
+          rm .github/workflows/apply-admin-reward-claims.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Add admin reward claim queue and navigation cleanup" || exit 0
+          git push
