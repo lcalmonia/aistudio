@@ -5,10 +5,9 @@ import { RewardClaim, rewardClaimService } from '../services/rewardClaimService'
 interface RewardClaimsBannerProps {
   currentTab: string;
   admin: AdminPrincipal;
-  onShowNotification: (message: string) => void;
 }
 
-export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentTab, admin, onShowNotification }) => {
+export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentTab, admin }) => {
   const [claims, setClaims] = useState<RewardClaim[]>([]);
 
   const refresh = async () => {
@@ -36,9 +35,9 @@ export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentT
     try {
       await rewardClaimService.fulfillClaim(claim.id);
       await refresh();
-      onShowNotification(`Reward fulfilled for ${claim.customerName}: ${claim.perkName}.`);
+      window.alert(`Reward fulfilled for ${claim.customerName}: ${claim.perkName}.`);
     } catch (error) {
-      onShowNotification(error instanceof Error ? error.message : 'Unable to fulfill reward claim.');
+      window.alert(error instanceof Error ? error.message : 'Unable to fulfill reward claim.');
     }
   };
 
@@ -47,9 +46,9 @@ export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentT
     try {
       await rewardClaimService.rejectClaim(claim.id);
       await refresh();
-      onShowNotification(`Reward claim rejected for ${claim.customerName}.`);
+      window.alert(`Reward claim rejected for ${claim.customerName}.`);
     } catch (error) {
-      onShowNotification(error instanceof Error ? error.message : 'Unable to reject reward claim.');
+      window.alert(error instanceof Error ? error.message : 'Unable to reject reward claim.');
     }
   };
 
