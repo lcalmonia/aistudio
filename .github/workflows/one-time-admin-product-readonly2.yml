@@ -1,0 +1,40 @@
+name: One-time admin product readonly fix 2
+
+on:
+  push:
+    branches:
+      - fix/barista-category-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  patch-product-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Hide product availability control for Admin
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('src/components/AdminMenuView.tsx')
+          s = p.read_text()
+          pattern = re.compile(r'''(?P<indent>                    )\{\/\* Stock Switch \*\/\}\n(?P<button>                    <button\n                      onClick=\{\(\) => handleToggleProduct\(product\.id\)\}.*?                    </button>)''', re.S)
+          m = pattern.search(s)
+          if not m:
+              raise SystemExit('Stock switch block not found')
+          replacement = f"{m.group('indent')}{{isSuperAdmin && (\\n{m.group('button')}\\n{m.group('indent')}}})"
+          s = s[:m.start()] + replacement + s[m.end():]
+          p.write_text(s)
+          PY
+      - name: Commit and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/AdminMenuView.tsx .github/workflows/one-time-admin-product-readonly2.yml
+          git rm .github/workflows/one-time-admin-product-readonly2.yml
+          git commit -m "Restrict admin product availability control"
+          git push
