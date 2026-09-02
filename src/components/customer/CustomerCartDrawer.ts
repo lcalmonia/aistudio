@@ -109,8 +109,10 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     if (firstUnprepared && !isBundleModalOpen) {
       setPendingBundleCartItemId(firstUnprepared.id);
       setIsBundleModalOpen(true);
+      // A combo opens the customization flow, not the Order Bag.
+      props.onClose();
     }
-  }, [props.isOpen, props.cartItems, preparedBundles, dismissedBundles, isBundleModalOpen]);
+  }, [props.isOpen, props.cartItems, preparedBundles, dismissedBundles, isBundleModalOpen, props.onClose]);
 
   const handleCompleteBundle = (selections: CustomerCartItem[]) => {
     if (!pendingBundleCartItemId) return;
@@ -125,6 +127,8 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     });
     setPendingBundleCartItemId(null);
     setIsBundleModalOpen(false);
+    // Keep the Order Bag closed after customization. The customer can open it via View Order Bag.
+    props.onClose();
   };
 
   const handleCloseBundleModal = () => {
@@ -133,6 +137,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     }
     setPendingBundleCartItemId(null);
     setIsBundleModalOpen(false);
+    props.onClose();
   };
 
   const handlePlaceOrder = (order: Order) => {
@@ -147,6 +152,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
         return next;
       });
       setIsBundleModalOpen(true);
+      props.onClose();
       return;
     }
     props.onPlaceOrder(order);
@@ -173,6 +179,7 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     null,
     React.createElement(LegacyCustomerCartDrawer, {
       ...props,
+      isOpen: props.isOpen && !isBundleModalOpen,
       cartItems: effectiveCartItems,
       onRemoveItem: handleRemoveItem,
       onPlaceOrder: handlePlaceOrder,
