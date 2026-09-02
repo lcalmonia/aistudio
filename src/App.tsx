@@ -1040,7 +1040,7 @@ const handleDeleteInventoryCategory = async (category: string) => {
           />
 
           {/* Main Admin Tab View Content */}
-          <main className="flex-1 w-full max-w-5xl mx-auto">
+         <main className="flex-1 w-full max-w-none mx-0 px-3 sm:px-4 lg:px-6">
             {/* Menu Management View */}
             {currentTab === 'admin-menu' && (
               <AdminMenuView
