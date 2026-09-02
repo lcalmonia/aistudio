@@ -89,6 +89,45 @@ export default async function handler(request: Request): Promise<Response> {
         return json({ customer: mapCustomer(customer) });
       }
 
+      if (action === 'change') {
+        const customerId = typeof body.customerId === 'string' ? body.customerId.trim() : '';
+        const currentPassword = typeof body.currentPassword === 'string' ? body.currentPassword : '';
+        const newPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
+
+        if (!customerId || !currentPassword || !newPassword) {
+          throw new RequestError(400, 'Customer ID, current password, and new password are required.');
+        }
+        if (newPassword.length < 6 || newPassword.length > 128) {
+          throw new RequestError(400, 'New password must be 6 to 128 characters.');
+        }
+        if (currentPassword === newPassword) {
+          throw new RequestError(400, 'New password must be different from the current password.');
+        }
+
+        const result = await db.pool.query(
+          `SELECT id, password_hash, status
+           FROM customers
+           WHERE id = $1
+           LIMIT 1`,
+          [customerId]
+        );
+        const customer = result.rows[0];
+        if (!customer) throw new RequestError(404, 'Customer account not found.');
+        if (customer.status === 'inactive') throw new RequestError(403, 'This account has been deactivated. Please contact cafe support.');
+        if (!customer.password_hash) throw new RequestError(409, 'This account needs a password reset before the password can be changed.');
+
+        const valid = await verifyPassword(currentPassword, String(customer.password_hash));
+        if (!valid) throw new RequestError(401, 'Current password is incorrect.');
+
+        const passwordHash = await hashPassword(newPassword);
+        await db.pool.query(
+          `UPDATE customers SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+          [passwordHash, customerId]
+        );
+
+        return json({ changed: true });
+      }
+
       if (action === 'request') {
         const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
         if (!identifier) throw new RequestError(400, 'Email or mobile number is required.');
