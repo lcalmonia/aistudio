@@ -1,0 +1,47 @@
+name: Remove menu read-only notice
+
+on:
+  push:
+    branches:
+      - remove-menu-read-only-notice
+
+permissions:
+  contents: write
+
+jobs:
+  remove-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove read-only notice
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/components/AdminMenuView.tsx')
+          text = path.read_text()
+          start = text.find('            {/* Read-Only Notice for Admin Role */}')
+          if start == -1:
+              raise SystemExit('Read-only notice block not found')
+          end_marker = '            {/* Dynamic Filter Pills */}'
+          end = text.find(end_marker, start)
+          if end == -1:
+              raise SystemExit('Dynamic Filter Pills marker not found')
+          replacement = text[start:end]
+          if 'Read-Only' not in replacement:
+              raise SystemExit('Read-only notice content not found')
+          text = text[:start] + text[end:]
+          path.write_text(text)
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/AdminMenuView.tsx
+          git commit -m "Remove admin menu read-only notice"
+          git push
+      - name: Remove temporary workflow
+        if: always()
+        run: |
+          git rm .github/workflows/remove-menu-read-only-notice.yml || true
+          git commit -m "Remove temporary menu notice workflow" || true
+          git push || true
