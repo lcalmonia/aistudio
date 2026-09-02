@@ -283,7 +283,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               {/* Main Feature Card */}
               <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white bg-white">
                 <img
-  src="/images/iluvkeyks-store.jpg"
+  src="/iluvkeyks-store.jpg"
   alt="iLuvKeyks Coffee & Tea Store"
   className="w-full h-72 sm:h-80 object-cover"
 />
