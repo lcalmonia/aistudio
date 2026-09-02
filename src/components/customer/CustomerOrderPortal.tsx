@@ -18,6 +18,7 @@ import { CustomerCartDrawer } from './CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';
 import { rewardClaimService } from '../../services/rewardClaimService';
 import { rewardClaimService } from '../../services/rewardClaimService';
+import { rewardClaimService } from '../../services/rewardClaimService';
 
 interface CustomerOrderPortalProps {
   menuItems: MenuItem[];
