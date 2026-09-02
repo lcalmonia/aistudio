@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StoreSettings } from '../types';
+import { prepareUploadedImage } from '../utils/imageCompression';
 
 interface SettingsViewProps {
   settings: StoreSettings;
@@ -39,7 +40,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -48,20 +49,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      onShowNotification('File is too large. Please select an image under 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      onShowNotification('File is too large. Please select an image under 10MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        const base64Url = event.target.result as string;
-        handleInputChange('logoUrl', base64Url);
-        onShowNotification('Store logo loaded! Click Save to apply live. ☕✨');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const preparedImage = await prepareUploadedImage(file);
+      handleInputChange('logoUrl', preparedImage);
+      onShowNotification('Store logo optimized and loaded! Click Save to apply live. ☕✨');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The logo could not be prepared.';
+      onShowNotification(message);
+    }
   };
 
   const handleRemoveLogo = () => {

@@ -1,4 +1,4 @@
-const MAX_JSON_BYTES = 64 * 1024;
+const MAX_JSON_BYTES = 2 * 1024 * 1024;
 
 export class RequestError extends Error {
   constructor(

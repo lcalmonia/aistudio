@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Order, OrderStatus } from '../types';
+import { AdminPrincipal, Order, OrderStatus } from '../types';
 import confetti from 'canvas-confetti';
 
 interface ActiveOrdersViewProps {
@@ -9,6 +9,7 @@ interface ActiveOrdersViewProps {
   onShowNotification: (msg: string) => void;
   onRefreshOrders?: () => void;
   isSyncing?: boolean;
+  admin?: AdminPrincipal | null;
 }
 
 export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
@@ -18,8 +19,10 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
   onShowNotification,
   onRefreshOrders,
   isSyncing = false,
+  admin,
 }) => {
-  const [selectedFilter, setSelectedFilter] = useState<'All' | 'New' | 'Brewing' | 'Ready' | 'Completed'>('All');
+  const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
+  const [selectedFilter, setSelectedFilter] = useState<'All' | 'Today' | 'New' | 'Brewing' | 'Ready' | 'Completed'>('All');
   const [activeMenuOrderId, setActiveMenuOrderId] = useState<string | null>(null);
 
   const orderList = orders || [];
@@ -29,11 +32,18 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
   const brewingCount = orderList.filter((o) => o && (o.status === 'Brewing' || o.status === 'Preparing')).length;
   const readyCount = orderList.filter((o) => o && o.status === 'Ready').length;
   const completedCount = orderList.filter((o) => o && o.status === 'Completed').length;
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+  const todayCount = orderList.filter((o) => o && o.timestamp >= todayStart.getTime() && o.timestamp <= todayEnd.getTime()).length;
   const allActiveCount = orderList.filter((o) => o && o.status !== 'Completed').length;
 
   const filteredOrders = orderList.filter((order) => {
     if (!order) return false;
     if (selectedFilter === 'All') return order.status !== 'Completed';
+    if (selectedFilter === 'Today') return order.timestamp >= todayStart.getTime() && order.timestamp <= todayEnd.getTime();
     if (selectedFilter === 'New') return order.status === 'New';
     if (selectedFilter === 'Brewing') return order.status === 'Brewing' || order.status === 'Preparing';
     if (selectedFilter === 'Ready') return order.status === 'Ready';
@@ -64,8 +74,27 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
     onShowNotification(`Sent SMS reminder to ${order.customerName} (${order.customerPhone || 'customer'})! 📱`);
   };
 
+  const handleResetOrders = async () => {
+    if (!isSuperAdmin) return;
+    const confirmed = window.confirm(
+      'RESET ALL ORDERS? This permanently deletes every current and previous transaction from the Orders tab. This does not change menu, inventory, customers, or rewards.'
+    );
+    if (!confirmed) return;
+
+    try {
+      const { orderResetService } = await import('../services/orderResetService');
+      const deletedOrders = await orderResetService.resetAllOrders();
+      setSelectedFilter('All');
+      if (onRefreshOrders) await onRefreshOrders();
+      onShowNotification(`Orders reset successfully. ${deletedOrders} transaction(s) deleted.`);
+    } catch (error) {
+      console.error('[ActiveOrdersView] Failed to reset orders:', error);
+      onShowNotification('Unable to reset orders. No records were deleted.');
+    }
+  };
+
   return (
-    <div className="pt-20 px-3.5 sm:px-5 max-w-lg mx-auto pb-28">
+    <div className="pt-20 pb-28 px-3.5 sm:px-5 w-full max-w-[1400px] mx-auto">
       {/* Sub-header & Filter Tabs */}
       <section className="mb-4">
         <div className="flex justify-between items-center mb-1">
@@ -86,6 +115,17 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
                 </span>
               </button>
             )}
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={handleResetOrders}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold bg-[#ffdad6] text-[#93000a] border border-[#f2b8b5] hover:bg-[#ffc9c4] active:scale-95 transition-all whitespace-nowrap"
+                title="Reset all orders"
+              >
+                <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                Reset Orders
+              </button>
+            )}
             <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold px-2.5 py-1 bg-[#e1e1c9] text-[#636451] rounded-full whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               Live Server
@@ -104,6 +144,16 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
             }`}
           >
             All ({allActiveCount})
+          </button>
+          <button
+            onClick={() => setSelectedFilter('Today')}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 ${
+              selectedFilter === 'Today'
+                ? 'bg-[#3d2b1f] text-[#ac9181] shadow-sm font-bold'
+                : 'bg-[#f3ecea] text-[#4f453f] border border-[#d2c4bc] hover:bg-[#e8e1df]'
+            }`}
+          >
+            Today ({todayCount})
           </button>
           <button
             onClick={() => setSelectedFilter('New')}

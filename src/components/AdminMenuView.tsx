@@ -194,6 +194,28 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   // Category list combined with 'All'
   const filterCategoriesList = ['All', ...categories];
 
+  const getCategoryProductCount = (category: string) =>
+    category === 'All' ? menuItems.length : menuItems.filter((item) => item.category === category).length;
+
+  const handleEditMenuCategory = (category: string) => {
+    if (!isSuperAdmin || !onSaveCategory) return;
+    const nextName = window.prompt(`Edit category "${category}"`, category)?.trim();
+    if (!nextName || nextName === category) return;
+    onSaveCategory(nextName, category);
+    if (selectedCategory === category) setSelectedCategory(nextName);
+  };
+
+  const handleDeleteMenuCategory = (category: string) => {
+    if (!isSuperAdmin || !onDeleteCategory) return;
+    const productCount = getCategoryProductCount(category);
+    const message = productCount > 0
+      ? `Delete category "${category}"? ${productCount} product(s) will be moved to another category.`
+      : `Delete category "${category}"?`;
+    if (!window.confirm(message)) return;
+    onDeleteCategory(category);
+    if (selectedCategory === category) setSelectedCategory('All');
+  };
+
   // Quick Add category from Menu Bar
   const handleQuickAddCategorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,7 +299,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
   };
 
   return (
-    <div className="pb-28 pt-20 px-3 sm:px-4 max-w-5xl mx-auto space-y-4">
+    <div className="pb-28 pt-20 px-3 sm:px-4 w-full max-w-[1400px] mx-auto space-y-4">
       {/* Top Admin Banner */}
       <div className="bg-[#26170c] text-[#f9f2f0] p-3.5 sm:p-5 rounded-2xl shadow-md border border-[#3d2b1f] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
@@ -476,21 +498,68 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                 </form>
               )}
 
-              {/* Category Pills Bar */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-                {filterCategoriesList.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 ${
-                      selectedCategory === cat
-                        ? 'bg-[#26170c] text-white shadow-xs'
-                        : 'bg-white text-[#4f453f] border border-[#d2c4bc] hover:bg-[#f3ecea]'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+              {/* Category Pills Bar - wraps on narrow screens so every category remains reachable */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-1 max-w-full">
+                {filterCategoriesList.map((cat) => {
+                  const count = getCategoryProductCount(cat);
+                  const isAll = cat === 'All';
+                  return (
+                    <div
+                      key={cat}
+                      className={`inline-flex items-center rounded-full border transition-all ${
+                        selectedCategory === cat
+                          ? 'bg-[#26170c] border-[#26170c] text-white shadow-xs'
+                          : 'bg-white border-[#d2c4bc] text-[#4f453f]'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className="px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+                        title={`Show ${count} product${count === 1 ? '' : 's'} in ${cat}`}
+                      >
+                        {cat} <span className={selectedCategory === cat ? 'opacity-80' : 'text-[#81756e]'}>({count})</span>
+                      </button>
+
+                      {isSuperAdmin && !isAll && (
+                        <div className="flex items-center pr-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditMenuCategory(cat);
+                            }}
+                            className={`p-1 rounded-full transition-colors cursor-pointer ${
+                              selectedCategory === cat
+                                ? 'text-[#e1e1c9] hover:bg-white/10'
+                                : 'text-[#81756e] hover:text-[#26170c] hover:bg-[#f3ecea]'
+                            }`}
+                            title={`Edit ${cat}`}
+                            aria-label={`Edit ${cat} category`}
+                          >
+                            <span className="material-symbols-outlined text-[15px]">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMenuCategory(cat);
+                            }}
+                            className={`p-1 rounded-full transition-colors cursor-pointer ${
+                              selectedCategory === cat
+                                ? 'text-[#ffb4ab] hover:bg-white/10'
+                                : 'text-[#ba1a1a] hover:bg-[#ffdad6]'
+                            }`}
+                            title={`Delete ${cat}`}
+                            aria-label={`Delete ${cat} category`}
+                          >
+                            <span className="material-symbols-outlined text-[15px]">delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
