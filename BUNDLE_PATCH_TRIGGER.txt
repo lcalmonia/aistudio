@@ -1,0 +1,1 @@
+Temporary trigger for the customer bundle customization patch. This file should be removed by the patch workflow.
