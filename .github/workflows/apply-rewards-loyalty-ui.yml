@@ -1,0 +1,39 @@
+name: Apply rewards loyalty UI patch
+on:
+  push:
+    branches: [rewards-loyalty-configurable]
+    paths: ['.github/workflows/apply-rewards-loyalty-ui.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            let app = fs.readFileSync('src/App.tsx','utf8');
+            const oldRewards = /    \/\/ Update customer stamps and points via loyaltyService[\s\S]*?    showNotification\(`🎉 Order #\$\{created\.orderNumber\} placed successfully! Barista notified\.\`\);/;
+            if (!oldRewards.test(app)) throw new Error('Could not locate App loyalty block');
+            app = app.replace(oldRewards, "    const rewardResult = await loyaltyService.awardOrderRewards(currentCustomer.id, created);\n    if (rewardResult.qualified) {\n      showNotification(`🎉 Order #${created.orderNumber} placed successfully! ${rewardResult.reason}`);\n    } else {\n      showNotification(`🎉 Order #${created.orderNumber} placed successfully!`);\n    }");
+            app = app.replace('<RewardsView onShowNotification={showNotification} />','<RewardsView onShowNotification={showNotification} menuItems={menuItems} admin={adminPrincipal} />');
+            fs.writeFileSync('src/App.tsx',app);
+
+            let portal = fs.readFileSync('src/components/customer/CustomerOrderPortal.tsx','utf8');
+            portal = portal.replace("import { customerService } from '../../services/customerService';", "import { customerService } from '../../services/customerService';\nimport { loyaltyConfigService } from '../../services/loyaltyConfigService';\nimport { LoyaltyPerk, LoyaltySettings } from '../../types';");
+            portal = portal.replace("  const [isChangingPassword, setIsChangingPassword] = useState(false);", "  const [isChangingPassword, setIsChangingPassword] = useState(false);\n  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings | null>(null);\n  const [loyaltyPerks, setLoyaltyPerks] = useState<LoyaltyPerk[]>([]);\n  const [redeemingPerkId, setRedeemingPerkId] = useState<string | null>(null);\n\n  useEffect(() => {\n    loyaltyConfigService.get().then((data) => { setLoyaltySettings(data.settings); setLoyaltyPerks((data.perks || []).filter((p) => p.active)); }).catch(() => {});\n  }, []);");
+            portal = portal.replace("  // Stamp card calculation (10 stamps per reward)\n  const currentStamps = currentCustomer.stamps || 0;\n  const stampsArray = Array.from({ length: 10 }, (_, i) => i < currentStamps);", "  const currentStamps = currentCustomer.stamps || 0;\n  const stampCycle = loyaltySettings?.stampCycle || 10;\n  const stampsArray = Array.from({ length: stampCycle }, (_, i) => i < currentStamps);\n\n  const handleRedeemPerk = async (perk: LoyaltyPerk) => {\n    setRedeemingPerkId(perk.id);\n    try {\n      const result = perk.redemptionType === 'points'\n        ? await import('../../services/loyaltyService').then(({ loyaltyService }) => loyaltyService.redeemPoints(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`))\n        : await import('../../services/loyaltyService').then(({ loyaltyService }) => loyaltyService.redeemStamps(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`));\n      if (!result.success) { window.alert(result.error || 'Unable to redeem this perk.'); return; }\n      const refreshed = await customerService.getCustomer(currentCustomer.id);\n      if (refreshed) { window.location.reload(); }\n    } finally { setRedeemingPerkId(null); }\n  };");
+            const rewardMarker = /            \{\/\* Redeemable Perks \*\/\}[\s\S]*?            \<\/div\>\n          \)\}/;
+            if (!rewardMarker.test(portal)) throw new Error('Could not locate customer perk section');
+            const newPerks = `            {/* Redeemable Perks */}\n            <div>\n              <h3 className="font-serif text-lg font-bold text-[#26170c] mb-3">Available VIP Perks</h3>\n              {loyaltyPerks.length === 0 ? (\n                <div className="p-4 bg-white rounded-2xl border border-[#f3ecea] text-xs text-[#81756e]">No active perks are available right now.</div>\n              ) : (\n                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">\n                  {loyaltyPerks.map((perk) => {\n                    const balance = perk.redemptionType === 'points' ? (currentCustomer.points || 0) : currentStamps;\n                    const canRedeem = balance >= perk.redemptionCost;\n                    const rewardName = perk.rewardSource === 'menu' ? (menuItems.find((item) => item.id === perk.menuItemId)?.name || 'Menu Product') : (perk.customItemName || 'Custom Item');\n                    return (\n                      <div key={perk.id} className="p-4 bg-white rounded-2xl border border-[#f3ecea] shadow-xs flex items-center justify-between gap-3">\n                        <div className="min-w-0">\n                          <h4 className="font-serif text-sm font-bold text-[#26170c]">{perk.name}</h4>\n                          <p className="text-[11px] text-[#81756e]">{perk.description || rewardName}</p>\n                          <span className="text-[10px] font-bold text-[#5e604d]">{perk.redemptionCost} {perk.redemptionType}</span>\n                        </div>\n                        <button onClick={() => handleRedeemPerk(perk)} disabled={!canRedeem || redeemingPerkId === perk.id} className={`px-3 py-1.5 text-[11px] font-bold rounded-xl whitespace-nowrap ${canRedeem ? 'bg-[#5e604d] text-white' : 'bg-[#e8e1df] text-[#81756e]'}`}>{redeemingPerkId === perk.id ? 'Redeeming…' : 'Redeem'}</button>\n                      </div>\n                    );\n                  })}\n                </div>\n              )}\n            </div>\n          )}`;
+            portal = portal.replace(rewardMarker, newPerks);
+            portal = portal.replace('You have <strong>{currentStamps} of 10 stamps</strong>. Only {10 - currentStamps} more orders until your free reward!', 'You have <strong>{currentStamps} of {stampCycle} stamps</strong>. Only {Math.max(0, stampCycle - currentStamps)} more qualifying orders until your free reward!');
+            portal = portal.replace(/Array\.from\(\{ length: 10 \}/g, 'Array.from({ length: stampCycle }');
+            fs.writeFileSync('src/components/customer/CustomerOrderPortal.tsx',portal);
+
+            fs.unlinkSync('.github/workflows/apply-rewards-loyalty-ui.yml');
+            execSync('git config user.name "github-actions[bot]" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com" && git add . && git commit -m "feat: connect configurable loyalty rules to customer orders" && git push');
