@@ -12,6 +12,8 @@ import {
 import { CustomerProductModal } from './CustomerProductModal';
 import { orderService } from '../../services/orderService';
 import { customerService } from '../../services/customerService';
+import { loyaltyConfigService } from '../../services/loyaltyConfigService';
+import { LoyaltyPerk, LoyaltySettings } from '../../types';
 import { CustomerCartDrawer } from './CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';
 
@@ -99,6 +101,9 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordChangeMessage, setPasswordChangeMessage] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings | null>(null);
+  const [loyaltyPerks, setLoyaltyPerks] = useState<LoyaltyPerk[]>([]);
+  useEffect(() => { loyaltyConfigService.get().then((data) => { setLoyaltySettings(data.settings); setLoyaltyPerks((data.perks || []).filter((p) => p.active)); }).catch(() => {}); }, []);
 
   // Filter available items
   const availableItems = useMemo(() => {
@@ -321,9 +326,10 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
     }
   };
 
-  // Stamp card calculation (10 stamps per reward)
   const currentStamps = currentCustomer.stamps || 0;
-  const stampsArray = Array.from({ length: 10 }, (_, i) => i < currentStamps);
+  const stampCycle = loyaltySettings?.stampCycle || 10;
+  const stampsArray = Array.from({ length: stampCycle }, (_, i) => i < currentStamps);
+  const handleRedeemPerk = async (perk: LoyaltyPerk) => { const { loyaltyService } = await import('../../services/loyaltyService'); const result = perk.redemptionType === 'points' ? await loyaltyService.redeemPoints(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`) : await loyaltyService.redeemStamps(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`); if (!result.success) { window.alert(result.error || 'Unable to redeem this perk.'); return; } window.location.reload(); };
 
   return (
     <div className="min-h-screen bg-[#fff8f5] text-[#1d1b1a] flex flex-col font-sans pb-24 selection:bg-[#fbddca] selection:text-[#26170c] w-full max-w-full overflow-x-hidden">
@@ -926,38 +932,16 @@ export const CustomerOrderPortal: React.FC<CustomerOrderPortalProps> = ({
               </div>
 
               <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl sm:rounded-2xl text-center text-[11px] sm:text-xs text-[#dec1af]">
-                🎉 You have <strong>{currentStamps} of 10 stamps</strong>. Only {10 - currentStamps} more orders until your free reward!
+                🎉 You have <strong>{currentStamps} of {stampCycle} stamps</strong>. Only {Math.max(0, stampCycle - currentStamps)} more qualifying orders until your free reward!
               </div>
             </div>
 
             {/* Redeemable Perks */}
             <div>
               <h3 className="font-serif text-lg font-bold text-[#26170c] mb-3">Available VIP Perks</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="p-4 bg-white rounded-2xl border border-[#f3ecea] shadow-xs flex items-center justify-between">
-                  <div>
-                    <h4 className="font-serif text-sm font-bold text-[#26170c]">Free Espresso Upsize</h4>
-                    <p className="text-[11px] text-[#81756e]">Upgrade 16oz to 22oz for free</p>
-                  </div>
-                  <span className="px-3 py-1 bg-[#e1e1c9] text-[#636451] text-xs font-bold rounded-xl">
-                    Active
-                  </span>
-                </div>
-
-                <div className="p-4 bg-white rounded-2xl border border-[#f3ecea] shadow-xs flex items-center justify-between">
-                  <div>
-                    <h4 className="font-serif text-sm font-bold text-[#26170c]">Birthday Freebie Slice</h4>
-                    <p className="text-[11px] text-[#81756e]">Complimentary cake slice on your birthday month</p>
-                  </div>
-                  <span className="px-3 py-1 bg-[#fbddca] text-[#26170c] text-xs font-bold rounded-xl">
-                    Unlocked
-                  </span>
-                </div>
-              </div>
+              {loyaltyPerks.length === 0 ? <div className="p-4 bg-white rounded-2xl border border-[#f3ecea] text-xs text-[#81756e]">No active perks are available right now.</div> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">{loyaltyPerks.map((perk) => { const balance = perk.redemptionType === 'points' ? (currentCustomer.points || 0) : currentStamps; const canRedeem = balance >= perk.redemptionCost; const rewardName = perk.rewardSource === 'menu' ? (menuItems.find((item) => item.id === perk.menuItemId)?.name || 'Menu Product') : (perk.customItemName || 'Custom Item'); return <div key={perk.id} className="p-4 bg-white rounded-2xl border border-[#f3ecea] shadow-xs flex items-center justify-between gap-3"><div className="min-w-0"><h4 className="font-serif text-sm font-bold text-[#26170c]">{perk.name}</h4><p className="text-[11px] text-[#81756e]">{perk.description || rewardName}</p><span className="text-[10px] font-bold text-[#5e604d]">{perk.redemptionCost} {perk.redemptionType}</span></div><button onClick={() => handleRedeemPerk(perk)} disabled={!canRedeem} className="px-3 py-1.5 text-[11px] font-bold rounded-xl whitespace-nowrap bg-[#5e604d] text-white disabled:bg-[#e8e1df] disabled:text-[#81756e]">{canRedeem ? 'Redeem' : 'Not enough'}</button></div>; })}</div>}
             </div>
           </div>
-        )}
-
         {/* TAB 4: PROFILE & ADDRESS VIEW */}
         {activeTab === 'profile' && (
           <div className="max-w-xl mx-auto bg-white rounded-3xl border border-[#dec1af]/60 p-6 sm:p-8 shadow-sm space-y-5">
