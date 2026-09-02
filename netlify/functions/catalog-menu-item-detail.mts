@@ -25,6 +25,7 @@ export default async function handler(request: Request, context: Context): Promi
       const body = await readJsonObject(request);
 
       if (body.toggleAvailability === true) {
+        requireSuperAdmin(admin);
         const menuItem = await toggleMenuItemAvailabilityInDatabase(menuItemId);
         return json({ menuItem, message: 'Availability updated.' });
       }
