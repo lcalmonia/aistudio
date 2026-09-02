@@ -444,13 +444,15 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                 <span className="text-[11px] font-bold text-[#81756e] uppercase tracking-wider">
                   Category ({categories.length}):
                 </span>
-                <button
-                  onClick={() => setIsQuickAddCategoryOpen(!isQuickAddCategoryOpen)}
-                  className="text-[11px] font-bold text-[#5e604d] hover:text-[#26170c] flex items-center gap-1 hover:underline cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[14px]">add_circle</span>
-                  + Add Category
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setIsQuickAddCategoryOpen(!isQuickAddCategoryOpen)}
+                    className="text-[11px] font-bold text-[#5e604d] hover:text-[#26170c] flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                    + Add Category
+                  </button>
+                )}
               </div>
 
               {/* Quick Inline Add Category Input */}
@@ -792,12 +794,14 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               <p className="text-xs text-[#4f453f] max-w-sm mx-auto">
                 No menu items match your search or filter settings. Try adjusting your filters or click below to add a new product.
               </p>
-              <button
-                onClick={handleAddProduct}
-                className="mt-2 px-4 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f]"
-              >
-                + Add New Product
-              </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={handleAddProduct}
+                  className="mt-2 px-4 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f]"
+                >
+                  + Add New Product
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -938,7 +942,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] text-[#81756e]">lock</span>
                 <span>
-                  <strong>Admin Mode:</strong> Modifier groups, options, and pricing configurations can only be created or modified by Super Admin. Availability toggles remain active.
+                  <strong>Admin Mode:</strong> Menu products, modifier groups, modifier options, pricing, categories, and availability settings are read-only. Only Super Admin can modify them.
                 </span>
               </div>
               <span className="text-[10px] font-bold bg-[#e8e1df] px-2 py-0.5 rounded uppercase tracking-wider text-[#636451]">
@@ -1299,19 +1303,21 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                             </div>
 
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              {/* Toggle Availability / Stock: accessible to ALL authenticated staff/admins */}
-                              <button
-                                type="button"
-                                onClick={() => onToggleAddonStock(addon.id)}
-                                title={addon.available ? 'In Stock (Click to toggle)' : 'Out of Stock (Click to toggle)'}
-                                className={`p-1 rounded-md text-xs font-bold cursor-pointer ${
-                                  addon.available ? 'text-[#636451] hover:bg-[#e1e1c9]' : 'text-[#ba1a1a] hover:bg-[#ffdad6]'
-                                }`}
-                              >
-                                <span className="material-symbols-outlined text-[18px]">
-                                  {addon.available ? 'toggle_on' : 'toggle_off'}
-                                </span>
-                              </button>
+                              {/* Modifier availability is configuration: SUPER_ADMIN only. Admin users have read-only access. */}
+                              {isSuperAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => onToggleAddonStock(addon.id)}
+                                  title={addon.available ? 'In Stock (Click to toggle)' : 'Out of Stock (Click to toggle)'}
+                                  className={`p-1 rounded-md text-xs font-bold cursor-pointer ${
+                                    addon.available ? 'text-[#636451] hover:bg-[#e1e1c9]' : 'text-[#ba1a1a] hover:bg-[#ffdad6]'
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">
+                                    {addon.available ? 'toggle_on' : 'toggle_off'}
+                                  </span>
+                                </button>
+                              )}
 
                               {/* Edit / Delete only accessible to SUPER_ADMIN */}
                               {isSuperAdmin && (
@@ -1575,13 +1581,15 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                 <p className="text-[11px] text-[#81756e]">
                   Preview renders accurately across POS, Barista iPad KDS, and mobile guest menu.
                 </p>
-                <button
-                  onClick={() => handleEditProduct(previewProduct)}
-                  className="px-3 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-lg hover:bg-[#3d2b1f] flex items-center gap-1 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit</span>
-                  Edit This Item
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => handleEditProduct(previewProduct)}
+                    className="px-3 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-lg hover:bg-[#3d2b1f] flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Edit This Item
+                  </button>
+                )}
               </div>
             </div>
           </div>
