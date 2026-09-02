@@ -112,7 +112,7 @@ export interface PromoBundle {
 export interface MenuItem {
   id: string;
   name: string;
-  category: string; // Dynamic cafe category: Coffee, Non-Coffee, Pastries, Pasta, Rice Meals, etc.
+  category: string;
   price: number;
   image: string;
   description: string;
@@ -121,8 +121,8 @@ export interface MenuItem {
   available: boolean;
   temperature: ProductTemperature;
   sizes?: ProductSize[];
-  addons?: string[]; // IDs of applicable add-ons
-  modifierCategoryIds?: string[]; // IDs of enabled modifier categories for this product
+  addons?: string[];
+  modifierCategoryIds?: string[];
   allergens?: string[];
   calories?: number;
   createdAt?: string;
@@ -142,7 +142,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   orderNumber: string;
-  customerId?: string; // Stable customer ID
+  customerId?: string;
   customerName: string;
   customerEmail?: string;
   timeAgo: string;
@@ -168,7 +168,7 @@ export interface Order {
 }
 
 export interface CustomerUser {
-  id: string; // e.g. "cust_8f293b"
+  id: string;
   name: string;
   email: string;
   mobile: string;
@@ -242,6 +242,34 @@ export interface LoyaltyTransaction {
   reason: string;
   timestamp: number;
   createdAt: string;
+}
+
+export interface LoyaltySettings {
+  welcomeEnabled: boolean;
+  welcomeStamps: number;
+  welcomePoints: number;
+  stampMinimumPurchase: number;
+  stampsPerQualifyingOrder: number;
+  pointsMinimumPurchase: number;
+  pointsMode: 'fixed' | 'ratio';
+  fixedPoints: number;
+  pointsPerCurrency: number;
+  currencyUnit: number;
+  stampCycle: number;
+}
+
+export interface LoyaltyPerk {
+  id: string;
+  name: string;
+  description: string;
+  rewardSource: 'menu' | 'custom';
+  menuItemId?: string;
+  customItemName?: string;
+  redemptionType: 'stamps' | 'points';
+  redemptionCost: number;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface StoreSettings {
