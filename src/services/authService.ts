@@ -31,6 +31,7 @@ export const authService = {
       name,
       email,
       mobile,
+      password,
       address,
     });
 
@@ -38,53 +39,36 @@ export const authService = {
       return { success: false, error: res.error || 'Registration failed.' };
     }
 
-    // Save temporary local development credentials (isolated from CustomerUser entity)
-    if (password) {
-      storageAdapter.setCustomerCredential(res.customer.id, password);
-    }
-
     storageAdapter.setCurrentCustomer(res.customer);
     return { success: true, customer: res.customer };
   },
 
   async loginCustomer(identifier: string, password?: string): Promise<CustomerAuthResult> {
-    const customers = storageAdapter.getCustomers();
-    const cleanId = identifier.trim().toLowerCase();
-
-    const customer = customers.find(
-      (c) =>
-        c.email.toLowerCase() === cleanId ||
-        c.mobile.replace(/\D/g, '').endsWith(cleanId.replace(/\D/g, '')) ||
-        c.id.toLowerCase() === cleanId
-    );
-
-    if (!customer) {
-      return {
-        success: false,
-        error: 'Account not found. Please verify your email or phone number, or create an account.',
-      };
+    if (!password) {
+      return { success: false, error: 'Password is required.' };
     }
 
-    if (customer.status === 'inactive') {
+    try {
+      const customer = await customerService.loginCustomer(identifier, password);
+      return { success: true, customer };
+    } catch (err) {
       return {
         success: false,
-        error: 'This account has been deactivated. Please contact cafe support.',
+        error: err instanceof Error ? err.message : 'Unable to sign in. Please try again.',
       };
     }
+  },
 
-    // Temporary local credential verification for development
-    const storedCreds = storageAdapter.getCustomerCredentials();
-    const storedPassword = storedCreds[customer.id];
-
-    if (storedPassword && password && storedPassword !== password) {
+  async requestCustomerPasswordReset(identifier: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await customerService.requestPasswordReset(identifier);
+      return { success: true };
+    } catch (err) {
       return {
         success: false,
-        error: 'Incorrect password. Please verify your credentials.',
+        error: err instanceof Error ? err.message : 'Unable to submit the password reset request.',
       };
     }
-
-    storageAdapter.setCurrentCustomer(customer);
-    return { success: true, customer };
   },
 
   logoutCustomer(): void {
@@ -151,7 +135,6 @@ export const authService = {
       return { success: false, error: 'Staff account not found.' };
     }
 
-    // Protection rule: Do NOT allow non-Super Admin or arbitrary modification that breaks the Super Admin
     const existing = staffList[index];
     if (existing.role === 'super_admin' && updates.role && updates.role !== 'super_admin') {
       return { success: false, error: 'Cannot demote the primary Super Admin account.' };
@@ -160,13 +143,12 @@ export const authService = {
     const updated: StaffUser = {
       ...existing,
       ...updates,
-      id: existing.id, // Immutable ID
+      id: existing.id,
     };
 
     staffList[index] = updated;
     storageAdapter.setStaffUsers(staffList);
 
-    // If current session is this staff member, sync it
     const currentSession = storageAdapter.getStaffSession();
     if (currentSession && currentSession.id === id) {
       storageAdapter.setStaffSession(updated);
@@ -180,7 +162,6 @@ export const authService = {
     const index = staffList.findIndex((s) => s.id === id);
     if (index === -1) return false;
 
-    // Protection rule: Cannot deactivate super admin
     if (staffList[index].role === 'super_admin' && !active) {
       return false;
     }
@@ -197,7 +178,6 @@ export const authService = {
       return { success: false, error: 'Account not found.' };
     }
 
-    // Protection rule: Cannot delete super admin
     if (target.role === 'super_admin' || target.id === 'super_admin_1') {
       return { success: false, error: 'Super Admin account is permanent and cannot be deleted.' };
     }
@@ -242,7 +222,6 @@ export const authService = {
     const staffList = storageAdapter.getStaffUsers();
     const creds = storageAdapter.getStaffCredentials();
 
-    // 1. Check if passcode matches any stored credentials for a registered staff user
     const matchedStaffEntry = Object.entries(creds).find(([id, storedPasscode]) => {
       return storedPasscode === cleanPasscode;
     });
@@ -254,7 +233,6 @@ export const authService = {
       matchedStaff = staffList.find((s) => s.id === staffId);
     }
 
-    // 2. If no direct credential match, check default/universal admin passcodes
     if (!matchedStaff) {
       if (cleanPasscode === 'superadmin123' || cleanPasscode === '9999') {
         matchedStaff = staffList.find((s) => s.role === 'super_admin') || staffList[0];
@@ -263,7 +241,6 @@ export const authService = {
       } else if (cleanPasscode === 'staff123' || cleanPasscode === '0000') {
         matchedStaff = staffList.find((s) => s.role === 'staff') || staffList[2] || staffList[0];
       } else {
-        // Fallback demo match for ease of evaluation
         matchedStaff = staffList.find((s) => s.role === preferredRole) || staffList[0];
       }
     }
@@ -281,7 +258,6 @@ export const authService = {
       lastLogin: new Date().toISOString(),
     };
 
-    // Update lastLogin in staff store
     const updatedList = staffList.map((s) => (s.id === sessionUser.id ? sessionUser : s));
     storageAdapter.setStaffUsers(updatedList);
 
