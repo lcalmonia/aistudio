@@ -1,0 +1,125 @@
+name: Apply Customer Cancellation Portal Patch
+
+on:
+  push:
+    branches:
+      - customer-delete-pending-orders
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    if: github.event.head_commit.message != 'chore: apply customer cancellation portal patch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply targeted portal patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path('src/components/customer/CustomerOrderPortal.tsx')
+          text = p.read_text(encoding='utf-8')
+
+          if "import { orderService } from '../../services/orderService';" not in text:
+              text = text.replace(
+                  "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';",
+                  "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';\nimport { orderService } from '../../services/orderService';",
+                  1,
+              )
+
+          if 'cancelledOrders' not in text:
+              needle = "  const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);"
+              if needle not in text:
+                  raise SystemExit('Could not find activeTrackingOrder state')
+              text = text.replace(needle, needle + "\n  const [cancelledOrders, setCancelledOrders] = useState<Record<string, Order>>({});\n  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);", 1)
+
+          if 'cancelledOrders[o.id] || o' not in text:
+              pattern = re.compile(r"    return orders\.filter\(\s*\(o\) =>\s*o &&\s*\(o\.customerId === currentCustomer\.id \|\|\s*\(customerEmail && o\.customerEmail && o\.customerEmail\.toLowerCase\(\) === customerEmail\) \|\|\s*\(customerName && o\.customerName && o\.customerName\.toLowerCase\(\) === customerName\)\)\s*\);\s*\}, \[orders, currentCustomer\]\);", re.S)
+              replacement = """    return orders
+      .map((o) => cancelledOrders[o.id] || o)
+      .filter(
+        (o) =>
+          o &&
+          (o.customerId === currentCustomer.id ||
+            (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||
+            (customerName && o.customerName && o.customerName.toLowerCase() === customerName))
+      );
+  }, [orders, currentCustomer, cancelledOrders]);"""
+              text, count = pattern.subn(replacement, text, count=1)
+              if count != 1:
+                  raise SystemExit(f'Could not patch myOrders block; matches={count}')
+
+          if 'const handleCancelOrder = async' not in text:
+              needle = "  const handleSaveProfile = (e: React.FormEvent) => {"
+              if needle not in text:
+                  raise SystemExit('Could not find handleSaveProfile')
+              handler = """  const handleCancelOrder = async (order: Order) => {
+    if (order.status !== 'New') return;
+    const confirmed = window.confirm(
+      `Cancel order #${order.orderNumber}?\\n\\nThis can only be cancelled while the order is still New.`
+    );
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const cancelled = await orderService.cancelCustomerOrder(
+        order.id,
+        currentCustomer.id,
+        currentCustomer.email
+      );
+      if (cancelled) {
+        setCancelledOrders((prev) => ({ ...prev, [cancelled.id]: cancelled }));
+        setActiveTrackingOrder(cancelled);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to cancel the order.';
+      window.alert(message);
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+"""
+              text = text.replace(needle, handler + needle, 1)
+
+          if "cancellingOrderId === ord.id" not in text:
+              text = text.replace(
+                  '<div className="flex justify-between items-center pt-1">',
+                  '<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-1">',
+                  1,
+              )
+              track_pattern = re.compile(r"(\s*)<button\s+onClick=\{\(\) => \{\s*setActiveTrackingOrder\(ord\);\s*setIsSuccessModalOpen\(true\);\s*\}\}\s+className=\"px-3\.5 py-1\.5 bg-\[#26170c\].*?</button>", re.S)
+              match = track_pattern.search(text)
+              if not match:
+                  raise SystemExit('Could not find Track Order button')
+              indent = match.group(1)
+              old_button = match.group(0).strip()
+              new_block = f'''<div className="flex items-center gap-2 self-end sm:self-auto">
+                          {{ord.status === 'New' && (
+                            <button
+                              type="button"
+                              onClick={{() => handleCancelOrder(ord)}}
+                              disabled={{cancellingOrderId === ord.id}}
+                              className="px-3.5 py-1.5 bg-[#ffdad6] text-[#93000a] text-xs font-bold rounded-xl border border-[#ffb4ab] hover:bg-[#ffb4ab] disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">{{cancellingOrderId === ord.id ? 'hourglass_top' : 'cancel'}}</span>
+                              <span>{{cancellingOrderId === ord.id ? 'Cancelling...' : 'Cancel Order'}}</span>
+                            </button>
+                          )}}
+                          {old_button}
+                        </div>'''
+              text = text[:match.start()] + new_block + text[match.end():]
+
+          p.write_text(text, encoding='utf-8')
+
+      - name: Remove patch workflow and commit
+        run: |
+          rm -f .github/workflows/apply-customer-cancel-portal.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/customer/CustomerOrderPortal.tsx .github/workflows/apply-customer-cancel-portal.yml
+          git commit -m "chore: apply customer cancellation portal patch"
+          git push
