@@ -547,23 +547,12 @@ export default function App() {
     setOrders((prev) => [created, ...prev.filter((o) => o.id !== created.id)]);
     setLastCustomerOrder(created);
 
-    // Update customer stamps and points via loyaltyService
-    if (currentCustomer) {
-      const rewardCalc = loyaltyService.calculateOrderRewards(
-        created.total,
-        currentCustomer.stamps || 0,
-        currentCustomer.points || 0
-      );
-      await loyaltyService.addStamp(currentCustomer.id);
-      await loyaltyService.addPoints(currentCustomer.id, rewardCalc.earnedPoints);
-      const updatedCust = await customerService.getCustomer(currentCustomer.id);
-      if (updatedCust) {
-        setCurrentCustomer(updatedCust);
-        setCustomers(await customerService.listCustomers());
-      }
+    const rewardResult = await loyaltyService.awardOrderRewards(currentCustomer.id, created);
+    if (rewardResult.qualified) {
+      showNotification(`🎉 Order #${created.orderNumber} placed successfully! ${rewardResult.reason}`);
+    } else {
+      showNotification(`🎉 Order #${created.orderNumber} placed successfully!`);
     }
-
-    showNotification(`🎉 Order #${created.orderNumber} placed successfully! Barista notified.`);
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -1174,7 +1163,7 @@ const handleDeleteInventoryCategory = async (category: string) => {
 
             {/* Rewards View */}
             {currentTab === 'rewards' && (
-              <RewardsView onShowNotification={showNotification} />
+              <RewardsView onShowNotification={showNotification} menuItems={menuItems} admin={adminPrincipal} />
             )}
 
             {/* Profile View */}
