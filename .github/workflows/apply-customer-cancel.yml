@@ -1,0 +1,134 @@
+name: Apply Customer Cancellation UI Patch
+
+on:
+  push:
+    branches:
+      - customer-delete-pending-orders
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'chore: apply customer cancellation UI patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply targeted patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path('src/components/customer/CustomerOrderPortal.tsx')
+          text = p.read_text(encoding='utf-8')
+
+          if "from '../../services/orderService'" not in text:
+              marker = "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';"
+              assert marker in text, 'CustomerOrderSuccessModal import not found'
+              text = text.replace(marker, marker + "\nimport { orderService } from '../../services/orderService';", 1)
+
+          if 'cancelledOrders' not in text:
+              marker = "  const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);"
+              assert marker in text, 'activeTrackingOrder state not found'
+              text = text.replace(marker, marker + "\n  const [cancelledOrders, setCancelledOrders] = useState<Record<string, Order>>({});\n  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);", 1)
+
+          if 'cancelledOrders[o.id] || o' not in text:
+              pattern = r"    return orders\.filter\(\n      \(o\) =>\n        o &&\n        \(o\.customerId === currentCustomer\.id \|\|\n          \(customerEmail && o\.customerEmail && o\.customerEmail\.toLowerCase\(\) === customerEmail\) \|\|\n          \(customerName && o\.customerName && o\.customerName\.toLowerCase\(\) === customerName\)\)\n    \);\n  \}, \[orders, currentCustomer\]\);"
+              replacement = "    return orders\n      .map((o) => cancelledOrders[o.id] || o)\n      .filter(\n        (o) =>\n          o &&\n          (o.customerId === currentCustomer.id ||\n            (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||\n            (customerName && o.customerName && o.customerName.toLowerCase() === customerName))\n      );\n  }, [orders, currentCustomer, cancelledOrders]);"
+              text, n = re.subn(pattern, replacement, text, count=1)
+              assert n == 1, 'Customer order filter pattern not found'
+
+          if 'const handleCancelOrder = async' not in text:
+              marker = "  const handleSaveProfile = (e: React.FormEvent) => {"
+              assert marker in text, 'handleSaveProfile not found'
+              handler = '''  const handleCancelOrder = async (order: Order) => {
+    if (order.status !== 'New') return;
+    const confirmed = window.confirm(
+      `Cancel order #${order.orderNumber}?\\n\\nThis can only be cancelled while the order is still New.`
+    );
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const cancelled = await orderService.cancelCustomerOrder(
+        order.id,
+        currentCustomer.id,
+        currentCustomer.email
+      );
+      if (cancelled) {
+        setCancelledOrders((prev) => ({ ...prev, [cancelled.id]: cancelled }));
+        setActiveTrackingOrder(cancelled);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to cancel the order.';
+      window.alert(message);
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+'''
+              text = text.replace(marker, handler + marker, 1)
+
+          if "{ord.status === 'New' && (" not in text:
+              old = '''                      {/* Footer Actions */}
+                      <div className="flex justify-between items-center pt-1">
+'''
+              new = '''                      {/* Footer Actions */}
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-1">
+'''
+              assert old in text, 'Footer Actions block not found'
+              text = text.replace(old, new, 1)
+
+              old_button = '''                        <button
+                          onClick={() => {
+                            setActiveTrackingOrder(ord);
+                            setIsSuccessModalOpen(true);
+                          }}
+                          className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">visibility</span>
+                          <span>Track Order</span>
+                        </button>
+'''
+              new_button = '''                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          {ord.status === 'New' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrder(ord)}
+                              disabled={cancellingOrderId === ord.id}
+                              className="px-3.5 py-1.5 bg-[#ffdad6] text-[#93000a] text-xs font-bold rounded-xl border border-[#ffb4ab] hover:bg-[#ffb4ab] disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">{cancellingOrderId === ord.id ? 'hourglass_top' : 'cancel'}</span>
+                              <span>{cancellingOrderId === ord.id ? 'Cancelling...' : 'Cancel Order'}</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setActiveTrackingOrder(ord);
+                              setIsSuccessModalOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">visibility</span>
+                            <span>Track Order</span>
+                          </button>
+                        </div>
+'''
+              assert old_button in text, 'Track Order button block not found'
+              text = text.replace(old_button, new_button, 1)
+
+          p.write_text(text, encoding='utf-8')
+
+      - name: Validate and commit
+        run: |
+          grep -q "cancelCustomerOrder" src/components/customer/CustomerOrderPortal.tsx
+          grep -q "Cancel Order" src/components/customer/CustomerOrderPortal.tsx
+          rm -f .github/workflows/apply-customer-cancel.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/customer/CustomerOrderPortal.tsx .github/workflows/apply-customer-cancel.yml
+          git commit -m "chore: apply customer cancellation UI patch"
+          git push
