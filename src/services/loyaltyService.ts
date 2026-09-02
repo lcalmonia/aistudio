@@ -3,6 +3,7 @@ import { customerService } from './customerService';
 import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
 import { loyaltyConfigService } from './loyaltyConfigService';
+import { rewardClaimService } from './rewardClaimService';
 
 export const loyaltyService = {
   async getCustomerLoyalty(customerId: string): Promise<{ stamps:number; points:number } | null> {
@@ -27,16 +28,22 @@ export const loyaltyService = {
   async redeemPoints(customerId:string,pointsCost:number,reason:string='Reward discount redemption'):Promise<{success:boolean;remainingPoints?:number;error?:string}>{
     const customer=await customerService.getCustomer(customerId);if(!customer)return {success:false,error:'Customer not found.'};
     const currentPoints=customer.points||0;if(currentPoints<pointsCost)return {success:false,error:'Insufficient loyalty reward points.'};
-    const remaining=currentPoints-pointsCost;await customerService.updateCustomer(customerId,{points:remaining});
-    storageAdapter.addLoyaltyTransaction({id:generateEntityId('loy'),customerId,type:'redeem_points',amount:pointsCost,reason,timestamp:Date.now(),createdAt:new Date().toISOString()});
-    return {success:true,remainingPoints:remaining};
+    try {
+      await rewardClaimService.requestClaim(customerId, reason.replace(/^Redeemed perk:\s*/i, ''));
+      return {success:false,remainingPoints:currentPoints,error:'Reward claim sent to the counter. Please wait for staff to fulfill your preferred perk.'};
+    } catch (error) {
+      return {success:false,error:error instanceof Error?error.message:'Unable to submit reward claim.'};
+    }
   },
   async redeemStamps(customerId:string,stampsCost:number,reason:string='Digital stamp reward redemption'):Promise<{success:boolean;remainingStamps?:number;error?:string}>{
     const customer=await customerService.getCustomer(customerId);if(!customer)return {success:false,error:'Customer not found.'};
     const current=customer.stamps||0;if(current<stampsCost)return {success:false,error:'Insufficient digital stamps.'};
-    const remaining=current-stampsCost;await customerService.updateCustomer(customerId,{stamps:remaining});
-    storageAdapter.addLoyaltyTransaction({id:generateEntityId('loy'),customerId,type:'redeem_stamps',amount:stampsCost,reason,timestamp:Date.now(),createdAt:new Date().toISOString()});
-    return {success:true,remainingStamps:remaining};
+    try {
+      await rewardClaimService.requestClaim(customerId, reason.replace(/^Redeemed perk:\s*/i, ''));
+      return {success:false,remainingStamps:current,error:'Reward claim sent to the counter. Please wait for staff to fulfill your preferred perk.'};
+    } catch (error) {
+      return {success:false,error:error instanceof Error?error.message:'Unable to submit reward claim.'};
+    }
   },
   async listTransactions(customerId?:string):Promise<LoyaltyTransaction[]>{const txs=storageAdapter.getLoyaltyTransactions();return customerId?txs.filter(t=>t.customerId===customerId):txs;},
   async awardOrderRewards(customerId:string,order:Order):Promise<{stampsAdded:number;pointsAdded:number;qualified:boolean;reason:string}> {
