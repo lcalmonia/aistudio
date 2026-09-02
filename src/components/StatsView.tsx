@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Order, MenuItem, AdminPrincipal } from '../types';
 import { reportingService } from '../services/reportingService';
 import { orderService } from '../services/orderService';
+import { statsResetService } from '../services/statsResetService';
 import {
   StatsDateRangePreset,
   computeDateRangeBoundaries,
@@ -33,6 +34,18 @@ export const StatsView: React.FC<StatsViewProps> = ({
   // Range orders state
   const [rangeOrders, setRangeOrders] = useState<Order[]>([]);
   const [isLoadingRange, setIsLoadingRange] = useState<boolean>(false);
+  const [statsResetAt, setStatsResetAt] = useState<string | null>(null);
+  const [isResettingStats, setIsResettingStats] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    statsResetService.getResetAt()
+      .then((resetAt) => {
+        if (active) setStatsResetAt(resetAt);
+      })
+      .catch((err) => console.error('[StatsView] Failed to load stats reset state:', err));
+    return () => { active = false; };
+  }, []);
 
   // Ensure Admin role cannot remain on an unauthorized preset
   useEffect(() => {
@@ -54,17 +67,29 @@ export const StatsView: React.FC<StatsViewProps> = ({
   const fetchRangeOrders = useCallback(async () => {
     try {
       setIsLoadingRange(true);
+      const resetMs = statsResetAt ? new Date(statsResetAt).getTime() : 0;
+
       if (boundary.isAllTime) {
-        // Query up to 10000 historical orders for All Time without 200 order limit
-        const allOrders = await orderService.listOrders({ limit: 10000 });
-        setRangeOrders(allOrders);
-      } else {
         const filtered = await orderService.listOrders({
-          startDate: boundary.startDate,
-          endDate: boundary.endDate,
+          startDate: resetMs > 0 ? new Date(resetMs).toISOString() : undefined,
           limit: 10000,
         });
         setRangeOrders(filtered);
+      } else {
+        const boundaryStartMs = boundary.startDate ? new Date(boundary.startDate).getTime() : 0;
+        const boundaryEndMs = boundary.endDate ? new Date(boundary.endDate).getTime() : Number.POSITIVE_INFINITY;
+        const effectiveStartMs = Math.max(boundaryStartMs, resetMs);
+
+        if (effectiveStartMs > boundaryEndMs) {
+          setRangeOrders([]);
+        } else {
+          const filtered = await orderService.listOrders({
+            startDate: effectiveStartMs > 0 ? new Date(effectiveStartMs).toISOString() : boundary.startDate,
+            endDate: boundary.endDate,
+            limit: 10000,
+          });
+          setRangeOrders(filtered);
+        }
       }
     } catch (err) {
       console.error('[StatsView] Failed to fetch range orders:', err);
@@ -82,7 +107,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
     } finally {
       setIsLoadingRange(false);
     }
-  }, [boundary.isAllTime, boundary.startDate, boundary.endDate, propOrders]);
+  }, [boundary.isAllTime, boundary.startDate, boundary.endDate, propOrders, statsResetAt]);
 
   useEffect(() => {
     fetchRangeOrders();
@@ -160,6 +185,26 @@ export const StatsView: React.FC<StatsViewProps> = ({
     ];
   }, [isSuperAdmin]);
 
+  const handleResetStats = async () => {
+    if (!isSuperAdmin || isResettingStats) return;
+    const confirmed = window.confirm(
+      'RESET SALES STATISTICS? This clears the Stats tab by starting a new reporting period now. Orders and other records are NOT deleted.'
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsResettingStats(true);
+      const resetAt = await statsResetService.reset();
+      setStatsResetAt(resetAt);
+      setRangeOrders([]);
+    } catch (error) {
+      console.error('[StatsView] Failed to reset stats:', error);
+      window.alert('Unable to reset sales statistics. No records were changed.');
+    } finally {
+      setIsResettingStats(false);
+    }
+  };
+
   const handleSelectPreset = (presetKey: StatsDateRangePreset) => {
     if (!isSuperAdmin && presetKey !== 'today' && presetKey !== 'yesterday') {
       return;
@@ -191,6 +236,20 @@ export const StatsView: React.FC<StatsViewProps> = ({
           </span>
           <span>{isLoadingRange ? 'Refreshing...' : 'Refresh'}</span>
         </button>
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={handleResetStats}
+            disabled={isResettingStats}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#ffdad6] text-[#93000a] border border-[#f2b8b5] hover:bg-[#ffc9c4] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            title="Reset all sales statistics"
+          >
+            <span className={`material-symbols-outlined text-[16px] ${isResettingStats ? 'animate-spin' : ''}`}>
+              delete_sweep
+            </span>
+            <span>{isResettingStats ? 'Resetting...' : 'Reset Stats'}</span>
+          </button>
+        )}
       </section>
 
       {/* Date Range Selector Section */}

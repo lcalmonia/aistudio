@@ -1132,6 +1132,7 @@ const handleDeleteInventoryCategory = async (category: string) => {
                 onShowNotification={showNotification}
                 onRefreshOrders={refreshOrders}
                 isSyncing={isSyncingOrders}
+                admin={adminPrincipal}
               />
             )}
 
