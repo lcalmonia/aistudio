@@ -438,21 +438,6 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
               </div>
             </div>
 
-            {/* Read-Only Notice for Admin Role */}
-            {isAdminOnly && (
-              <div className="bg-[#f3ecea] border border-[#d2c4bc] text-[#4f453f] px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-[#81756e]">lock</span>
-                  <span>
-                    <strong>Admin Mode:</strong> Menu item creation, copying, editing, and deletion require Super Admin privileges. Availability toggles remain active.
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold bg-[#e8e1df] px-2 py-0.5 rounded uppercase tracking-wider text-[#636451]">
-                  Read-Only
-                </span>
-              </div>
-            )}
-
             {/* Dynamic Filter Pills */}
             <div className="pt-2 border-t border-[#f3ecea] space-y-2">
               <div className="flex items-center justify-between">
