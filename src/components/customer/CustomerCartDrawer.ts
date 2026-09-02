@@ -168,24 +168,23 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = (props) => 
     props.onRemoveItem(cartItemId);
   };
 
-  return (
-    <>
-      <LegacyCustomerCartDrawer
-        {...props}
-        cartItems={effectiveCartItems}
-        onRemoveItem={handleRemoveItem}
-        onPlaceOrder={handlePlaceOrder}
-      />
-
-      <BundleCustomizationModal
-        isOpen={isBundleModalOpen}
-        onClose={handleCloseBundleModal}
-        bundle={pendingBundle?.bundleData || null}
-        menuItems={catalog.menuItems}
-        addonsList={catalog.addons}
-        modifierCategories={catalog.modifierCategories}
-        onComplete={handleCompleteBundle}
-      />
-    </>
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(LegacyCustomerCartDrawer, {
+      ...props,
+      cartItems: effectiveCartItems,
+      onRemoveItem: handleRemoveItem,
+      onPlaceOrder: handlePlaceOrder,
+    }),
+    React.createElement(BundleCustomizationModal, {
+      isOpen: isBundleModalOpen,
+      onClose: handleCloseBundleModal,
+      bundle: pendingBundle?.bundleData || null,
+      menuItems: catalog.menuItems,
+      addonsList: catalog.addons,
+      modifierCategories: catalog.modifierCategories,
+      onComplete: handleCompleteBundle,
+    })
   );
 };
