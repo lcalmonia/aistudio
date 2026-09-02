@@ -10,6 +10,7 @@ import {
   ModifierCategory,
 } from '../../types';
 import { CustomerProductModal } from './CustomerProductModal';
+import { orderService } from '../../services/orderService';
 import { CustomerCartDrawer } from './CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';
 
