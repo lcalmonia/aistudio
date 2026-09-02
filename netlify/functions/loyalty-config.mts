@@ -1,5 +1,6 @@
+import type { Config } from '@netlify/functions';
 import { database } from './_shared/database.mts';
-import { requireAdmin, requireSuperAdmin } from './_shared/auth.mts';
+import { requireSuperAdmin } from './_shared/auth.mts';
 
 const defaults = { welcomeEnabled: false, welcomeStamps: 0, welcomePoints: 0, stampMinimumPurchase: 0, stampsPerQualifyingOrder: 1, pointsMinimumPurchase: 0, pointsMode: 'ratio' as const, fixedPoints: 0, pointsPerCurrency: 1, currencyUnit: 10, stampCycle: 10 };
 
@@ -52,3 +53,8 @@ export default async function handler(request: Request): Promise<Response> {
   if (body.action === 'toggle-perk') { const result = await db.pool.query('UPDATE loyalty_perks SET active=NOT active,updated_at=NOW() WHERE id=$1 RETURNING *', [String(body.id)]); return Response.json({ perk: result.rows[0] ? mapPerk(result.rows[0]) : null }); }
   return Response.json({ error: 'Unknown action.' }, { status: 400 });
 }
+
+export const config: Config = {
+  path: '/api/loyalty-config',
+  method: ['GET', 'POST'],
+};
