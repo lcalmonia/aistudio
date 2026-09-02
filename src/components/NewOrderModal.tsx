@@ -144,27 +144,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             <label className="block text-xs font-semibold text-[#26170c] mb-1.5">
               Customer Name / Table #
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. Maria, Table 3, Takeout #12..."
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="flex-1 px-3.5 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:outline-none focus:ring-2 focus:ring-[#5e604d]"
-              />
-              <div className="flex gap-1">
-                {['Maria', 'Ken', 'Sofia'].map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => setCustomerName(name)}
-                    className="px-2 py-1 bg-[#f3ecea] hover:bg-[#e1e1c9] text-xs font-medium text-[#4f453f] rounded-lg transition-colors"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <input
+              type="text"
+              placeholder="Customer name, table #, or takeout #..."
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="w-full px-3.5 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:outline-none focus:ring-2 focus:ring-[#5e604d]"
+            />
           </div>
 
           {/* Menu Category Filter */}
@@ -172,21 +158,23 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             <label className="block text-xs font-semibold text-[#26170c] mb-1.5">
               Select Category
             </label>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrolling-hide">
-              {allCategoryList.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                    activeCategory === cat
-                      ? 'bg-[#26170c] text-white'
-                      : 'bg-[#f3ecea] text-[#4f453f] hover:bg-[#e8e1df]'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+            <div className="w-full rounded-xl bg-[#f3ecea] p-1.5 overflow-x-auto scrolling-hide">
+              <div className="flex min-w-max gap-1.5">
+                {allCategoryList.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                      activeCategory === cat
+                        ? 'bg-[#26170c] text-white shadow-sm'
+                        : 'bg-[#fff8f5] text-[#4f453f] hover:bg-[#e8e1df]'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
