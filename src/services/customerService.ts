@@ -121,6 +121,18 @@ export const customerService = {
     return response.customer;
   },
 
+  async changeCustomerPassword(customerId: string, currentPassword: string, newPassword: string): Promise<void> {
+    await api('/api/customer-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'change',
+        customerId,
+        currentPassword,
+        newPassword,
+      }),
+    });
+  },
+
   async requestPasswordReset(identifier: string): Promise<void> {
     await api('/api/customer-password', {
       method: 'POST',
