@@ -15,6 +15,7 @@ function mapCustomer(row: Record<string, unknown>) {
   return {
     id: String(row.id),
     name: String(row.name),
+    username: String(row.username || ''),
     email: String(row.email),
     mobile: String(row.mobile),
     address: String(row.address),
@@ -66,13 +67,14 @@ export default async function handler(request: Request): Promise<Response> {
       if (action === 'login') {
         const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
         const password = typeof body.password === 'string' ? body.password : '';
-        if (!identifier || !password) throw new RequestError(400, 'Email/mobile and password are required.');
+        if (!identifier || !password) throw new RequestError(400, 'Email, username/mobile and password are required.');
 
         const normalizedMobile = identifier.replace(/\D/g, '');
         const result = await db.pool.query(
-          `SELECT id, name, email, mobile, address, status, role, stamps, points, created_at, password_hash
+          `SELECT id, name, username, email, mobile, address, status, role, stamps, points, created_at, password_hash
            FROM customers
            WHERE LOWER(email) = $1
+              OR LOWER(username) = $1
               OR regexp_replace(mobile, '\\D', '', 'g') = $2
               OR LOWER(id) = $1
            LIMIT 1`,
@@ -136,6 +138,7 @@ export default async function handler(request: Request): Promise<Response> {
         const result = await db.pool.query(
           `SELECT id FROM customers
            WHERE LOWER(email) = $1
+              OR LOWER(username) = $1
               OR regexp_replace(mobile, '\\D', '', 'g') = $2
            LIMIT 1`,
           [identifier, normalizedMobile]

@@ -26,7 +26,9 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [familyName, setFamilyName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +57,10 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setError(null);
     setSuccess(null);
 
-    if (!name.trim()) return setError('Please enter your full name.');
+    if (!firstName.trim()) return setError('Please enter your first name.');
+    if (!familyName.trim()) return setError('Please enter your family name.');
+    if (!username.trim()) return setError('Please choose a username.');
+    if (!/^[A-Za-z0-9._-]{3,32}$/.test(username.trim())) return setError('Username must be 3-32 characters and use only letters, numbers, dots, underscores, or hyphens.')
     if (!email.trim() || !email.includes('@')) return setError('Please enter a valid email address.');
     if (!mobile.trim() || mobile.length < 8) return setError('Please enter a valid mobile number.');
     if (!password.trim() || password.length < 6) return setError('Password must be at least 6 characters.');
@@ -64,7 +69,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setLoading(true);
     try {
       const res = await authService.registerCustomer({
-        name: name.trim(), email: email.trim(), mobile: mobile.trim(), password: password.trim(), address: address.trim(),
+        name: `${firstName.trim()} ${familyName.trim()}`, username: username.trim(), email: email.trim(), mobile: mobile.trim(), password: password.trim(), address: address.trim(),
       });
       if (res.success && res.customer) {
         onRegisterSuccess?.(res.customer);
@@ -85,7 +90,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setError(null);
     setSuccess(null);
 
-    if (!loginIdentifier.trim()) return setError('Please enter your registered email or mobile number.');
+    if (!loginIdentifier.trim()) return setError('Please enter your registered email, username, or mobile number.');
     if (!loginPassword.trim()) return setError('Please enter your password.');
 
     setLoading(true);
@@ -110,7 +115,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setError(null);
     setSuccess(null);
     if (!forgotIdentifier.trim()) {
-      setError('Please enter your registered email or mobile number.');
+      setError('Please enter your registered email, username, or mobile number.');
       return;
     }
 
@@ -159,21 +164,22 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
           {forgotMode ? (
             <form onSubmit={handleForgotPassword} className="space-y-4">
-              <div className="p-3 bg-[#dec1af]/20 rounded-xl text-xs text-[#4f453f]">Enter the email or mobile number registered to your customer account. A Super Admin must approve the reset before your password changes.</div>
-              <input type="text" value={forgotIdentifier} onChange={(e) => setForgotIdentifier(e.target.value)} placeholder="Email address or mobile number" className="w-full px-3.5 py-3 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]" required />
+              <div className="p-3 bg-[#dec1af]/20 rounded-xl text-xs text-[#4f453f]">Enter the email, username, or mobile number registered to your customer account. A Super Admin must approve the reset before your password changes.</div>
+              <input type="text" value={forgotIdentifier} onChange={(e) => setForgotIdentifier(e.target.value)} placeholder="Email address, username, or mobile number" className="w-full px-3.5 py-3 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-2 focus:ring-[#26170c]" required />
               <button type="submit" disabled={loading} className="w-full py-3 bg-[#26170c] text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer">{loading ? 'Sending Request...' : 'Request Password Reset'}</button>
               <button type="button" onClick={() => { setForgotMode(false); setError(null); setSuccess(null); }} className="w-full py-2 text-xs font-bold text-[#26170c] hover:underline cursor-pointer">Back to Sign In</button>
             </form>
           ) : mode === 'login' ? (
             <form onSubmit={handleLogin} className="space-y-3.5">
-              <div><label className="block text-xs font-bold text-[#4f453f] mb-1">Email Address or Mobile Number *</label><input type="text" value={loginIdentifier} onChange={(e) => setLoginIdentifier(e.target.value)} placeholder="e.g. name@example.com or 09170000000" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /></div>
+              <div><label className="block text-xs font-bold text-[#4f453f] mb-1">Email Address, Username, or Mobile Number *</label><input type="text" value={loginIdentifier} onChange={(e) => setLoginIdentifier(e.target.value)} placeholder="e.g. name@example.com, username, or 09170000000" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /></div>
               <div><label className="block text-xs font-bold text-[#4f453f] mb-1">Password *</label><input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Enter your password" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /></div>
               <div className="text-right"><button type="button" onClick={() => { setForgotMode(true); setError(null); setSuccess(null); }} className="text-xs font-bold text-[#26170c] hover:underline cursor-pointer">Forgot Password?</button></div>
               <button type="submit" disabled={loading} className="w-full py-3 bg-[#26170c] text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer">{loading ? 'Signing In...' : 'Sign In & Continue Order'}</button>
             </form>
           ) : (
             <form onSubmit={handleRegister} className="space-y-3">
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full Name" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /><input type="text" value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="Family Name" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /></div>
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" autoComplete="username" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /><input type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="Mobile Number" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /></div>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create Password (at least 6 characters)" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required />
               <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Delivery / Home Address" rows={2} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required />
