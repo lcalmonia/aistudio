@@ -1,0 +1,2 @@
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS loyalty_awarded_at TIMESTAMPTZ;
