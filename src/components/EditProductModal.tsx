@@ -7,6 +7,7 @@ import {
   isProductDraftDirty,
   PRESET_CAFE_PHOTOS,
 } from '../utils/productDraft';
+import { prepareUploadedImage } from '../utils/imageCompression';
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -360,32 +361,34 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     );
   };
 
-  // Photo handlers
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Photo handlers - optimize uploaded images before storing them in the JSON draft.
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setImage(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      const preparedImage = await prepareUploadedImage(file);
+      setImage(preparedImage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The image could not be prepared.';
+      window.alert(message);
+    } finally {
+      e.target.value = '';
     }
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setImage(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      const preparedImage = await prepareUploadedImage(file);
+      setImage(preparedImage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The image could not be prepared.';
+      window.alert(message);
     }
   };
 
@@ -585,7 +588,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 </div>
                 <div className="flex-1 text-left">
                   <p className="text-xs font-bold text-[#26170c]">Drag & Drop product photo here</p>
-                  <p className="text-[11px] text-[#81756e] mb-2">Supports JPG, PNG, WEBP high-res images</p>
+                  <p className="text-[11px] text-[#81756e] mb-2">JPG, PNG, WEBP — images are automatically optimized before saving</p>
                   <label className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white text-xs font-semibold rounded-lg cursor-pointer transition-all shadow-xs">
                     <span className="material-symbols-outlined text-[16px]">file_upload</span>
                     Browse Image
