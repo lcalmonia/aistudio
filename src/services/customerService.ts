@@ -14,7 +14,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export interface CustomerPasswordResetRequest { id:string; customerId:string; customerName:string; email:string; mobile:string; requestedAt:string; status:string; reviewedAt:string|null; }
 export const customerService = {
   async listCustomers(): Promise<CustomerUser[]> { return storageAdapter.getCustomers(); },
-  async listCustomersFromServer(): Promise<CustomerUser[]> { const response=await api<{customers:CustomerUser[]}>('/api/customers',{method:'GET'}); if(!response||!Array.isArray(response.customers)) throw new CustomerApiError('Invalid customer directory response.'); return response.customers; },
+  async listCustomersFromServer(): Promise<CustomerUser[]> { const response=await api<{customers:CustomerUser[]}>('/api/customers',{method:'GET'}); if(!response||!Array.isArray(response.customers)) throw new CustomerApiError('Invalid customer directory response.'); storageAdapter.setCustomers(response.customers); return response.customers; },
   async getCustomer(id:string):Promise<CustomerUser|null>{ return storageAdapter.getCustomers().find(c=>c.id===id)||null; },
   async createCustomer(data:{name:string;email:string;mobile:string;address:string;password?:string}):Promise<{success:boolean;customer?:CustomerUser;error?:string}>{
     const customers=storageAdapter.getCustomers(); const cleanEmail=data.email.trim().toLowerCase(); const cleanMobile=data.mobile.trim();
