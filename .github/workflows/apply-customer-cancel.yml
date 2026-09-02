@@ -1,134 +1,50 @@
-name: Apply Customer Cancellation UI Patch
+name: Apply Customer Change Password UI Patch
 
 on:
   push:
-    branches:
-      - customer-delete-pending-orders
+    branches: [customer-password-recovery]
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.event.head_commit.message != 'chore: apply customer cancellation UI patch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = 'customer-password-recovery';
+            const path = 'src/components/customer/CustomerOrderPortal.tsx';
+            const file = await github.rest.repos.getContent({owner: context.repo.owner, repo: context.repo.repo, path, ref: branch});
+            const sha = file.data.sha;
+            let text = Buffer.from(file.data.content, 'base64').toString('utf8');
+            if (text.includes('customerService.changeCustomerPassword')) {
+              core.info('Change Password UI already present.');
+            } else {
+              const importAnchor = "import { orderService } from '../../services/orderService';";
+              if (!text.includes(importAnchor)) throw new Error('Import anchor not found.');
+              text = text.replace(importAnchor, importAnchor + "\nimport { customerService } from '../../services/customerService';");
 
-      - name: Apply targeted patch
-        shell: python
-        run: |
-          from pathlib import Path
-          import re
+              const stateAnchor = "  const [profileSavedToast, setProfileSavedToast] = useState(false);";
+              if (!text.includes(stateAnchor)) throw new Error('Profile state anchor not found.');
+              const stateBlock = `  const [profileSavedToast, setProfileSavedToast] = useState(false);\n  const [showPasswordEditor, setShowPasswordEditor] = useState(false);\n  const [currentPassword, setCurrentPassword] = useState('');\n  const [newPassword, setNewPassword] = useState('');\n  const [confirmPassword, setConfirmPassword] = useState('');\n  const [passwordChangeMessage, setPasswordChangeMessage] = useState<string | null>(null);\n  const [isChangingPassword, setIsChangingPassword] = useState(false);`;
+              text = text.replace(stateAnchor, stateBlock);
 
-          p = Path('src/components/customer/CustomerOrderPortal.tsx')
-          text = p.read_text(encoding='utf-8')
+              const handlerAnchor = '  // Stamp card calculation (10 stamps per reward)';
+              if (!text.includes(handlerAnchor)) throw new Error('Handler anchor not found.');
+              const handler = `  const handleChangePassword = async (e: React.FormEvent) => {\n    e.preventDefault();\n    setPasswordChangeMessage(null);\n    if (newPassword.length < 6 || newPassword.length > 128) {\n      setPasswordChangeMessage('New password must be 6 to 128 characters.');\n      return;\n    }\n    if (newPassword !== confirmPassword) {\n      setPasswordChangeMessage('New password and confirmation do not match.');\n      return;\n    }\n    setIsChangingPassword(true);\n    try {\n      await customerService.changeCustomerPassword(currentCustomer.id, currentPassword, newPassword);\n      setCurrentPassword('');\n      setNewPassword('');\n      setConfirmPassword('');\n      setPasswordChangeMessage('Password changed successfully.');\n    } catch (error) {\n      setPasswordChangeMessage(error instanceof Error ? error.message : 'Unable to change your password.');\n    } finally {\n      setIsChangingPassword(false);\n    }\n  };\n\n`;
+              text = text.replace(handlerAnchor, handler + handlerAnchor);
 
-          if "from '../../services/orderService'" not in text:
-              marker = "import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';"
-              assert marker in text, 'CustomerOrderSuccessModal import not found'
-              text = text.replace(marker, marker + "\nimport { orderService } from '../../services/orderService';", 1)
+              const profileAnchor = `            </form>\n          </div>\n        )}\n      </main>`;
+              if (!text.includes(profileAnchor)) throw new Error('Profile UI anchor not found.');
+              const passwordUi = `            </form>\n\n            <div className="pt-4 border-t border-[#f3ecea]">\n              <div className="flex items-center justify-between gap-3">\n                <div>\n                  <h4 className="font-serif text-base font-bold text-[#26170c]">Password</h4>\n                  <p className="text-[11px] text-[#81756e] mt-0.5">Change your password anytime using your current password.</p>\n                </div>\n                <button type="button" onClick={() => { setShowPasswordEditor((value) => !value); setPasswordChangeMessage(null); }} className="px-4 py-2 bg-[#f3ecea] hover:bg-[#e8e1df] text-[#26170c] font-bold rounded-xl border border-[#dec1af] transition-all cursor-pointer whitespace-nowrap">\n                  {showPasswordEditor ? 'Close' : 'Change Password'}\n                </button>\n              </div>\n              {showPasswordEditor && (\n                <form onSubmit={handleChangePassword} className="mt-4 space-y-3">\n                  <div><label className="block font-bold text-[#4f453f] mb-1">Current Password</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-[#26170c] focus:ring-2 focus:ring-[#26170c]" autoComplete="current-password" required /></div>\n                  <div><label className="block font-bold text-[#4f453f] mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-[#26170c] focus:ring-2 focus:ring-[#26170c]" autoComplete="new-password" minLength={6} maxLength={128} required /></div>\n                  <div><label className="block font-bold text-[#4f453f] mb-1">Confirm New Password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-[#26170c] focus:ring-2 focus:ring-[#26170c]" autoComplete="new-password" minLength={6} maxLength={128} required /></div>\n                  {passwordChangeMessage && <div className="p-3 bg-[#f9f2f0] border border-[#dec1af] rounded-xl text-xs font-semibold text-[#26170c]">{passwordChangeMessage}</div>}\n                  <button type="submit" disabled={isChangingPassword} className="w-full py-3 bg-[#26170c] hover:bg-[#3d2b1f] disabled:opacity-60 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer">{isChangingPassword ? 'Changing Password...' : 'Save New Password'}</button>\n                </form>\n              )}\n            </div>\n          </div>\n        )}\n      </main>`;
+              text = text.replace(profileAnchor, passwordUi);
 
-          if 'cancelledOrders' not in text:
-              marker = "  const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(lastCustomerOrder);"
-              assert marker in text, 'activeTrackingOrder state not found'
-              text = text.replace(marker, marker + "\n  const [cancelledOrders, setCancelledOrders] = useState<Record<string, Order>>({});\n  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);", 1)
+              await github.rest.repos.createOrUpdateFileContents({owner: context.repo.owner, repo: context.repo.repo, path, message: 'Add customer change password UI', content: Buffer.from(text, 'utf8').toString('base64'), sha, branch});
+              core.info('Customer Change Password UI committed.');
+            }
 
-          if 'cancelledOrders[o.id] || o' not in text:
-              pattern = r"    return orders\.filter\(\n      \(o\) =>\n        o &&\n        \(o\.customerId === currentCustomer\.id \|\|\n          \(customerEmail && o\.customerEmail && o\.customerEmail\.toLowerCase\(\) === customerEmail\) \|\|\n          \(customerName && o\.customerName && o\.customerName\.toLowerCase\(\) === customerName\)\)\n    \);\n  \}, \[orders, currentCustomer\]\);"
-              replacement = "    return orders\n      .map((o) => cancelledOrders[o.id] || o)\n      .filter(\n        (o) =>\n          o &&\n          (o.customerId === currentCustomer.id ||\n            (customerEmail && o.customerEmail && o.customerEmail.toLowerCase() === customerEmail) ||\n            (customerName && o.customerName && o.customerName.toLowerCase() === customerName))\n      );\n  }, [orders, currentCustomer, cancelledOrders]);"
-              text, n = re.subn(pattern, replacement, text, count=1)
-              assert n == 1, 'Customer order filter pattern not found'
-
-          if 'const handleCancelOrder = async' not in text:
-              marker = "  const handleSaveProfile = (e: React.FormEvent) => {"
-              assert marker in text, 'handleSaveProfile not found'
-              handler = '''  const handleCancelOrder = async (order: Order) => {
-    if (order.status !== 'New') return;
-    const confirmed = window.confirm(
-      `Cancel order #${order.orderNumber}?\\n\\nThis can only be cancelled while the order is still New.`
-    );
-    if (!confirmed) return;
-
-    setCancellingOrderId(order.id);
-    try {
-      const cancelled = await orderService.cancelCustomerOrder(
-        order.id,
-        currentCustomer.id,
-        currentCustomer.email
-      );
-      if (cancelled) {
-        setCancelledOrders((prev) => ({ ...prev, [cancelled.id]: cancelled }));
-        setActiveTrackingOrder(cancelled);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to cancel the order.';
-      window.alert(message);
-    } finally {
-      setCancellingOrderId(null);
-    }
-  };
-
-'''
-              text = text.replace(marker, handler + marker, 1)
-
-          if "{ord.status === 'New' && (" not in text:
-              old = '''                      {/* Footer Actions */}
-                      <div className="flex justify-between items-center pt-1">
-'''
-              new = '''                      {/* Footer Actions */}
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-1">
-'''
-              assert old in text, 'Footer Actions block not found'
-              text = text.replace(old, new, 1)
-
-              old_button = '''                        <button
-                          onClick={() => {
-                            setActiveTrackingOrder(ord);
-                            setIsSuccessModalOpen(true);
-                          }}
-                          className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">visibility</span>
-                          <span>Track Order</span>
-                        </button>
-'''
-              new_button = '''                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          {ord.status === 'New' && (
-                            <button
-                              type="button"
-                              onClick={() => handleCancelOrder(ord)}
-                              disabled={cancellingOrderId === ord.id}
-                              className="px-3.5 py-1.5 bg-[#ffdad6] text-[#93000a] text-xs font-bold rounded-xl border border-[#ffb4ab] hover:bg-[#ffb4ab] disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
-                            >
-                              <span className="material-symbols-outlined text-[15px]">{cancellingOrderId === ord.id ? 'hourglass_top' : 'cancel'}</span>
-                              <span>{cancellingOrderId === ord.id ? 'Cancelling...' : 'Cancel Order'}</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setActiveTrackingOrder(ord);
-                              setIsSuccessModalOpen(true);
-                            }}
-                            className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3d2b1f] transition-all cursor-pointer flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">visibility</span>
-                            <span>Track Order</span>
-                          </button>
-                        </div>
-'''
-              assert old_button in text, 'Track Order button block not found'
-              text = text.replace(old_button, new_button, 1)
-
-          p.write_text(text, encoding='utf-8')
-
-      - name: Validate and commit
-        run: |
-          grep -q "cancelCustomerOrder" src/components/customer/CustomerOrderPortal.tsx
-          grep -q "Cancel Order" src/components/customer/CustomerOrderPortal.tsx
-          rm -f .github/workflows/apply-customer-cancel.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/components/customer/CustomerOrderPortal.tsx .github/workflows/apply-customer-cancel.yml
-          git commit -m "chore: apply customer cancellation UI patch"
-          git push
+            const workflowPath = '.github/workflows/apply-customer-cancel.yml';
+            const workflow = await github.rest.repos.getContent({owner: context.repo.owner, repo: context.repo.repo, path: workflowPath, ref: branch});
+            await github.rest.repos.deleteFile({owner: context.repo.owner, repo: context.repo.repo, path: workflowPath, message: 'Remove one-time customer password UI workflow', sha: workflow.data.sha, branch});
