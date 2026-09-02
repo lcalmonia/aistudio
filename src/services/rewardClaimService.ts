@@ -23,10 +23,10 @@ async function api<T>(init: RequestInit = {}): Promise<T> {
 }
 
 export const rewardClaimService = {
-  async requestClaim(customerId: string, perkId: string): Promise<RewardClaim> {
+  async requestClaim(customerId: string, perkIdOrName: string): Promise<RewardClaim> {
     const response = await api<{ claim: RewardClaim }>({
       method: 'POST',
-      body: JSON.stringify({ action: 'request', customerId, perkId }),
+      body: JSON.stringify({ action: 'request', customerId, perkId: perkIdOrName, perkName: perkIdOrName }),
     });
     return response.claim;
   },
