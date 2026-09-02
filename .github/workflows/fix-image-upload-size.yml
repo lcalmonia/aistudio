@@ -1,126 +1,27 @@
-name: Fix image upload size retry
+name: Image upload fix
 
 on:
   push:
-    branches:
-      - fix-responsive-admin-views
+    branches: [fix-responsive-admin-views]
 
 permissions:
   contents: write
 
 jobs:
-  fix-image-upload-size:
+  fix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Apply image upload fixes
-        shell: bash
+      - name: Apply fixes
+        env:
+          PRODUCT_HANDLER_B64: ICAvLyBQaG90byBoYW5kbGVycyAtIG9wdGltaXplIHVwbG9hZGVkIGltYWdlcyBiZWZvcmUgc3RvcmluZyB0aGVtIGluIHRoZSBKU09OIGRyYWZ0LgogIGNvbnN0IGhhbmRsZUZpbGVVcGxvYWQgPSBhc3luYyAoZTogUmVhY3QuQ2hhbmdlRXZlbnQ8SFRNTElucHV0RWxlbWVudD4pID0+IHsKICAgIGNvbnN0IGZpbGUgPSBlLnRhcmdldC5maWxlcz8uWzBdOwogICAgaWYgKCFmaWxlKSByZXR1cm47CgogICAgdHJ5IHsKICAgICAgY29uc3QgcHJlcGFyZWRJbWFnZSA9IGF3YWl0IHByZXBhcmVVcGxvYWRlZEltYWdlKGZpbGUpOwogICAgICBzZXRJbWFnZShwcmVwYXJlZEltYWdlKTsKICAgIH0gY2F0Y2ggKGVycm9yKSB7CiAgICAgIGNvbnN0IG1lc3NhZ2UgPSBlcnJvciBpbnN0YW5jZW9mIEVycm9yID8gZXJyb3IubWVzc2FnZSA6ICdUaGUgaW1hZ2UgY291bGQgbm90IGJlIHByZXBhcmVkLic7CiAgICAgIHdpbmRvdy5hbGVydChtZXNzYWdlKTsKICAgIH0gZmluYWxseSB7CiAgICAgIGUudGFyZ2V0LnZhbHVlID0gJyc7CiAgICB9CiAgfTsKCiAgY29uc3QgaGFuZGxlRHJvcCA9IGFzeW5jIChlOiBSZWFjdC5EcmFnRXZlbnQ8SFRNTERpdkVsZW1lbnQ+KSA9PiB7CiAgICBlLnByZXZlbnREZWZhdWx0KCk7CiAgICBzZXRJc0RyYWdPdmVyKGZhbHNlKTsKICAgIGNvbnN0IGZpbGUgPSBlLmRhdGFUcmFuc2Zlci5maWxlcz8uWzBdOwogICAgaWYgKCFmaWxlKSByZXR1cm47CgogICAgdHJ5IHsKICAgICAgY29uc3QgcHJlcGFyZWRJbWFnZSA9IGF3YWl0IHByZXBhcmVVcGxvYWRlZEltYWdlKGZpbGUpOwogICAgICBzZXRJbWFnZShwcmVwYXJlZEltYWdlKTsKICAgIH0gY2F0Y2ggKGVycm9yKSB7CiAgICAgIGNvbnN0IG1lc3NhZ2UgPSBlcnJvciBpbnN0YW5jZW9mIEVycm9yID8gZXJyb3IubWVzc2FnZSA6ICdUaGUgaW1hZ2UgY291bGQgbm90IGJlIHByZXBhcmVkLic7CiAgICAgIHdpbmRvdy5hbGVydChtZXNzYWdlKTsKICAgIH0KICB9OwoK
+          SETTINGS_HANDLER_B64: ICBjb25zdCBoYW5kbGVGaWxlVXBsb2FkID0gYXN5bmMgKGU6IFJlYWN0LkNoYW5nZUV2ZW50PEhUTUxJbnB1dEVsZW1lbnQ+KSA9PiB7CiAgICBjb25zdCBmaWxlID0gZS50YXJnZXQuZmlsZXM/LlswXTsKICAgIGlmICghZmlsZSkgcmV0dXJuOwoKICAgIGlmICghZmlsZS50eXBlLnN0YXJ0c1dpdGgoJ2ltYWdlLycpKSB7CiAgICAgIG9uU2hvd05vdGlmaWNhdGlvbignUGxlYXNlIHVwbG9hZCBhbiBpbWFnZSBmaWxlIChQTkcsIEpQRywgV0VCUCwgU1ZHKS4nKTsKICAgICAgcmV0dXJuOwogICAgfQoKICAgIGlmIChmaWxlLnNpemUgPiAxMCAqIDEwMjQgKiAxMDI0KSB7CiAgICAgIG9uU2hvd05vdGlmaWNhdGlvbignRmlsZSBpcyB0b28gbGFyZ2UuIFBsZWFzZSBzZWxlY3QgYW4gaW1hZ2UgdW5kZXIgMTBNQi4nKTsKICAgICAgcmV0dXJuOwogICAgfQoKICAgIHRyeSB7CiAgICAgIGNvbnN0IHByZXBhcmVkSW1hZ2UgPSBhd2FpdCBwcmVwYXJlVXBsb2FkZWRJbWFnZShmaWxlKTsKICAgICAgaGFuZGxlSW5wdXRDaGFuZ2UoJ2xvZ29VcmwnLCBwcmVwYXJlZEltYWdlKTsKICAgICAgb25TaG93Tm90aWZpY2F0aW9uKCdTdG9yZSBsb2dvIG9wdGltaXplZCBhbmQgbG9hZGVkISBDbGljayBTYXZlIHRvIGFwcGx5IGxpdmUuIOKYleKcqCcpOwogICAgfSBjYXRjaCAoZXJyb3IpIHsKICAgICAgY29uc3QgbWVzc2FnZSA9IGVycm9yIGluc3RhbmNlb2YgRXJyb3IgPyBlcnJvci5tZXNzYWdlIDogJ1RoZSBsb2dvIGNvdWxkIG5vdCBiZSBwcmVwYXJlZC4nOwogICAgICBvblNob3dOb3RpZmljYXRpb24obWVzc2FnZSk7CiAgICB9CiAgfTsKCg==
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          http = Path('netlify/functions/_shared/http.mts')
-          text = http.read_text()
-          text, count = re.subn(r'const MAX_JSON_BYTES = 64 \* 1024;', 'const MAX_JSON_BYTES = 2 * 1024 * 1024;', text, count=1)
-          if count != 1:
-              raise SystemExit('Expected MAX_JSON_BYTES line not found')
-          http.write_text(text)
-
-          product = Path('src/components/EditProductModal.tsx')
-          text = product.read_text()
-          import_line = "import { prepareUploadedImage } from '../utils/imageCompression';"
-          if import_line not in text:
-              marker = "} from '../utils/productDraft';"
-              if marker not in text:
-                  raise SystemExit('Expected productDraft import not found')
-              text = text.replace(marker, marker + '\n' + import_line, 1)
-
-          product_handlers = '''  // Photo handlers - optimize uploaded images before storing them in the JSON draft.
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const preparedImage = await prepareUploadedImage(file);
-      setImage(preparedImage);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'The image could not be prepared.';
-      window.alert(message);
-    } finally {
-      e.target.value = '';
-    }
-  };
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-
-    try {
-      const preparedImage = await prepareUploadedImage(file);
-      setImage(preparedImage);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'The image could not be prepared.';
-      window.alert(message);
-    }
-  };
-
-'''
-          pattern = r'  // Photo handlers\n.*?(?=  // Size row handlers)'
-          text, count = re.subn(pattern, product_handlers, text, count=1, flags=re.S)
-          if count != 1:
-              raise SystemExit('Expected product photo handler block not found')
-          text = text.replace('Supports JPG, PNG, WEBP high-res images', 'JPG, PNG, WEBP — images are automatically optimized before saving', 1)
-          product.write_text(text)
-
-          settings = Path('src/components/SettingsView.tsx')
-          text = settings.read_text()
-          import_line = "import { prepareUploadedImage } from '../utils/imageCompression';"
-          if import_line not in text:
-              marker = "import { StoreSettings } from '../types';"
-              if marker not in text:
-                  raise SystemExit('Expected SettingsView import not found')
-              text = text.replace(marker, marker + '\n' + import_line, 1)
-
-          settings_handler = '''  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      onShowNotification('Please upload an image file (PNG, JPG, WEBP, SVG).');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      onShowNotification('File is too large. Please select an image under 10MB.');
-      return;
-    }
-
-    try {
-      const preparedImage = await prepareUploadedImage(file);
-      handleInputChange('logoUrl', preparedImage);
-      onShowNotification('Store logo optimized and loaded! Click Save to apply live. ☕✨');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'The logo could not be prepared.';
-      onShowNotification(message);
-    }
-  };
-
-'''
-          pattern = r'  const handleFileUpload = .*?(?=  const handleRemoveLogo)'
-          text, count = re.subn(pattern, settings_handler, text, count=1, flags=re.S)
-          if count != 1:
-              raise SystemExit('Expected SettingsView upload handler not found')
-          settings.write_text(text)
-
-          Path('.github/workflows/fix-image-upload-size.yml').unlink()
-          PY
-
-      - name: Commit fixes
-        shell: bash
+          python -c "from pathlib import Path; import re,base64; p=Path('netlify/functions/_shared/http.mts'); s=p.read_text(); p.write_text(s.replace('const MAX_JSON_BYTES = 64 * 1024;','const MAX_JSON_BYTES = 2 * 1024 * 1024;',1))"
+          python -c "from pathlib import Path; p=Path('src/components/EditProductModal.tsx'); s=p.read_text(); s=s.replace(\"} from '../utils/productDraft';\",\"} from '../utils/productDraft';\\nimport { prepareUploadedImage } from '../utils/imageCompression';\",1); r=base64.b64decode('${PRODUCT_HANDLER_B64}').decode(); s,n=re.subn(r'  // Photo handlers\\n.*?(?=  // Size row handlers)',r,s,flags=re.S,count=1); assert n==1; s=s.replace('Supports JPG, PNG, WEBP high-res images','JPG, PNG, WEBP — images are automatically optimized before saving',1); p.write_text(s)"
+          python -c "from pathlib import Path; p=Path('src/components/SettingsView.tsx'); s=p.read_text(); s=s.replace(\"import { StoreSettings } from '../types';\",\"import { StoreSettings } from '../types';\\nimport { prepareUploadedImage } from '../utils/imageCompression';\",1); r=base64.b64decode('${SETTINGS_HANDLER_B64}').decode(); s,n=re.subn(r'  const handleFileUpload = .*?(?=  const handleRemoveLogo)',r,s,flags=re.S,count=1); assert n==1; p.write_text(s)"
+          rm -f .github/workflows/fix-image-upload-size.yml
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
