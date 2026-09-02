@@ -287,13 +287,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   alt="iLuvKeyks Coffee & Tea Store"
   className="w-full h-72 sm:h-80 object-cover"
 />
-              
-
-            
-            </div>
-          </div>
-        </div>
-      </section>
+</div>
+</div>
+</div>
+</div>
+</section>
 
       {/* ========================================================================= */}
       {/* 3. PROMOTIONS & COMBO DEALS                                               */}
