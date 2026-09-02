@@ -26,6 +26,24 @@ export const BundleCustomizationModal: React.FC<BundleCustomizationModalProps> =
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Bundles use the product's modifier configuration, but optional add-ons/extras
+  // are intentionally excluded from combo customization.
+  const bundleModifierCategories = useMemo(
+    () => modifierCategories.filter((category) => category.itemType !== 'addon'),
+    [modifierCategories]
+  );
+
+  const bundleModifierItems = useMemo(() => {
+    return addonsList.filter((addon) => {
+      const category = modifierCategories.find(
+        (cat) =>
+          cat.id === addon.category ||
+          cat.name.toLowerCase() === addon.category.toLowerCase()
+      );
+      return category ? category.itemType !== 'addon' : false;
+    });
+  }, [addonsList, modifierCategories]);
+
   const includedProducts = useMemo(() => {
     if (!bundle) return [];
     return bundle.bundleItems.map((itemRef, index) => {
@@ -36,8 +54,15 @@ export const BundleCustomizationModal: React.FC<BundleCustomizationModalProps> =
 
   const hasCustomization = (product: MenuItem) =>
     Boolean(
-      (product.modifierCategoryIds && product.modifierCategoryIds.length > 0) ||
-        (product.addons && product.addons.length > 0)
+      product.modifierCategoryIds &&
+        product.modifierCategoryIds.some((categoryId) => {
+          const category = bundleModifierCategories.find(
+            (cat) =>
+              cat.id === categoryId ||
+              cat.name.toLowerCase() === categoryId.toLowerCase()
+          );
+          return Boolean(category);
+        })
     );
 
   const createStandardSelection = (product: MenuItem): CustomerCartItem => ({
@@ -164,7 +189,7 @@ export const BundleCustomizationModal: React.FC<BundleCustomizationModalProps> =
                             : customizable
                             ? selected
                               ? 'Customization selected'
-                              : 'Modifier/add-on selection required'
+                              : 'Modifier selection required'
                             : 'Standard preparation'}
                         </p>
                       </div>
@@ -224,8 +249,8 @@ export const BundleCustomizationModal: React.FC<BundleCustomizationModalProps> =
           setSelectedProduct(null);
         }}
         product={selectedProduct}
-        addonsList={addonsList}
-        modifierCategories={modifierCategories}
+        addonsList={bundleModifierItems}
+        modifierCategories={bundleModifierCategories}
         onAddToCart={handleProductAdded}
       />
     </>
