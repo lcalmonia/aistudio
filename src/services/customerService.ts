@@ -37,3 +37,4 @@ export const customerService = {
 };
 
 // Customer username authentication patch trigger.
+// Type patch workflow trigger.
