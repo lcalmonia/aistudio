@@ -35,3 +35,5 @@ export const customerService = {
   async deactivateCustomer(id:string):Promise<{success:boolean;error?:string}>{const updated=storageAdapter.getCustomers().map(c=>c.id===id?{...c,status:'inactive' as const}:c);storageAdapter.setCustomers(updated);return {success:true};},
   async saveCustomers(customers:CustomerUser[]):Promise<CustomerUser[]>{storageAdapter.setCustomers(customers);return customers;},
 };
+
+// Customer username authentication patch trigger.
