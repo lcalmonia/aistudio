@@ -287,31 +287,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   alt="iLuvKeyks Coffee & Tea Store"
   className="w-full h-72 sm:h-80 object-cover"
 />
-                <div className="p-4 bg-[#fff8f5]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5e604d]">
-                        House Bestseller
-                      </span>
-                      <h3 className="font-serif text-base font-bold text-[#26170c]">
-                        Spanish Latte & Ube Tub Cake Pair
-                      </h3>
-                    </div>
-                    <span className="font-serif font-bold text-lg text-[#26170c]">₱295</span>
-                  </div>
-                </div>
-              </div>
+              
 
-              {/* Floating review badge */}
-              <div className="absolute -bottom-4 -left-4 bg-[#26170c] text-white p-3.5 rounded-2xl shadow-xl border border-white/20 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#fbddca] text-[#26170c] flex items-center justify-center font-bold text-base">
-                  ★ 4.9
-                </div>
-                <div>
-                  <p className="text-xs font-bold">1,800+ Happy Foodies</p>
-                  <p className="text-[10px] text-[#dec1af]">Rated Manila's Sweetest Cafe</p>
-                </div>
-              </div>
+            
             </div>
           </div>
         </div>
