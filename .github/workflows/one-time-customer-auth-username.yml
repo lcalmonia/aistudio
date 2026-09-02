@@ -1,0 +1,66 @@
+name: One-time customer username auth patch
+on:
+  push:
+    branches: [feature/customer-username-login]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/customer-username-login, fetch-depth: 0}
+      - name: Apply patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          def sub(path, old, new):
+            p=Path(path); s=p.read_text()
+            if old not in s: raise SystemExit(f'Not found in {path}: {old[:80]}')
+            p.write_text(s.replace(old,new,1))
+
+          # Modal
+          p=Path('src/components/auth/CustomerAuthModal.tsx'); s=p.read_text()
+          s=s.replace("const [name, setName] = useState('');", "const [firstName, setFirstName] = useState('');\n  const [familyName, setFamilyName] = useState('');\n  const [username, setUsername] = useState('');")
+          s=s.replace("if (!name.trim()) return setError('Please enter your full name.');", "if (!firstName.trim()) return setError('Please enter your first name.');\n    if (!familyName.trim()) return setError('Please enter your family name.');\n    if (!username.trim()) return setError('Please choose a username.');\n    if (!/^[A-Za-z0-9._-]{3,32}$/.test(username.trim())) return setError('Username must be 3-32 characters and use only letters, numbers, dots, underscores, or hyphens.')")
+          s=s.replace("if (!loginIdentifier.trim()) return setError('Please enter your registered email or mobile number.');", "if (!loginIdentifier.trim()) return setError('Please enter your registered email, username, or mobile number.');")
+          s=s.replace("const res = await authService.registerCustomer({\n        name: name.trim(), email: email.trim(), mobile: mobile.trim(), password: password.trim(), address: address.trim(),\n      });", "const res = await authService.registerCustomer({\n        name: `${firstName.trim()} ${familyName.trim()}`, username: username.trim(), email: email.trim(), mobile: mobile.trim(), password: password.trim(), address: address.trim(),\n      });")
+          s=s.replace('Email Address or Mobile Number *','Email Address, Username, or Mobile Number *').replace('e.g. name@example.com or 09170000000','e.g. name@example.com, username, or 09170000000')
+          s=s.replace('email or mobile number','email, username, or mobile number').replace('Email address or mobile number','Email address, username, or mobile number')
+          s=s.replace('<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full Name" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required />\n              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><input type="email" value={email}', '<div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /><input type="text" value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="Family Name" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required /></div>\n              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" autoComplete="username" className="w-full px-3.5 py-2.5 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm" required />\n              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><input type="email" value={email}')
+          p.write_text(s)
+
+          # Auth service registration payload
+          p=Path('src/services/authService.ts'); s=p.read_text()
+          sub('src/services/authService.ts', "    name: string;\n    email: string;", "    name: string;\n    username: string;\n    email: string;")
+          s=p.read_text(); sub('src/services/authService.ts', "const { name, email, mobile, password, address } = params;", "const { name, username, email, mobile, password, address } = params;")
+          sub('src/services/authService.ts', "      name,\n      email,", "      name,\n      username,\n      email,")
+
+          # Customer API response + registration
+          p=Path('netlify/functions/customers.mts'); s=p.read_text()
+          s=s.replace('id:String(row.id), name:String(row.name), email:String(row.email),', 'id:String(row.id), name:String(row.name), username:String(row.username || \'\'), email:String(row.email),')
+          s=s.replace("const id=typeof body.id==='string'?body.id.trim():''; const name=typeof body.name==='string'?body.name.trim():''; const email=", "const id=typeof body.id==='string'?body.id.trim():''; const name=typeof body.name==='string'?body.name.trim():''; const username=typeof body.username==='string'?body.username.trim().toLowerCase():''; const email=")
+          s=s.replace("if(!id||!name||!email||!mobile||!address)throw new RequestError(400,'Customer name, email, mobile, address, and ID are required.');", "if(!id||!name||!username||!email||!mobile||!address)throw new RequestError(400,'Customer name, username, email, mobile, address, and ID are required.');\n      if(!/^[a-z0-9._-]{3,32}$/.test(username))throw new RequestError(400,'Username must be 3-32 characters and use only letters, numbers, dots, underscores, or hyphens.');")
+          s=s.replace("SELECT id FROM customers WHERE email=$1 OR id=$2 LIMIT 1`,[email,id]", "SELECT id FROM customers WHERE email=$1 OR id=$2 OR LOWER(username)=$3 LIMIT 1`,[email,id,username]")
+          s=s.replace("INSERT INTO customers (id,name,email,mobile,address,status,role,stamps,points,password_hash,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,'active','customer',$6,$7,$8,NOW(),NOW()) RETURNING id,name,email,mobile,address,status,role,stamps,points,created_at`,[id,name,email,mobile,address,stamps,points,passwordHash]", "INSERT INTO customers (id,name,username,email,mobile,address,status,role,stamps,points,password_hash,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,'active','customer',$7,$8,$9,NOW(),NOW()) RETURNING id,name,username,email,mobile,address,status,role,stamps,points,created_at`,[id,name,username,email,mobile,address,stamps,points,passwordHash]")
+          p.write_text(s)
+
+          # Login + reset lookup
+          p=Path('netlify/functions/customer-password.mts'); s=p.read_text()
+          s=s.replace('id: String(row.id),\n    name: String(row.name),\n    email:', 'id: String(row.id),\n    name: String(row.name),\n    username: String(row.username || \'\'),\n    email:')
+          s=s.replace('Email/mobile and password are required.', 'Email, username/mobile and password are required.')
+          s=s.replace('SELECT id, name, email, mobile, address, status, role, stamps, points, created_at, password_hash', 'SELECT id, name, username, email, mobile, address, status, role, stamps, points, created_at, password_hash')
+          s=s.replace("WHERE LOWER(email) = $1\n              OR regexp_replace(mobile, '\\\\D', '', 'g') = $2", "WHERE LOWER(email) = $1\n              OR LOWER(username) = $1\n              OR regexp_replace(mobile, '\\\\D', '', 'g') = $2")
+          p.write_text(s)
+
+          # DB migration
+          Path('netlify/database/migrations/20260902000000_add-customer-usernames.sql').write_text("""ALTER TABLE customers ADD COLUMN IF NOT EXISTS username VARCHAR(64);\nUPDATE customers SET username = LEFT(COALESCE(NULLIF(regexp_replace(LOWER(name), '[^a-z0-9]+', '', 'g'), ''), 'customer') || '_' || RIGHT(regexp_replace(id, '[^a-zA-Z0-9]', '', 'g'), 6), 64) WHERE username IS NULL OR BTRIM(username) = '';\nCREATE UNIQUE INDEX IF NOT EXISTS customers_username_lower_key ON customers (LOWER(username));\nALTER TABLE customers ALTER COLUMN username SET NOT NULL;\n""")
+          PY
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/auth/CustomerAuthModal.tsx src/services/authService.ts netlify/functions/customers.mts netlify/functions/customer-password.mts netlify/database/migrations/20260902000000_add-customer-usernames.sql
+          git rm .github/workflows/one-time-customer-auth-username.yml
+          git commit -m "Add customer username registration and login"
+          git push origin feature/customer-username-login
