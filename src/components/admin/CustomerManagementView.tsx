@@ -12,7 +12,7 @@ interface CustomerManagementViewProps {
 export const CustomerManagementView: React.FC<CustomerManagementViewProps> = ({ customers = [], orders = [], onShowNotification }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [directoryCustomers, setDirectoryCustomers] = useState<CustomerUser[]>(customers || []);
+  const [directoryCustomers, setDirectoryCustomers] = useState<CustomerUser[]>([]);
   const [resetRequests, setResetRequests] = useState<CustomerPasswordResetRequest[]>([]);
   const [requestLoading, setRequestLoading] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -43,23 +43,16 @@ export const CustomerManagementView: React.FC<CustomerManagementViewProps> = ({ 
     let active = true;
     customerService.listCustomersFromServer().then((serverCustomers) => {
       if (!active) return;
-      const serverIds = new Set(serverCustomers.map((c) => c.id));
-      const serverEmails = new Set(serverCustomers.map((c) => c.email.toLowerCase()));
-      const localOnly = (customers || []).filter((c) => !serverIds.has(c.id) && !serverEmails.has((c.email || '').toLowerCase()));
-      setDirectoryCustomers([...serverCustomers, ...localOnly]);
+      setDirectoryCustomers(serverCustomers);
     }).catch((error) => {
       console.warn('[CustomerManagementView] Failed to load shared customer directory:', error);
       if (active) {
-        setDirectoryCustomers(customers || []);
-        onShowNotification('Unable to refresh the shared customer directory. Showing local records.');
+        setDirectoryCustomers([]);
+        onShowNotification('Unable to refresh the shared customer directory. Please try again.');
       }
     });
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (!directoryCustomers.length && customers.length) setDirectoryCustomers(customers);
-  }, [customers, directoryCustomers.length]);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
