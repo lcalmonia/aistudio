@@ -102,3 +102,13 @@ div[class~="overflow-x-auto"][class~="pt-1"][class~="pb-1"][class~="border-t"] {
 div[class~="overflow-x-auto"][class~="pt-1"][class~="pb-1"][class~="border-t"] > button {
   flex-shrink: 0;
 }
+
+/* Admin product editor: show every modifier/add-on category by wrapping the
+   category pills onto additional rows instead of clipping them horizontally.
+   Other scrolling filter rows remain unchanged. */
+div[class~="overflow-x-auto"][class~="scrolling-hide"][class~="py-0.5"][class~="flex-1"] {
+  flex-wrap: wrap;
+  overflow-x: visible !important;
+  overflow-y: visible;
+  row-gap: 0.25rem;
+}
