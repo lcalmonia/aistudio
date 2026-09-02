@@ -34,9 +34,7 @@ export default async function handler(request: Request): Promise<Response> {
       return json({ claims: result.rows.map(mapClaim) });
     }
 
-    if (request.method !== 'POST') {
-      return json({ error: 'Method not allowed.' }, 405);
-    }
+    if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
 
     enforceSameOrigin(request);
     const body = await readJsonObject(request);
@@ -45,7 +43,8 @@ export default async function handler(request: Request): Promise<Response> {
     if (action === 'request') {
       const customerId = String(body.customerId || '').trim();
       const perkId = String(body.perkId || '').trim();
-      if (!customerId || !perkId) throw new RequestError(400, 'Customer and reward perk are required.');
+      const perkName = String(body.perkName || '').trim();
+      if (!customerId || (!perkId && !perkName)) throw new RequestError(400, 'Customer and reward perk are required.');
 
       const customerResult = await db.pool.query(
         `SELECT id, name, stamps, points FROM customers WHERE id = $1 AND status = 'active' LIMIT 1`,
@@ -56,22 +55,22 @@ export default async function handler(request: Request): Promise<Response> {
 
       const perkResult = await db.pool.query(
         `SELECT id, name, redemption_type, redemption_cost, active
-         FROM loyalty_perks WHERE id = $1 LIMIT 1`,
-        [perkId],
+         FROM loyalty_perks
+         WHERE ($1 <> '' AND id = $1) OR ($2 <> '' AND LOWER(name) = LOWER($2))
+         ORDER BY CASE WHEN $1 <> '' AND id = $1 THEN 0 ELSE 1 END
+         LIMIT 1`,
+        [perkId, perkName],
       );
       const perk = perkResult.rows[0];
       if (!perk || !perk.active) throw new RequestError(404, 'Reward perk is no longer available.');
 
       const balance = perk.redemption_type === 'points' ? Number(customer.points || 0) : Number(customer.stamps || 0);
       const cost = Number(perk.redemption_cost);
-      if (balance < cost) {
-        throw new RequestError(400, `Insufficient ${perk.redemption_type}.`);
-      }
+      if (balance < cost) throw new RequestError(400, `Insufficient ${perk.redemption_type}.`);
 
       const duplicate = await db.pool.query(
-        `SELECT id FROM reward_claims
-         WHERE customer_id = $1 AND perk_id = $2 AND status = 'pending' LIMIT 1`,
-        [customerId, perkId],
+        `SELECT id FROM reward_claims WHERE customer_id = $1 AND perk_id = $2 AND status = 'pending' LIMIT 1`,
+        [customerId, perk.id],
       );
       if (duplicate.rows[0]) throw new RequestError(409, 'You already have a pending claim for this reward.');
 
@@ -95,33 +94,21 @@ export default async function handler(request: Request): Promise<Response> {
       const client = await db.pool.connect();
       try {
         await client.query('BEGIN');
-        const claimResult = await client.query(
-          `SELECT * FROM reward_claims WHERE id = $1 AND status = 'pending' FOR UPDATE`,
-          [claimId],
-        );
+        const claimResult = await client.query(`SELECT * FROM reward_claims WHERE id = $1 AND status = 'pending' FOR UPDATE`, [claimId]);
         const claim = claimResult.rows[0];
         if (!claim) throw new RequestError(404, 'Reward claim is no longer pending.');
 
-        const customerResult = await client.query(
-          `SELECT id, stamps, points FROM customers WHERE id = $1 FOR UPDATE`,
-          [claim.customer_id],
-        );
+        const customerResult = await client.query(`SELECT id, stamps, points FROM customers WHERE id = $1 FOR UPDATE`, [claim.customer_id]);
         const customer = customerResult.rows[0];
         if (!customer) throw new RequestError(404, 'Customer account not found.');
 
         const field = claim.redemption_type === 'points' ? 'points' : 'stamps';
         const balance = Number(customer[field] || 0);
-        if (balance < Number(claim.redemption_cost)) {
-          throw new RequestError(400, `Customer no longer has enough ${claim.redemption_type}.`);
-        }
+        if (balance < Number(claim.redemption_cost)) throw new RequestError(400, `Customer no longer has enough ${claim.redemption_type}.`);
 
-        await client.query(
-          `UPDATE customers SET ${field} = ${field} - $1, updated_at = NOW() WHERE id = $2`,
-          [Number(claim.redemption_cost), claim.customer_id],
-        );
+        await client.query(`UPDATE customers SET ${field} = ${field} - $1, updated_at = NOW() WHERE id = $2`, [Number(claim.redemption_cost), claim.customer_id]);
         const result = await client.query(
-          `UPDATE reward_claims
-           SET status = 'fulfilled', fulfilled_at = NOW()
+          `UPDATE reward_claims SET status = 'fulfilled', fulfilled_at = NOW()
            WHERE id = $1
            RETURNING id, customer_id, customer_name, perk_id, perk_name,
                      redemption_type, redemption_cost, status, requested_at, fulfilled_at`,
@@ -158,7 +145,4 @@ export default async function handler(request: Request): Promise<Response> {
   }
 }
 
-export const config: Config = {
-  path: '/api/reward-claims',
-  method: ['GET', 'POST'],
-};
+export const config: Config = { path: '/api/reward-claims', method: ['GET', 'POST'] };
