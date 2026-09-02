@@ -168,7 +168,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
   };
 
   return (
-    <div className="pt-20 px-3.5 sm:px-5 max-w-2xl mx-auto pb-28">
+    <div className="pt-20 pb-28 px-3.5 sm:px-5 w-full max-w-[1400px] mx-auto">
       {/* Header */}
       <section className="mb-4 sm:mb-5 flex items-start justify-between gap-3">
         <div>

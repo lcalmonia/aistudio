@@ -65,7 +65,7 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
   };
 
   return (
-    <div className="pt-20 px-3.5 sm:px-5 max-w-lg mx-auto pb-28">
+    <div className="pt-20 pb-28 px-3.5 sm:px-5 w-full max-w-[1400px] mx-auto">
       {/* Sub-header & Filter Tabs */}
       <section className="mb-4">
         <div className="flex justify-between items-center mb-1">
