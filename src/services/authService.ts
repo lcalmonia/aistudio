@@ -20,15 +20,17 @@ export const authService = {
   // -------------------------------------------------------------
   async registerCustomer(params: {
     name: string;
+    username: string;
     email: string;
     mobile: string;
     password?: string;
     address: string;
   }): Promise<CustomerAuthResult> {
-    const { name, email, mobile, password, address } = params;
+    const { name, username, email, mobile, password, address } = params;
 
     const res = await customerService.createCustomer({
       name,
+      username,
       email,
       mobile,
       password,

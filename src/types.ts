@@ -170,6 +170,7 @@ export interface Order {
 export interface CustomerUser {
   id: string;
   name: string;
+  username?: string;
   email: string;
   mobile: string;
   address: string;
