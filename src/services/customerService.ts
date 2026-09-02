@@ -2,9 +2,41 @@ import { CustomerUser } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateCustomerId } from './idGenerator';
 
+class CustomerApiError extends Error {
+  constructor(message: string, public readonly status?: number) {
+    super(message);
+  }
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers,
+    },
+  });
+
+  const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
+  if (!response.ok) {
+    throw new CustomerApiError(data.error || 'The customer request could not be completed.', response.status);
+  }
+  return data;
+}
+
 export const customerService = {
   async listCustomers(): Promise<CustomerUser[]> {
     return storageAdapter.getCustomers();
+  },
+
+  /** Fetch the authoritative customer directory from the shared database. */
+  async listCustomersFromServer(): Promise<CustomerUser[]> {
+    const response = await api<{ customers: CustomerUser[] }>('/api/customers', { method: 'GET' });
+    if (!response || !Array.isArray(response.customers)) {
+      throw new CustomerApiError('Invalid customer directory response.');
+    }
+    return response.customers;
   },
 
   async getCustomer(id: string): Promise<CustomerUser | null> {
@@ -36,13 +68,28 @@ export const customerService = {
       createdAt: new Date().toISOString().split('T')[0],
       status: 'active',
       role: 'customer',
-      stamps: 1, // Welcome gift stamp
-      points: 50, // Welcome bonus points
+      stamps: 1,
+      points: 50,
     };
 
-    const updated = [newCustomer, ...customers];
-    storageAdapter.setCustomers(updated);
-    return { success: true, customer: newCustomer };
+    try {
+      const response = await api<{ customer: CustomerUser }>('/api/customers', {
+        method: 'POST',
+        body: JSON.stringify(newCustomer),
+      });
+
+      if (!response?.customer) {
+        return { success: false, error: 'Registration failed.' };
+      }
+
+      const savedCustomer = response.customer;
+      const updated = [savedCustomer, ...customers.filter((c) => c.id !== savedCustomer.id)];
+      storageAdapter.setCustomers(updated);
+      return { success: true, customer: savedCustomer };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Registration failed.';
+      return { success: false, error: message };
+    }
   },
 
   async updateCustomer(
@@ -63,7 +110,6 @@ export const customerService = {
     customers[index] = updatedCustomer;
     storageAdapter.setCustomers(customers);
 
-    // If updating current active customer, sync current session
     const current = storageAdapter.getCurrentCustomer();
     if (current && current.id === id) {
       storageAdapter.setCurrentCustomer(updatedCustomer);
