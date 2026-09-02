@@ -18,13 +18,13 @@ export default async function handler(request: Request, context: Context): Promi
       enforceSameOrigin(request);
       const admin = await requireAuthenticatedAdmin(request);
       const body = await readJsonObject(request);
+      requireSuperAdmin(admin);
 
       if (body.toggleStock === true) {
         const addon = await toggleAddonStockInDatabase(addonId);
         return json({ addon, message: 'Add-on stock toggled.' });
       }
 
-      requireSuperAdmin(admin);
       const addon = await updateAddonInDatabase(addonId, body);
       return json({ addon, message: 'Add-on updated successfully.' });
     }
