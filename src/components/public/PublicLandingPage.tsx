@@ -283,10 +283,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               {/* Main Feature Card */}
               <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white bg-white">
                 <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEPK9an39rFEkfnp4LRaMqlPguV-s_RqdDV3FcNMZJuxAA2NG3s4Vj1YCqZGozzqYBUaORRDaOp1QySWD3zavJSY4WfpCoG_tOmX6LnCt7kbG-aSamCO4-gV_vKuAsnEqCQcBJQV1oJXYCXqiAz0xdScWn3LHH2FL9FY8Os11FNYgSA8OYNMaTpGUSs6lVsJ4RLjDLzmTHawjWGN39KIROIBlVnGpeNKU6y-nW8S2RGne8Y87fgfSG"
-                  alt="Signature Spanish Latte & Treats"
-                  className="w-full h-72 sm:h-80 object-cover"
-                />
+  src="/images/iluvkeyks-store.jpg"
+  alt="iLuvKeyks Coffee & Tea Store"
+  className="w-full h-72 sm:h-80 object-cover"
+/>
                 <div className="p-4 bg-[#fff8f5]">
                   <div className="flex items-center justify-between">
                     <div>
