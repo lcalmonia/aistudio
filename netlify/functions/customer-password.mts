@@ -2,7 +2,7 @@ import type { Config } from '@netlify/functions';
 import { requireAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts';
 import { database } from './_shared/database.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject, RequestError } from './_shared/http.mts';
-import { hashPassword } from './_shared/password.mts';
+import { hashPassword, verifyPassword } from './_shared/password.mts';
 
 const DEFAULT_CUSTOMER_PASSWORD = 'password1234';
 
@@ -63,6 +63,32 @@ export default async function handler(request: Request): Promise<Response> {
       const action = typeof body.action === 'string' ? body.action : '';
       const db = database();
 
+      if (action === 'login') {
+        const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
+        const password = typeof body.password === 'string' ? body.password : '';
+        if (!identifier || !password) throw new RequestError(400, 'Email/mobile and password are required.');
+
+        const normalizedMobile = identifier.replace(/\D/g, '');
+        const result = await db.pool.query(
+          `SELECT id, name, email, mobile, address, status, role, stamps, points, created_at, password_hash
+           FROM customers
+           WHERE LOWER(email) = $1
+              OR regexp_replace(mobile, '\\D', '', 'g') = $2
+              OR LOWER(id) = $1
+           LIMIT 1`,
+          [identifier, normalizedMobile]
+        );
+        const customer = result.rows[0];
+        if (!customer) throw new RequestError(401, 'Account not found. Please verify your email or phone number.');
+        if (customer.status === 'inactive') throw new RequestError(403, 'This account has been deactivated. Please contact cafe support.');
+        if (!customer.password_hash) throw new RequestError(409, 'This account needs a password reset. Please use Forgot Password.');
+
+        const valid = await verifyPassword(password, String(customer.password_hash));
+        if (!valid) throw new RequestError(401, 'Incorrect password. Please verify your credentials.');
+
+        return json({ customer: mapCustomer(customer) });
+      }
+
       if (action === 'request') {
         const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
         if (!identifier) throw new RequestError(400, 'Email or mobile number is required.');
@@ -77,9 +103,7 @@ export default async function handler(request: Request): Promise<Response> {
         );
 
         const customer = result.rows[0];
-        if (!customer) {
-          throw new RequestError(404, 'No customer account was found with those details.');
-        }
+        if (!customer) throw new RequestError(404, 'No customer account was found with those details.');
 
         const existing = await db.pool.query(
           `SELECT id FROM customer_password_reset_requests
