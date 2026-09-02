@@ -1,3 +1,5 @@
+import { storageAdapter } from './storageAdapter';
+
 class OrderResetApiError extends Error {
   constructor(message: string, public readonly status?: number) {
     super(message);
@@ -23,7 +25,7 @@ export const orderResetService = {
       throw new OrderResetApiError(data.error || 'Unable to reset orders.', response.status);
     }
 
-    const deletedOrders = Number(data.deletedOrders || 0);
-    return deletedOrders;
+    storageAdapter.setOrders([]);
+    return Number(data.deletedOrders || 0);
   },
 };
