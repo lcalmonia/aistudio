@@ -65,7 +65,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
       setAvailable(true);
       setSelectedItems([menuItems[0]?.name, menuItems[1]?.name].filter(Boolean));
     }
-  }, [bundleToEdit, isOpen, menuItems]);
+  }, [bundleToEdit?.id, isOpen]);
 
   const handleToggleItem = (itemName: string) => {
     setSelectedItems((prev) =>
