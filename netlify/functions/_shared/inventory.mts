@@ -330,7 +330,7 @@ export async function insertInventoryCategoryToDatabase(name: string): Promise<s
 }
 export async function renameInventoryCategoryInDatabase(
   oldName: string,
-  newName: string,
+  newName: string
 ): Promise<string[]> {
   const cleanOldName = oldName.trim();
   const cleanNewName = newName.trim();
@@ -344,95 +344,180 @@ export async function renameInventoryCategoryInDatabase(
   }
 
   const db = database();
-
   const client = await db.pool.connect();
 
   try {
     await client.query('BEGIN');
 
+    // Make sure the new category name does not already exist.
     const duplicate = await client.query(
-      `SELECT 1
-       FROM inventory_categories
-       WHERE LOWER(name) = LOWER($1)
-       LIMIT 1`,
-      [cleanNewName],
+      `
+        SELECT 1
+        FROM (
+          SELECT name AS category
+          FROM inventory_categories
+
+          UNION
+
+          SELECT DISTINCT category
+          FROM inventory_items
+          WHERE category IS NOT NULL
+            AND category != ''
+        ) AS all_categories
+        WHERE LOWER(category) = LOWER($1)
+        LIMIT 1
+      `,
+      [cleanNewName]
     );
 
     if (duplicate.rowCount) {
       throw new RequestError(409, 'A category with that name already exists.');
     }
 
-    const result = await client.query(
-      `UPDATE inventory_categories
-       SET name = $1
-       WHERE LOWER(name) = LOWER($2)`,
-      [cleanNewName, cleanOldName],
+    // Check whether the old category actually exists anywhere.
+    const existing = await client.query(
+      `
+        SELECT 1
+        FROM (
+          SELECT name AS category
+          FROM inventory_categories
+
+          UNION
+
+          SELECT DISTINCT category
+          FROM inventory_items
+          WHERE category IS NOT NULL
+            AND category != ''
+        ) AS all_categories
+        WHERE LOWER(category) = LOWER($1)
+        LIMIT 1
+      `,
+      [cleanOldName]
     );
 
-    if (!result.rowCount) {
+    if (!existing.rowCount) {
       throw new RequestError(404, 'Inventory category not found.');
     }
 
+    // Rename the category in the category table if it exists there.
     await client.query(
-      `UPDATE inventory_items
-       SET category = $1
-       WHERE LOWER(category) = LOWER($2)`,
-      [cleanNewName, cleanOldName],
+      `
+        UPDATE inventory_categories
+        SET name = $1
+        WHERE LOWER(name) = LOWER($2)
+      `,
+      [cleanNewName, cleanOldName]
+    );
+
+    // Rename the category on all inventory items using it.
+    await client.query(
+      `
+        UPDATE inventory_items
+        SET category = $1
+        WHERE LOWER(category) = LOWER($2)
+      `,
+      [cleanNewName, cleanOldName]
+    );
+
+    // If the category existed only through inventory_items,
+    // make sure the renamed category is also represented
+    // in inventory_categories.
+    await client.query(
+      `
+        INSERT INTO inventory_categories (name, created_at)
+        VALUES ($1, NOW())
+        ON CONFLICT (name) DO NOTHING
+      `,
+      [cleanNewName]
     );
 
     await client.query('COMMIT');
+
+    return fetchInventoryCategoriesFromDatabase();
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
   }
-
-  return fetchInventoryCategoriesFromDatabase();
 }
 
 export async function deleteInventoryCategoryFromDatabase(
-  categoryName: string,
-  fallbackCategory: string = 'Coffee Beans',
+  categoryName: string
 ): Promise<string[]> {
   const cleanCategory = categoryName.trim();
-  const cleanFallback = fallbackCategory.trim();
 
   if (!cleanCategory) {
     throw new RequestError(400, 'Category name is required.');
   }
 
-  if (cleanCategory.toLowerCase() === cleanFallback.toLowerCase()) {
-    throw new RequestError(400, 'The fallback category cannot be deleted.');
-  }
-
   const db = database();
-
   const client = await db.pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    await client.query(
-      `UPDATE inventory_items
-       SET category = $1
-       WHERE LOWER(category) = LOWER($2)`,
-      [cleanFallback, cleanCategory],
+    // Check whether the category exists anywhere in the database.
+    const existing = await client.query(
+      `
+        SELECT 1
+        FROM (
+          SELECT name AS category
+          FROM inventory_categories
+
+          UNION
+
+          SELECT DISTINCT category
+          FROM inventory_items
+          WHERE category IS NOT NULL
+            AND category != ''
+        ) AS all_categories
+        WHERE LOWER(category) = LOWER($1)
+        LIMIT 1
+      `,
+      [cleanCategory]
     );
 
+    if (!existing.rowCount) {
+      throw new RequestError(404, 'Inventory category not found.');
+    }
+
+    // Do not silently move products to a hard-coded category.
+    // Require the category to be empty before deleting it.
+    const items = await client.query(
+      `
+        SELECT COUNT(*)::int AS count
+        FROM inventory_items
+        WHERE LOWER(category) = LOWER($1)
+      `,
+      [cleanCategory]
+    );
+
+    const itemCount = Number(items.rows[0]?.count ?? 0);
+
+    if (itemCount > 0) {
+      throw new RequestError(
+        409,
+        `Cannot delete "${cleanCategory}" because it contains ${itemCount} inventory item${itemCount === 1 ? '' : 's'}. Move those items to another category first.`
+      );
+    }
+
+    // Delete the category itself.
     await client.query(
-      `DELETE FROM inventory_categories
-       WHERE LOWER(name) = LOWER($1)`,
-      [cleanCategory],
+      `
+        DELETE FROM inventory_categories
+        WHERE LOWER(name) = LOWER($1)
+      `,
+      [cleanCategory]
     );
 
     await client.query('COMMIT');
+
+    return fetchInventoryCategoriesFromDatabase();
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
   }
-
-  return fetchInventoryCategoriesFromDatabase();
 }
