@@ -147,15 +147,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </button>
             )}
 
-            {/* Main Primary "ORDER ONLINE" Button */}
-            <button
-              id="landing-order-online-btn"
-              onClick={onOrderOnline}
-              className="px-4 sm:px-5 py-2.5 bg-[#26170c] hover:bg-[#3d2b1f] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer border border-[#26170c]"
-            >
-              <span className="material-symbols-outlined text-[18px] text-[#fbddca]">shopping_bag</span>
-              <span>ORDER ONLINE</span>
-            </button>
+           
 
             {/* Mobile Menu Hamburger */}
             <button
