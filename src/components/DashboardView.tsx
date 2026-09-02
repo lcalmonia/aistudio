@@ -34,7 +34,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const recentOrders = (orders || []).slice(0, 3);
 
   return (
-    <div className="pt-20 pb-28 px-3.5 sm:px-5 max-w-lg mx-auto">
+    <div className="w-full max-w-[1400px] mx-auto pt-20 pb-28 px-3.5 sm:px-5">
       {/* Header Section */}
       <section className="mb-5 sm:mb-6 flex items-center justify-between">
         <div>
