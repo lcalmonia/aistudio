@@ -11,6 +11,7 @@ export * from './promoService';
 export * from './inventoryService';
 export * from './settingsService';
 export * from './loyaltyService';
+export * from './loyaltyConfigService';
 export * from './auxiliaryServices';
 export * from './reportingService';
 export * from './routeService';
