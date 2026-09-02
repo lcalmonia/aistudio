@@ -1,0 +1,20 @@
+name: Patch reward claims
+on:
+  push:
+    branches:
+      - admin-reward-claims
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch files
+        run: |
+          python -c "from pathlib import Path; p=Path('src/components/customer/CustomerOrderPortal.tsx'); s=p.read_text(); s=s.replace(\"import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';\", \"import { CustomerOrderSuccessModal } from './CustomerOrderSuccessModal';\\nimport { rewardClaimService } from '../../services/rewardClaimService';\", 1); s=s.replace(\"  const handleRedeemPerk = async (perk: LoyaltyPerk) => { const { loyaltyService } = await import('../../services/loyaltyService'); const result = perk.redemptionType === 'points' ? await loyaltyService.redeemPoints(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`) : await loyaltyService.redeemStamps(currentCustomer.id, perk.redemptionCost, `Redeemed perk: ${perk.name}`); if (!result.success) { window.alert(result.error || 'Unable to redeem this perk.'); return; } window.location.reload(); };\", \"  const handleRedeemPerk = async (perk: LoyaltyPerk) => { try { await rewardClaimService.requestClaim(currentCustomer.id, perk.id); window.alert(`Reward claim sent! Please see the counter/barista to claim: ${perk.name}.`); } catch (error) { window.alert(error instanceof Error ? error.message : 'Unable to request this reward.'); } };\", 1); p.write_text(s)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/customer/CustomerOrderPortal.tsx
+          git commit -m "Send customer reward claims to admin queue"
+          git push
