@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PromoBundle, MenuItem } from '../types';
 import { calculateBundleOriginalPrice, calculateBundleSavings } from '../utils/bundlePricing';
+import { prepareUploadedImage } from '../utils/imageCompression';
 
 interface EditBundleModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
   menuItems = [],
 }) => {
   const isEditing = Boolean(bundleToEdit);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState(bundleToEdit?.name || '');
   const [description, setDescription] = useState(bundleToEdit?.description || '');
@@ -27,11 +29,13 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
   const [discountBadge, setDiscountBadge] = useState(bundleToEdit?.discountBadge || 'Save 20%');
   const [temperatureOption, setTemperatureOption] = useState(bundleToEdit?.temperatureOption || 'Choice of Hot or Iced Drink');
   const [timeSlot, setTimeSlot] = useState(bundleToEdit?.timeSlot || 'Daily until 11:30 AM');
-  const [image, setImage] = useState(bundleToEdit?.image || menuItems[0]?.image || '');
+  const [image, setImage] = useState(bundleToEdit?.image || '');
   const [available, setAvailable] = useState<boolean>(bundleToEdit?.available ?? true);
   const [selectedItems, setSelectedItems] = useState<string[]>(
     bundleToEdit?.bundleItems || [menuItems[0]?.name, menuItems[1]?.name].filter(Boolean)
   );
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState('');
 
   // Dynamically calculate the combined original/base price from selected menu items
   const calculatedOriginalPrice = useMemo(() => {
@@ -51,7 +55,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
       setDiscountBadge(bundleToEdit.discountBadge || 'Save 20%');
       setTemperatureOption(bundleToEdit.temperatureOption || 'Choice of Hot or Iced Drink');
       setTimeSlot(bundleToEdit.timeSlot || 'Daily until 11:30 AM');
-      setImage(bundleToEdit.image || menuItems[0]?.image || '');
+      setImage(bundleToEdit.image || '');
       setAvailable(bundleToEdit.available ?? true);
       setSelectedItems(bundleToEdit.bundleItems || []);
     } else {
@@ -61,10 +65,13 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
       setDiscountBadge('Save 20%');
       setTemperatureOption('Choice of Hot or Iced Drink');
       setTimeSlot('Daily until 11:30 AM');
-      setImage(menuItems[0]?.image || '');
+      setImage('');
       setAvailable(true);
       setSelectedItems([menuItems[0]?.name, menuItems[1]?.name].filter(Boolean));
     }
+    setIsUploadingImage(false);
+    setImageUploadError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [bundleToEdit?.id, isOpen]);
 
   const handleToggleItem = (itemName: string) => {
@@ -73,9 +80,25 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
     );
   };
 
+  const handleImageUpload = async (file?: File) => {
+    if (!file) return;
+
+    setImageUploadError('');
+    setIsUploadingImage(true);
+    try {
+      const preparedImage = await prepareUploadedImage(file);
+      setImage(preparedImage);
+    } catch (error) {
+      console.error('[EditBundleModal] Failed to prepare uploaded image', error);
+      setImageUploadError('Unable to process this photo. Please choose another image.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isUploadingImage) return;
 
     // Use calculated original price, falling back to bundle price if no items matched
     const finalOriginalPrice = calculatedOriginalPrice > 0 ? calculatedOriginalPrice : Number(price);
@@ -88,7 +111,7 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
       price: Number(price),
       originalPrice: finalOriginalPrice,
       discountBadge: discountBadge.trim() || (savingsAmount > 0 ? `Save ₱${savingsAmount.toFixed(0)}` : ''),
-      image: image || menuItems[0]?.image,
+      image: image || undefined,
       available,
       temperatureOption: temperatureOption.trim(),
       timeSlot: timeSlot.trim(),
@@ -265,16 +288,60 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
             </div>
           </div>
 
-          {/* Bundle Image Selection */}
+          {/* Bundle Cover Photo Upload */}
           <div>
-            <label className="block text-xs font-bold text-[#26170c] mb-1">Bundle Cover Photo URL</label>
-            <input
-              type="url"
-              placeholder="https://..."
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-[#d2c4bc]"
-            />
+            <label className="block text-xs font-bold text-[#26170c] mb-1">Bundle Cover Photo</label>
+            <div className="rounded-xl border border-[#d2c4bc] bg-white p-3 space-y-2">
+              {image ? (
+                <div className="relative overflow-hidden rounded-lg border border-[#e8e1df] bg-[#f9f2f0]">
+                  <img src={image} alt="Bundle cover preview" className="w-full h-36 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImage('');
+                      setImageUploadError('');
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="absolute top-2 right-2 px-2 py-1 rounded-full bg-[#26170c] text-white text-[10px] font-bold shadow-md cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="h-24 rounded-lg border border-dashed border-[#d2c4bc] bg-[#f9f2f0] flex items-center justify-center text-center px-4">
+                  <div>
+                    <span className="material-symbols-outlined text-[28px] text-[#81756e]">add_photo_alternate</span>
+                    <p className="text-[11px] text-[#81756e]">Upload a cover photo for this bundle</p>
+                  </div>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImageUpload(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="w-full px-3 py-2 rounded-xl bg-[#26170c] text-white text-xs font-bold hover:bg-[#3d2b1f] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined align-middle text-[16px] mr-1">
+                  {isUploadingImage ? 'progress_activity' : 'upload'}
+                </span>
+                {isUploadingImage ? 'Processing Photo...' : image ? 'Replace Cover Photo' : 'Upload Cover Photo'}
+              </button>
+
+              {imageUploadError && (
+                <p className="text-[10px] font-semibold text-[#ba1a1a]">{imageUploadError}</p>
+              )}
+              <p className="text-[10px] text-[#81756e]">
+                Upload an image file only. The photo is prepared the same way as menu item photos.
+              </p>
+            </div>
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#26170c] pt-1">
@@ -310,7 +377,8 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              className="px-5 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f] transition-all cursor-pointer"
+              disabled={isUploadingImage}
+              className="px-5 py-2 bg-[#26170c] text-white text-xs font-bold rounded-full hover:bg-[#3d2b1f] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isEditing ? 'Update Bundle' : 'Save Bundle'}
             </button>
@@ -320,4 +388,3 @@ export const EditBundleModal: React.FC<EditBundleModalProps> = ({
     </div>
   );
 };
-

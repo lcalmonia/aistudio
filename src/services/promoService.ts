@@ -1,6 +1,7 @@
 import { PromoBundle } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
+import { catalogImageService } from './catalogImageService';
 
 export class PromoApiError extends Error {
   constructor(
@@ -81,6 +82,10 @@ export const promoService = {
       id: bundle.id || generateEntityId('bundle'),
     };
 
+    if (newBundle.image?.startsWith('data:image/')) {
+      newBundle.image = await catalogImageService.persistImage(newBundle.image, 'bundle', newBundle.id);
+    }
+
     const response = await api<{ bundle: PromoBundle }>('/api/bundles', {
       method: 'POST',
       body: JSON.stringify(newBundle),
@@ -98,9 +103,14 @@ export const promoService = {
     id: string,
     updates: Partial<PromoBundle>
   ): Promise<PromoBundle | null> {
+    const serverUpdates: Partial<PromoBundle> = { ...updates };
+    if (serverUpdates.image?.startsWith('data:image/')) {
+      serverUpdates.image = await catalogImageService.persistImage(serverUpdates.image, 'bundle', id);
+    }
+
     const response = await api<{ bundle: PromoBundle }>(`/api/bundles/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(serverUpdates),
     });
     if (response && response.bundle) {
       const bundles = storageAdapter.getPromoBundles();
@@ -150,4 +160,3 @@ export const promoService = {
     throw new PromoApiError('Failed to toggle combo bundle availability on server.');
   },
 };
-
