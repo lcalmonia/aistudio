@@ -1,0 +1,54 @@
+name: Finalize client payment
+on:
+  push:
+    branches:
+      - feature/collapsible-barista-order-sections
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.actor == 'lcalmonia'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch client payment persistence
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/App.tsx')
+          s = p.read_text()
+          old = "const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {\n    const updated = await orderService.updateOrderStatus(orderId, newStatus);"
+          new = "const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card') => {\n    const updated = await orderService.updateOrderStatus(orderId, newStatus, paymentMethod);"
+          if old in s: p.write_text(s.replace(old, new, 1))
+
+          p = Path('src/services/orderService.ts')
+          s = p.read_text()
+          old = "async updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {"
+          new = "async updateOrderStatus(orderId: string, status: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card'): Promise<Order | null> {"
+          if old in s: s = s.replace(old, new, 1)
+          old = "body: JSON.stringify({ status }),"
+          new = "body: JSON.stringify({ status, ...(paymentMethod ? { paymentMethod } : {}) }),"
+          if old in s: s = s.replace(old, new, 1)
+          old = "      status,\n      updatedAt: new Date().toISOString(),"
+          new = "      status,\n      ...(paymentMethod ? { paymentMethod } : {}),\n      updatedAt: new Date().toISOString(),"
+          if old in s: s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('netlify/functions/_shared/orders.mts')
+          s = p.read_text()
+          old = "export async function updateOrderStatusInDatabase(orderId: string, status: OrderStatus): Promise<FormattedOrder> {"
+          new = "export async function updateOrderStatusInDatabase(orderId: string, status: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card'): Promise<FormattedOrder> {"
+          if old in s: s = s.replace(old, new, 1)
+          old = "    let updateQuery = `\n      UPDATE orders\n      SET status = $1,\n          updated_at = NOW()\n    `;\n    const params: unknown[] = [status];\n    let paramIndex = 2;"
+          new = "    let updateQuery = `\n      UPDATE orders\n      SET status = $1,\n          updated_at = NOW()\n    `;\n    const params: unknown[] = [status];\n    let paramIndex = 2;\n\n    if (paymentMethod) {\n      updateQuery += `, payment_method = $${paramIndex}`;\n      params.push(paymentMethod);\n      paramIndex += 1;\n    }"
+          if old in s: s = s.replace(old, new, 1)
+          p.write_text(s)
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/services/orderService.ts netlify/functions/_shared/orders.mts .github/workflows/finalize-client-payment.yml
+          git commit -m "feat: persist selected barista payment method"
+          git rm .github/workflows/finalize-client-payment.yml
+          git commit -m "chore: remove temporary client payment workflow"
+          git push
