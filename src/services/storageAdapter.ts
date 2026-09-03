@@ -40,17 +40,24 @@ const KEYS = {
   STAFF_CREDENTIALS: 'iluvkeyks_staff_cred_v2',
   CUSTOMER_CREDENTIALS: 'iluvkeyks_cust_cred_v2',
   ORDERS: 'iluvkeyks_orders_v2',
-  MENU_ITEMS: 'iluvkeyks_menu_items_v2',
+  // v3 deliberately invalidates the previous browser catalog cache.
+  // The server database is the only authoritative source for catalog data.
+  MENU_ITEMS: 'iluvkeyks_menu_items_v3',
   CATEGORIES: 'iluvkeyks_categories_v2',
   MODIFIER_CATEGORIES: 'iluvkeyks_modifier_categories_v2',
   ADDONS: 'iluvkeyks_addons_v2',
-  BUNDLES: 'iluvkeyks_bundles_v2',
+  BUNDLES: 'iluvkeyks_bundles_v3',
   INVENTORY: 'iluvkeyks_inventory_v2',
   INVENTORY_CATEGORIES: 'iluvkeyks_inv_cats_v2',
   INVENTORY_MOVEMENTS: 'iluvkeyks_inv_mov_v2',
   LOYALTY_TRANSACTIONS: 'iluvkeyks_loyalty_tx_v2',
   SETTINGS: 'iluvkeyks_settings_v2',
 } as const;
+
+const LEGACY_CATALOG_KEYS = [
+  'iluvkeyks_menu_items_v2',
+  'iluvkeyks_bundles_v2',
+] as const;
 
 function safeGetItem<T>(key: string, fallback: T): T {
   try {
@@ -81,6 +88,13 @@ function safeRemoveItem(key: string): void {
     console.error(`[StorageAdapter] Failed to remove key \"${key}\"`, err);
   }
 }
+
+function clearLegacyCatalogCache(): void {
+  LEGACY_CATALOG_KEYS.forEach(safeRemoveItem);
+}
+
+// Remove the old browser catalog cache before any catalog state is read.
+clearLegacyCatalogCache();
 
 // Customers
 export const storageAdapter = {
@@ -143,6 +157,7 @@ export const storageAdapter = {
   clearCatalogCache: (): void => {
     safeRemoveItem(KEYS.MENU_ITEMS);
     safeRemoveItem(KEYS.BUNDLES);
+    clearLegacyCatalogCache();
   },
 
   // Categories
