@@ -35,13 +35,25 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+/**
+ * Keep the customer/admin catalog deterministic by name. The server remains
+ * authoritative; sorting is presentation-only and does not mutate the server
+ * order or the underlying records.
+ */
+function sortMenuItems(items: MenuItem[]): MenuItem[] {
+  return [...items].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true })
+  );
+}
+
 export const menuService = {
   async listMenuItems(): Promise<MenuItem[]> {
     try {
       const response = await api<{ menuItems: MenuItem[] }>('/api/menu-items', { method: 'GET' });
       if (response && Array.isArray(response.menuItems)) {
-        storageAdapter.setMenuItems(response.menuItems);
-        return response.menuItems;
+        const sortedItems = sortMenuItems(response.menuItems);
+        storageAdapter.setMenuItems(sortedItems);
+        return sortedItems;
       }
     } catch (err) {
       if (err instanceof MenuApiError) {
@@ -87,7 +99,7 @@ export const menuService = {
 
     if (response && response.menuItem) {
       const items = storageAdapter.getMenuItems().filter((i) => i.id !== response.menuItem.id);
-      storageAdapter.setMenuItems([response.menuItem, ...items]);
+      storageAdapter.setMenuItems(sortMenuItems([response.menuItem, ...items]));
       return response.menuItem;
     }
 
@@ -110,9 +122,9 @@ export const menuService = {
       const index = items.findIndex((i) => i.id === id);
       if (index !== -1) {
         items[index] = response.menuItem;
-        storageAdapter.setMenuItems(items);
+        storageAdapter.setMenuItems(sortMenuItems(items));
       } else {
-        storageAdapter.setMenuItems([response.menuItem, ...items]);
+        storageAdapter.setMenuItems(sortMenuItems([response.menuItem, ...items]));
       }
       return response.menuItem;
     }
@@ -127,7 +139,7 @@ export const menuService = {
 
     const items = storageAdapter.getMenuItems();
     const filtered = items.filter((i) => i.id !== id);
-    storageAdapter.setMenuItems(filtered);
+    storageAdapter.setMenuItems(sortMenuItems(filtered));
     return true;
   },
 
@@ -142,9 +154,9 @@ export const menuService = {
       const index = items.findIndex((i) => i.id === id);
       if (index !== -1) {
         items[index] = response.menuItem;
-        storageAdapter.setMenuItems(items);
+        storageAdapter.setMenuItems(sortMenuItems(items));
       } else {
-        storageAdapter.setMenuItems([response.menuItem, ...items]);
+        storageAdapter.setMenuItems(sortMenuItems([response.menuItem, ...items]));
       }
       return response.menuItem;
     }
@@ -153,7 +165,8 @@ export const menuService = {
   },
 
   async saveMenuItems(items: MenuItem[]): Promise<MenuItem[]> {
-    storageAdapter.setMenuItems(items);
-    return items;
+    const sortedItems = sortMenuItems(items);
+    storageAdapter.setMenuItems(sortedItems);
+    return sortedItems;
   },
 };
