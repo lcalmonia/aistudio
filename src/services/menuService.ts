@@ -1,6 +1,7 @@
 import { MenuItem } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
+import { catalogImageService } from './catalogImageService';
 
 export class MenuApiError extends Error {
   constructor(
@@ -74,6 +75,10 @@ export const menuService = {
       id: item.id || generateEntityId('menu'),
     };
 
+    if (newItem.image?.startsWith('data:image/')) {
+      newItem.image = await catalogImageService.persistImage(newItem.image, 'menu', newItem.id);
+    }
+
     const response = await api<{ menuItem: MenuItem }>('/api/menu-items', {
       method: 'POST',
       body: JSON.stringify(newItem),
@@ -89,9 +94,14 @@ export const menuService = {
   },
 
   async updateMenuItem(id: string, updates: Partial<MenuItem>): Promise<MenuItem | null> {
+    const serverUpdates: Partial<MenuItem> = { ...updates };
+    if (serverUpdates.image?.startsWith('data:image/')) {
+      serverUpdates.image = await catalogImageService.persistImage(serverUpdates.image, 'menu', id);
+    }
+
     const response = await api<{ menuItem: MenuItem }>(`/api/menu-items/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(serverUpdates),
     });
 
     if (response && response.menuItem) {
