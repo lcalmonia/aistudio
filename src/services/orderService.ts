@@ -180,11 +180,11 @@ export const orderService = {
   /**
    * Update order status on the central server
    */
-  async updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {
+  async updateOrderStatus(orderId: string, status: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card'): Promise<Order | null> {
     try {
       const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(paymentMethod ? { paymentMethod } : {}) }),
       });
 
       if (response && response.order) {
@@ -205,6 +205,7 @@ export const orderService = {
     const updatedOrder: Order = {
       ...local[index],
       status,
+      ...(paymentMethod ? { paymentMethod } : {}),
       updatedAt: new Date().toISOString(),
       completedAt: status === 'Completed' ? new Date().toISOString() : local[index].completedAt,
       cancelledAt: status === 'Cancelled' ? new Date().toISOString() : local[index].cancelledAt,
