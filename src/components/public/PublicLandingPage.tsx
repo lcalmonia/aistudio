@@ -493,7 +493,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </p>
             <p className="text-xs sm:text-sm text-[#4f453f] leading-relaxed">
               From your favorite coffee and refreshing drinks to satisfying meals and our signature Tub Cakes, everything is prepared with care to make every visit and every order special.
-              <p className="text-xs sm:text-sm text-[#4f453f] leading-relaxed">
+            </p>
+            <p className="text-xs sm:text-sm text-[#4f453f] leading-relaxed">
               Whether you're grabbing a coffee, enjoying a meal with friends, or celebrating with a box of cakes, iLuvKeyks is here to make your day a little sweeter.
             </p>
 
