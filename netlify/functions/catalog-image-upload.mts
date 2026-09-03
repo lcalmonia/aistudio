@@ -1,5 +1,5 @@
 import type { Config, Context } from '@netlify/functions';
-import { requireSuperAdmin } from './_shared/auth.mts';
+import { getAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts';
 import { database } from './_shared/database.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject, RequestError } from './_shared/http.mts';
 
@@ -26,7 +26,8 @@ export default async function handler(request: Request, _context: Context): Prom
     if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
 
     enforceSameOrigin(request);
-    await requireSuperAdmin(request);
+    const admin = await getAuthenticatedAdmin(request);
+    requireSuperAdmin(admin);
 
     const body = await readJsonObject(request);
     const entityType = assertEntityType(body.entityType);
