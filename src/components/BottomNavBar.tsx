@@ -26,7 +26,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
       </button>
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-between items-center px-1.5 xs:px-2 sm:px-3 pb-2.5 pt-1.5 bg-[#f9f2f0] border-t border-[#f3ecea] shadow-[0_-4px_16px_rgba(61,43,31,0.06)] rounded-t-2xl max-w-xl mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-between items-center px-1.5 xs:px-2 sm:px-3 pb-2.5 pt-1.5 bg-[#f9f2f0] border-t border-[#f3ecea] shadow-[0_-4px_16px_rgba(61,43,31,0.06)] rounded-t-2xl max-w-2xl mx-auto">
         {/* Home / Dashboard */}
         <button
           onClick={() => onSelectTab('home')}
@@ -90,6 +90,19 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
         >
           <span className="material-symbols-outlined text-[18px] xs:text-[20px]">inventory_2</span>
           <span className="text-[9px] xs:text-[10px] font-semibold tracking-tight truncate">Stock</span>
+        </button>
+
+        {/* Settings */}
+        <button
+          onClick={() => onSelectTab('settings')}
+          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 duration-150 cursor-pointer min-w-0 ${
+            currentTab === 'settings'
+              ? 'bg-[#e1e1c9] text-[#636451] rounded-full px-1 xs:px-2 font-bold shadow-xs'
+              : 'text-[#4f453f] hover:text-[#26170c] px-0.5'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px] xs:text-[20px]">settings</span>
+          <span className="text-[9px] xs:text-[10px] font-semibold tracking-tight truncate">Settings</span>
         </button>
       </nav>
     </>
