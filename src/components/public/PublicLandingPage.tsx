@@ -228,11 +228,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
 
             <h1 className="font-serif text-3xl sm:text-5xl lg:text-[54px] font-extrabold text-[#26170c] leading-[1.15] tracking-tight">
-              Artisanal Coffee, Refreshing Teas & Signature Tub Cakes.
+              Your Local Coffee & Cake Shop.
             </h1>
 
             <p className="text-sm sm:text-base text-[#4f453f] max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              Experience the perfect blend of rich espresso, creamy ceremonial matcha, savory rice meals, and our famous layered cakes on tub — prepared fresh daily in {branchName}.
+              Fresh coffee, refreshing drinks, delicious meals, and our signature cakes — made with love at iLuvKeyks, {branchName}.
             </p>
 
             {/* Hero CTAs */}
@@ -486,23 +486,25 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               Our Passion & Craft
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#26170c] leading-tight">
-              Crafted with Love, Baked in Tubs, Brewed to Perfection.
+              Made with Love, Served with Happiness..
             </h2>
             <p className="text-xs sm:text-sm text-[#4f453f] leading-relaxed">
-              At {storeName}, we believe that every cup of coffee and every bite of cake should bring comfort to your day. Founded with a deep love for Filipino cafe culture, our kitchen pairs premium espresso roasts with delightful dessert innovations like our viral Tub Cakes.
+              At {storeName}, we love bringing together good coffee, delicious food, and freshly made cakes in one cozy place.
             </p>
             <p className="text-xs sm:text-sm text-[#4f453f] leading-relaxed">
-              Whether you're stopping by for your morning Spanish Latte, dining in with friends over Truffle Pasta, or ordering fresh tub cakes for family celebrations, we are committed to delivering warmth and quality in every single order.
+              From your favorite coffee and refreshing drinks to satisfying meals and our signature Tub Cakes, everything is prepared with care to make every visit and every order special.
+              <p className="text-xs sm:text-sm text-[#4f453f] leading-relaxed">
+              Whether you're grabbing a coffee, enjoying a meal with friends, or celebrating with a box of cakes, iLuvKeyks is here to make your day a little sweeter.
             </p>
 
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="p-4 bg-[#f9f2f0] rounded-2xl border border-[#f3ecea]">
                 <h4 className="font-serif text-2xl font-bold text-[#26170c]">100%</h4>
-                <p className="text-xs text-[#4f453f] font-medium">Locally Sourced & Artisanal</p>
+                <p className="text-xs text-[#4f453f] font-medium">Fresh & Handcrafted</p>
               </div>
               <div className="p-4 bg-[#f9f2f0] rounded-2xl border border-[#f3ecea]">
-                <h4 className="font-serif text-2xl font-bold text-[#26170c]">Daily</h4>
-                <p className="text-xs text-[#4f453f] font-medium">Fresh Baked Batches</p>
+                <h4 className="font-serif text-2xl font-bold text-[#26170c]">Fresh Baked Batches</h4>
+                
               </div>
             </div>
           </div>
