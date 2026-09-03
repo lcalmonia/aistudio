@@ -1,4 +1,17 @@
-import { PromoVoucher } from '../types';
+export interface PromoVoucher {
+  id: string;
+  code: string;
+  description: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minimumOrderAmount: number;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: string | null;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 const api = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
