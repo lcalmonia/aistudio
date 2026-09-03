@@ -1,0 +1,31 @@
+name: Finalize payment persistence
+on:
+  push:
+    branches:
+      - feature/collapsible-barista-order-sections
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.actor == 'lcalmonia'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch order detail endpoint
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('netlify/functions/order-detail.mts')
+          s = p.read_text()
+          old = "const updatedOrder = await updateOrderStatusInDatabase(orderId, status);"
+          new = "const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : undefined;\n      if (paymentMethod && !['GCash', 'Maya', 'Cash', 'Card'].includes(paymentMethod)) {\n        throw new RequestError(400, `Invalid payment method \\\"${paymentMethod}\\\".`);\n      }\n\n      const updatedOrder = await updateOrderStatusInDatabase(orderId, status, paymentMethod as 'GCash' | 'Maya' | 'Cash' | 'Card' | undefined);"
+          if old not in s: raise SystemExit('order-detail update call not found')
+          p.write_text(s.replace(old, new, 1))
+      - name: Remove temporary workflows
+        run: |
+          rm -f .github/workflows/patch-payment-persistence.yml .github/workflows/finalize-payment-persistence.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add netlify/functions/order-detail.mts src/App.tsx src/services/orderService.ts netlify/functions/_shared/orders.mts .github/workflows/patch-payment-persistence.yml .github/workflows/finalize-payment-persistence.yml
+          git commit -m "feat: persist barista payment method on completion"
+          git push
