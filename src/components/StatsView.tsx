@@ -142,6 +142,29 @@ export const StatsView: React.FC<StatsViewProps> = ({
     return reportingService.calculateSalesSummary(rangeOrders);
   }, [rangeOrders]);
 
+  const paymentBreakdown = useMemo(() => {
+    const breakdown = {
+      GCash: 0,
+      Maya: 0,
+      Cash: 0,
+      Card: 0,
+      Unspecified: 0,
+    };
+
+    rangeOrders
+      .filter((order) => order && order.status !== 'Cancelled')
+      .forEach((order) => {
+        const amount = order.total || 0;
+        if (order.paymentMethod && order.paymentMethod in breakdown) {
+          breakdown[order.paymentMethod] += amount;
+        } else {
+          breakdown.Unspecified += amount;
+        }
+      });
+
+    return breakdown;
+  }, [rangeOrders]);
+
   const topProducts = useMemo(() => {
     return reportingService.calculateTopSellingItems(rangeOrders, menuItems);
   }, [rangeOrders, menuItems]);
@@ -336,6 +359,33 @@ export const StatsView: React.FC<StatsViewProps> = ({
           <span className="text-[11px] font-medium text-[#5e604d] flex items-center gap-0.5 mt-1">
             {summary.totalOrdersCount} {summary.totalOrdersCount === 1 ? 'order' : 'orders'} in period
           </span>
+
+          <div className="mt-3 pt-3 border-t border-[#dec1af]/50">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#81756e]">Payment Breakdown</span>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2">
+              {([
+                ['GCash', paymentBreakdown.GCash],
+                ['Maya', paymentBreakdown.Maya],
+                ['Cash', paymentBreakdown.Cash],
+                ['Card', paymentBreakdown.Card],
+              ] as const).map(([method, amount]) => (
+                <div key={method} className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="font-semibold text-[#4f453f]">{method}</span>
+                  <span className="font-bold text-[#26170c] whitespace-nowrap">
+                    ₱{amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {paymentBreakdown.Unspecified > 0 && (
+              <div className="flex items-center justify-between gap-2 text-[10px] mt-1.5 pt-1.5 border-t border-[#dec1af]/30">
+                <span className="font-semibold text-[#81756e]">Unspecified</span>
+                <span className="font-bold text-[#81756e] whitespace-nowrap">
+                  ₱{paymentBreakdown.Unspecified.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Avg. Ticket */}
