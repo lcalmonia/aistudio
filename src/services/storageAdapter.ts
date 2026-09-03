@@ -23,11 +23,9 @@ import {
 import {
   INITIAL_CUSTOMERS,
   INITIAL_ORDERS,
-  INITIAL_MENU_ITEMS,
   DEFAULT_CATEGORIES,
   DEFAULT_MODIFIER_CATEGORIES,
   INITIAL_ADDONS,
-  INITIAL_PROMO_BUNDLES,
   INVENTORY_ITEMS,
   DEFAULT_INVENTORY_CATEGORIES,
   DEFAULT_STORE_SETTINGS,
@@ -61,7 +59,7 @@ function safeGetItem<T>(key: string, fallback: T): T {
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch (err) {
-    console.warn(`[StorageAdapter] Failed to parse key "${key}"`, err);
+    console.warn(`[StorageAdapter] Failed to parse key \"${key}\"`, err);
     return fallback;
   }
 }
@@ -71,7 +69,7 @@ function safeSetItem<T>(key: string, value: T): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.error(`[StorageAdapter] Failed to write key "${key}"`, err);
+    console.error(`[StorageAdapter] Failed to write key \"${key}\"`, err);
   }
 }
 
@@ -80,7 +78,7 @@ function safeRemoveItem(key: string): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
     window.localStorage.removeItem(key);
   } catch (err) {
-    console.error(`[StorageAdapter] Failed to remove key "${key}"`, err);
+    console.error(`[StorageAdapter] Failed to remove key \"${key}\"`, err);
   }
 }
 
@@ -139,8 +137,13 @@ export const storageAdapter = {
   setOrders: (orders: Order[]): void => safeSetItem(KEYS.ORDERS, orders),
 
   // Menu Items
-  getMenuItems: (): MenuItem[] => safeGetItem<MenuItem[]>(KEYS.MENU_ITEMS, INITIAL_MENU_ITEMS),
+  // Catalog data is server-authoritative. Local storage is only a post-hydration cache.
+  getMenuItems: (): MenuItem[] => safeGetItem<MenuItem[]>(KEYS.MENU_ITEMS, []),
   setMenuItems: (items: MenuItem[]): void => safeSetItem(KEYS.MENU_ITEMS, items),
+  clearCatalogCache: (): void => {
+    safeRemoveItem(KEYS.MENU_ITEMS);
+    safeRemoveItem(KEYS.BUNDLES);
+  },
 
   // Categories
   getCategories: (): string[] => safeGetItem<string[]>(KEYS.CATEGORIES, DEFAULT_CATEGORIES),
@@ -155,7 +158,7 @@ export const storageAdapter = {
   setAddons: (addons: ProductAddon[]): void => safeSetItem(KEYS.ADDONS, addons),
 
   // Promo Bundles
-  getPromoBundles: (): PromoBundle[] => safeGetItem<PromoBundle[]>(KEYS.BUNDLES, INITIAL_PROMO_BUNDLES),
+  getPromoBundles: (): PromoBundle[] => safeGetItem<PromoBundle[]>(KEYS.BUNDLES, []),
   setPromoBundles: (bundles: PromoBundle[]): void => safeSetItem(KEYS.BUNDLES, bundles),
 
   // Inventory
