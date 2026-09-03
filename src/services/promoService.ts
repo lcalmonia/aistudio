@@ -47,10 +47,11 @@ export const promoService = {
       if (err instanceof PromoApiError) {
         console.warn(`[PromoService] Server listPromoBundles error (${err.status}):`, err.message);
       } else {
-        console.warn('[PromoService] Server listPromoBundles network failure, using local storage fallback:', err);
+        console.warn('[PromoService] Server listPromoBundles network failure:', err);
       }
     }
-    return storageAdapter.getPromoBundles();
+    // Never fall back to a stale local catalog. The server is authoritative.
+    return [];
   },
 
   async getPromoBundle(id: string): Promise<PromoBundle | null> {
@@ -63,10 +64,9 @@ export const promoService = {
       if (err instanceof PromoApiError && err.status === 404) {
         return null;
       }
-      console.warn(`[PromoService] Server getPromoBundle(${id}) failed, trying local storage:`, err);
+      console.warn(`[PromoService] Server getPromoBundle(${id}) failed:`, err);
     }
-    const bundles = storageAdapter.getPromoBundles();
-    return bundles.find((b) => b.id === id) || null;
+    return null;
   },
 
   async savePromoBundles(bundles: PromoBundle[]): Promise<PromoBundle[]> {

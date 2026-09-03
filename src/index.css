@@ -112,3 +112,13 @@ div[class~="overflow-x-auto"][class~="scrolling-hide"][class~="py-0.5"][class~="
   overflow-y: visible;
   row-gap: 0.25rem;
 }
+
+/* Public landing page: show all menu categories at once by wrapping the
+   category pills onto additional rows. This replaces the clipped horizontal
+   strip shown on smaller screens while leaving other horizontal filters alone. */
+div[class~="overflow-x-auto"][class~="pb-3"][class~="mb-6"][class~="no-scrollbar"] {
+  flex-wrap: wrap;
+  overflow-x: visible !important;
+  overflow-y: visible;
+  row-gap: 0.5rem;
+}

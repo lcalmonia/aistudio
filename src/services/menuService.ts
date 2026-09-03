@@ -47,10 +47,11 @@ export const menuService = {
       if (err instanceof MenuApiError) {
         console.warn(`[MenuService] Server listMenuItems error (${err.status}):`, err.message);
       } else {
-        console.warn('[MenuService] Server listMenuItems network failure, using local storage fallback:', err);
+        console.warn('[MenuService] Server listMenuItems network failure:', err);
       }
     }
-    return storageAdapter.getMenuItems();
+    // Never fall back to a stale local catalog. The server is authoritative.
+    return [];
   },
 
   async getMenuItem(id: string): Promise<MenuItem | null> {
@@ -63,10 +64,10 @@ export const menuService = {
       if (err instanceof MenuApiError && err.status === 404) {
         return null;
       }
-      console.warn(`[MenuService] Server getMenuItem(${id}) failed, trying local storage:`, err);
+      console.warn(`[MenuService] Server getMenuItem(${id}) failed:`, err);
     }
-    const items = storageAdapter.getMenuItems();
-    return items.find((i) => i.id === id) || null;
+    // Never resolve a deleted/stale item from browser storage.
+    return null;
   },
 
   async createMenuItem(item: Omit<MenuItem, 'id'> & { id?: string }): Promise<MenuItem> {

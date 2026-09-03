@@ -23,11 +23,9 @@ import {
 import {
   INITIAL_CUSTOMERS,
   INITIAL_ORDERS,
-  INITIAL_MENU_ITEMS,
   DEFAULT_CATEGORIES,
   DEFAULT_MODIFIER_CATEGORIES,
   INITIAL_ADDONS,
-  INITIAL_PROMO_BUNDLES,
   INVENTORY_ITEMS,
   DEFAULT_INVENTORY_CATEGORIES,
   DEFAULT_STORE_SETTINGS,
@@ -42,17 +40,24 @@ const KEYS = {
   STAFF_CREDENTIALS: 'iluvkeyks_staff_cred_v2',
   CUSTOMER_CREDENTIALS: 'iluvkeyks_cust_cred_v2',
   ORDERS: 'iluvkeyks_orders_v2',
-  MENU_ITEMS: 'iluvkeyks_menu_items_v2',
+  // v3 deliberately invalidates the previous browser catalog cache.
+  // The server database is the only authoritative source for catalog data.
+  MENU_ITEMS: 'iluvkeyks_menu_items_v3',
   CATEGORIES: 'iluvkeyks_categories_v2',
   MODIFIER_CATEGORIES: 'iluvkeyks_modifier_categories_v2',
   ADDONS: 'iluvkeyks_addons_v2',
-  BUNDLES: 'iluvkeyks_bundles_v2',
+  BUNDLES: 'iluvkeyks_bundles_v3',
   INVENTORY: 'iluvkeyks_inventory_v2',
   INVENTORY_CATEGORIES: 'iluvkeyks_inv_cats_v2',
   INVENTORY_MOVEMENTS: 'iluvkeyks_inv_mov_v2',
   LOYALTY_TRANSACTIONS: 'iluvkeyks_loyalty_tx_v2',
   SETTINGS: 'iluvkeyks_settings_v2',
 } as const;
+
+const LEGACY_CATALOG_KEYS = [
+  'iluvkeyks_menu_items_v2',
+  'iluvkeyks_bundles_v2',
+] as const;
 
 function safeGetItem<T>(key: string, fallback: T): T {
   try {
@@ -61,7 +66,7 @@ function safeGetItem<T>(key: string, fallback: T): T {
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch (err) {
-    console.warn(`[StorageAdapter] Failed to parse key "${key}"`, err);
+    console.warn(`[StorageAdapter] Failed to parse key \"${key}\"`, err);
     return fallback;
   }
 }
@@ -71,7 +76,7 @@ function safeSetItem<T>(key: string, value: T): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.error(`[StorageAdapter] Failed to write key "${key}"`, err);
+    console.error(`[StorageAdapter] Failed to write key \"${key}\"`, err);
   }
 }
 
@@ -80,9 +85,16 @@ function safeRemoveItem(key: string): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
     window.localStorage.removeItem(key);
   } catch (err) {
-    console.error(`[StorageAdapter] Failed to remove key "${key}"`, err);
+    console.error(`[StorageAdapter] Failed to remove key \"${key}\"`, err);
   }
 }
+
+function clearLegacyCatalogCache(): void {
+  LEGACY_CATALOG_KEYS.forEach(safeRemoveItem);
+}
+
+// Remove the old browser catalog cache before any catalog state is read.
+clearLegacyCatalogCache();
 
 // Customers
 export const storageAdapter = {
@@ -139,8 +151,14 @@ export const storageAdapter = {
   setOrders: (orders: Order[]): void => safeSetItem(KEYS.ORDERS, orders),
 
   // Menu Items
-  getMenuItems: (): MenuItem[] => safeGetItem<MenuItem[]>(KEYS.MENU_ITEMS, INITIAL_MENU_ITEMS),
+  // Catalog data is server-authoritative. Local storage is only a post-hydration cache.
+  getMenuItems: (): MenuItem[] => safeGetItem<MenuItem[]>(KEYS.MENU_ITEMS, []),
   setMenuItems: (items: MenuItem[]): void => safeSetItem(KEYS.MENU_ITEMS, items),
+  clearCatalogCache: (): void => {
+    safeRemoveItem(KEYS.MENU_ITEMS);
+    safeRemoveItem(KEYS.BUNDLES);
+    clearLegacyCatalogCache();
+  },
 
   // Categories
   getCategories: (): string[] => safeGetItem<string[]>(KEYS.CATEGORIES, DEFAULT_CATEGORIES),
@@ -155,7 +173,7 @@ export const storageAdapter = {
   setAddons: (addons: ProductAddon[]): void => safeSetItem(KEYS.ADDONS, addons),
 
   // Promo Bundles
-  getPromoBundles: (): PromoBundle[] => safeGetItem<PromoBundle[]>(KEYS.BUNDLES, INITIAL_PROMO_BUNDLES),
+  getPromoBundles: (): PromoBundle[] => safeGetItem<PromoBundle[]>(KEYS.BUNDLES, []),
   setPromoBundles: (bundles: PromoBundle[]): void => safeSetItem(KEYS.BUNDLES, bundles),
 
   // Inventory
