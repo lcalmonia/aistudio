@@ -26,13 +26,11 @@ export default async function handler(request: Request): Promise<Response> {
         {
           src: iconUrl,
           sizes: '192x192',
-          type: 'image/png',
           purpose: 'any',
         },
         {
           src: iconUrl,
           sizes: '512x512',
-          type: 'image/png',
           purpose: 'any',
         },
         {
