@@ -44,6 +44,17 @@ export const BundleCustomizationModal: React.FC<BundleCustomizationModalProps> =
     });
   }, [addonsList, modifierCategories]);
 
+  // Hide the quantity control only while a product is being customized from a combo.
+  // Regular standalone product customization keeps its normal quantity control.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    document.body.classList.add('bundle-product-customization');
+    return () => {
+      document.body.classList.remove('bundle-product-customization');
+    };
+  }, [isOpen]);
+
   const includedProducts = useMemo(() => {
     if (!bundle) return [];
     return bundle.bundleItems.map((itemRef, index) => {
@@ -124,6 +135,12 @@ export const BundleCustomizationModal: React.FC<BundleCustomizationModalProps> =
 
   return (
     <>
+      <style>{`
+        body.bundle-product-customization #customer-product-modal > div > div:last-child > div:first-child {
+          display: none !important;
+        }
+      `}</style>
+
       <div
         className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
         onClick={onClose}
