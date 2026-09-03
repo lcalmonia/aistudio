@@ -4,7 +4,7 @@ import confetti from 'canvas-confetti';
 
 interface ActiveOrdersViewProps {
   orders: Order[];
-  onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus) => void;
+  onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card') => void;
   onOpenNewOrder: () => void;
   onShowNotification: (msg: string) => void;
   onRefreshOrders?: () => void;
@@ -24,6 +24,7 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
   const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'Today' | 'New' | 'Brewing' | 'Ready' | 'Completed'>('All');
   const [activeMenuOrderId, setActiveMenuOrderId] = useState<string | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
 
   const orderList = orders || [];
 
@@ -59,14 +60,7 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
       onUpdateOrderStatus(order.id, 'Ready');
       onShowNotification(`Order #${order.orderNumber} marked ready for pickup! 🔔`);
     } else if (order.status === 'Ready') {
-      onUpdateOrderStatus(order.id, 'Completed');
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.8 },
-        colors: ['#26170c', '#8fbc8f', '#e1e1c9', '#fbddca']
-      });
-      onShowNotification(`Order #${order.orderNumber} completed! Have a great day.`);
+      setPaymentOrder(order);
     }
   };
 
@@ -428,6 +422,43 @@ export const ActiveOrdersView: React.FC<ActiveOrdersViewProps> = ({
           })
         )}
       </div>
+
+      {paymentOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="payment-method-title">
+          <div className="w-full max-w-md bg-[#fff8f5] rounded-2xl shadow-2xl border border-[#e8e1df] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#f3ecea] bg-[#f9f2f0] flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#636451]">Payment Method</p>
+                <h3 id="payment-method-title" className="font-serif text-xl font-bold text-[#26170c] mt-0.5">How did the customer pay?</h3>
+                <p className="text-xs text-[#81756e] mt-1">Order #{paymentOrder.orderNumber} • ₱{paymentOrder.total.toFixed(2)}</p>
+              </div>
+              <button type="button" onClick={() => setPaymentOrder(null)} className="p-2 rounded-full text-[#4f453f] hover:bg-[#e8e1df]" aria-label="Close payment method dialog">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-2 gap-3">
+                {(['GCash', 'Maya', 'Cash', 'Card'] as const).map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => {
+                      const order = paymentOrder;
+                      setPaymentOrder(null);
+                      onUpdateOrderStatus(order.id, 'Completed', method);
+                      confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 }, colors: ['#26170c', '#8fbc8f', '#e1e1c9', '#fbddca'] });
+                      onShowNotification(`Order #${order.orderNumber} completed via ${method}. Have a great day.`);
+                    }}
+                    className="min-h-[64px] rounded-xl border border-[#dec1af] bg-white hover:bg-[#f3ecea] active:scale-95 transition-all text-sm font-bold text-[#26170c]"
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

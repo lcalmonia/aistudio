@@ -494,8 +494,8 @@ export default function App() {
   // -------------------------------------------------------------
   // Order Management Handlers
   // -------------------------------------------------------------
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    const updated = await orderService.updateOrderStatus(orderId, newStatus);
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card') => {
+    const updated = await orderService.updateOrderStatus(orderId, newStatus, paymentMethod);
     if (updated) {
       setOrders(await orderService.listOrders());
     }

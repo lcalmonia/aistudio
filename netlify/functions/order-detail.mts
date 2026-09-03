@@ -150,7 +150,12 @@ export default async function handler(request: Request, context: Context): Promi
       const existingOrder = await fetchOrderById(orderId);
       if (!existingOrder) throw new RequestError(404, `Order "${orderId}" not found.`);
 
-      const updatedOrder = await updateOrderStatusInDatabase(orderId, status);
+      const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : undefined;
+      if (paymentMethod && !['GCash', 'Maya', 'Cash', 'Card'].includes(paymentMethod)) {
+        throw new RequestError(400, `Invalid payment method \"${paymentMethod}\".`);
+      }
+
+      const updatedOrder = await updateOrderStatusInDatabase(orderId, status, paymentMethod as 'GCash' | 'Maya' | 'Cash' | 'Card' | undefined);
       let loyalty = null;
       if (status === 'Completed') {
         loyalty = await awardCompletedOrderLoyalty(orderId);

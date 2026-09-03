@@ -420,7 +420,7 @@ export async function insertOrderToDatabase(payload: CreateOrderPayload): Promis
   }
 }
 
-export async function updateOrderStatusInDatabase(orderId: string, status: OrderStatus): Promise<FormattedOrder> {
+export async function updateOrderStatusInDatabase(orderId: string, status: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card'): Promise<FormattedOrder> {
   if (!VALID_ORDER_STATUSES.includes(status)) {
     throw new RequestError(400, `Invalid order status "${status}". Allowed: ${VALID_ORDER_STATUSES.join(', ')}`);
   }
@@ -438,6 +438,12 @@ export async function updateOrderStatusInDatabase(orderId: string, status: Order
     `;
     const params: unknown[] = [status];
     let paramIndex = 2;
+
+    if (paymentMethod) {
+      updateQuery += `, payment_method = $${paramIndex}`;
+      params.push(paymentMethod);
+      paramIndex += 1;
+    }
 
     if (status === 'Completed') {
       updateQuery += `, completed_at = COALESCE(completed_at, NOW())`;

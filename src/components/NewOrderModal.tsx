@@ -4,25 +4,144 @@ import { addonService, modifierCategoryService, storageAdapter } from '../servic
 import { generateOrderId, generateOrderNumber } from '../services/idGenerator';
 import { CustomerProductModal } from './customer/CustomerProductModal';
 
-interface NewOrderModalProps { isOpen:boolean; onClose:()=>void; onCreateOrder:(newOrder:Order)=>void; menuItems:MenuItem[]; categories?:string[]; addonsList?:ProductAddon[]; modifierCategories?:ModifierCategory[]; }
-interface SelectedOrderItem { lineId:string; item:MenuItem; quantity:number; customization:string; temperature?:'Hot'|'Iced'; size?:string; unitPrice:number; }
-export const NewOrderModal:React.FC<NewOrderModalProps>=({isOpen,onClose,onCreateOrder,menuItems=[],categories=[],addonsList=[],modifierCategories=[]})=>{
- const [customerName,setCustomerName]=useState('');
- const [selectedItems,setSelectedItems]=useState<SelectedOrderItem[]>([]);
- const [activeCategory,setActiveCategory]=useState('All');
- const [customizingProduct,setCustomizingProduct]=useState<MenuItem|null>(null);
- const [liveAddons,setLiveAddons]=useState<ProductAddon[]>(()=>storageAdapter.getAddons());
- const [liveModifierCategories,setLiveModifierCategories]=useState<ModifierCategory[]>(()=>storageAdapter.getModifierCategories());
- useEffect(()=>{if(!isOpen)return;let active=true;Promise.all([addonService.listAddons(),modifierCategoryService.listCategories()]).then(([a,c])=>{if(active){setLiveAddons(a);setLiveModifierCategories(c);}}).catch(e=>console.warn('[Barista POS] Failed to refresh modifiers:',e));return()=>{active=false;};},[isOpen]);
- if(!isOpen)return null;
- const effectiveAddons=addonsList.length?addonsList:liveAddons;
- const effectiveModifierCategories=modifierCategories.length?modifierCategories:liveModifierCategories;
- const allCategoryList=['All',...Array.from(new Set([...categories,...menuItems.map(m=>m.category)]))];
- const filteredMenuItems=(activeCategory==='All'?menuItems:menuItems.filter(m=>m.category===activeCategory)).filter(m=>m.available);
- const handleCustomizedItem=(cartItem:CustomerCartItem)=>{const d:string[]=[];if(cartItem.selectedTemperature&&cartItem.selectedTemperature!=='N/A')d.push(cartItem.selectedTemperature==='Hot'?'Hot Brewed':'Iced & Chilled');if(cartItem.selectedSize)d.push(cartItem.selectedSize.volume?`${cartItem.selectedSize.name} (${cartItem.selectedSize.volume})`:cartItem.selectedSize.name);if(cartItem.sweetnessLevel)d.push(`Sweetness: ${cartItem.sweetnessLevel}`);if(cartItem.iceLevel)d.push(`Ice: ${cartItem.iceLevel}`);const addons=(cartItem.selectedAddons||[]).filter(a=>a.name!==cartItem.sweetnessLevel&&a.name!==cartItem.iceLevel).map(a=>a.name);if(addons.length)d.push(`Add-ons: ${addons.join(', ')}`);if(cartItem.specialInstructions)d.push(`Note: ${cartItem.specialInstructions}`);setSelectedItems(p=>[...p,{lineId:cartItem.id,item:cartItem.menuItem,quantity:cartItem.quantity,customization:d.length?d.join(' • '):'Standard',temperature:cartItem.selectedTemperature==='Hot'||cartItem.selectedTemperature==='Iced'?cartItem.selectedTemperature:undefined,size:cartItem.selectedSize?.name,unitPrice:cartItem.unitPrice}]);setCustomizingProduct(null);};
- const handleRemoveItem=(id:string)=>setSelectedItems(p=>p.filter(x=>x.lineId!==id));
- const handleQuantityChange=(id:string,delta:number)=>setSelectedItems(p=>p.map(x=>x.lineId===id?{...x,quantity:x.quantity+delta}:x).filter(x=>x.quantity>0));
- const calculateTotal=()=>selectedItems.reduce((a,c)=>a+c.unitPrice*c.quantity,0);
- const handleSubmit=(e:React.FormEvent)=>{e.preventDefault();if(!selectedItems.length)return;const items:OrderItem[]=selectedItems.map(s=>({name:s.item.name,quantity:s.quantity,customization:s.customization,price:s.unitPrice,temperature:s.temperature,size:s.size}));const total=calculateTotal();onCreateOrder({id:generateOrderId(),orderNumber:generateOrderNumber(),customerName:customerName.trim()||'Dine-in Guest',timeAgo:'Just now',timestamp:Date.now(),status:'New',items,total,subtotal:total,image:selectedItems[0]?.item.image});setCustomerName('');setSelectedItems([]);setCustomizingProduct(null);onClose();};
- return <><div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"><div className="bg-[#fff8f5] rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl border border-[#e8e1df] overflow-hidden"><div className="px-5 py-4 border-b border-[#f3ecea] flex justify-between items-center bg-[#f9f2f0]"><div><span className="text-[10px] font-bold uppercase tracking-wider bg-[#e1e1c9] text-[#636451] px-2 py-0.5 rounded-md">POS Terminal</span><h3 className="font-serif text-xl font-bold text-[#26170c] mt-0.5">New Barista Order</h3></div><button onClick={onClose} className="p-1 rounded-full text-[#4f453f] hover:bg-[#e8e1df] transition-colors"><span className="material-symbols-outlined text-[20px]">close</span></button></div><div className="p-5 overflow-y-auto flex-1 space-y-4"><div><label className="block text-xs font-semibold text-[#26170c] mb-1.5">Customer Name / Table #</label><input type="text" placeholder="Customer name, table #, or takeout #..." value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full px-3.5 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:outline-none focus:ring-2 focus:ring-[#5e604d]"/></div><div><label className="block text-xs font-semibold text-[#26170c] mb-1.5">Select Category</label><div className="w-full rounded-xl bg-[#f3ecea] p-1.5 overflow-visible"><div className="flex flex-wrap gap-1.5 w-full">{allCategoryList.map(cat=><button key={cat} type="button" onClick={()=>setActiveCategory(cat)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${activeCategory===cat?'bg-[#26170c] text-white shadow-sm':'bg-[#fff8f5] text-[#4f453f] hover:bg-[#e8e1df]'}`}>{cat}</button>)}</div></div></div><div className="grid grid-cols-2 gap-2.5 max-h-44 overflow-y-auto pr-1">{filteredMenuItems.map(item=><div key={item.id} onClick={()=>setCustomizingProduct(item)} className="p-2.5 bg-[#f9f2f0] hover:bg-[#f3ecea] border border-[#e8e1df] rounded-xl flex items-center gap-2.5 cursor-pointer active:scale-95 transition-all shadow-xs"><img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer"/><div className="min-w-0 flex-1"><h5 className="text-xs font-bold text-[#26170c] truncate">{item.name}</h5><div className="flex items-center gap-1"><p className="text-[11px] text-[#5e604d] font-semibold">₱{item.price.toFixed(2)}</p>{item.temperature!=='N/A'&&<span className="text-[9px] text-[#81756e]">{item.temperature==='Both'?'🔥/❄️':item.temperature==='Hot'?'🔥':'❄️'}</span>}</div></div><span className="material-symbols-outlined text-[18px] text-[#636451]">add_circle</span></div>)}</div><div><label className="block text-xs font-semibold text-[#26170c] mb-1.5">Order Ticket ({selectedItems.length} items)</label>{!selectedItems.length?<div className="p-4 bg-[#f3ecea] rounded-xl text-center text-xs text-[#81756e]">No items added yet. Tap an item above to choose temperature, size and modifiers.</div>:<div className="space-y-2 bg-[#f9f2f0] p-3 rounded-xl border border-[#e8e1df]">{selectedItems.map(sel=><div key={sel.lineId} className="flex justify-between items-start gap-3 text-xs"><div className="min-w-0 flex-1"><span className="font-bold text-[#26170c]">{sel.item.name}</span><p className="text-[11px] text-[#5e604d] font-semibold">₱{sel.unitPrice.toFixed(2)} each</p><p className="text-[10px] text-[#81756e] leading-relaxed mt-0.5">{sel.customization}</p></div><div className="flex items-center gap-2 flex-shrink-0 pt-0.5"><button type="button" onClick={()=>handleQuantityChange(sel.lineId,-1)} className="w-6 h-6 rounded-full bg-[#e8e1df] text-[#26170c] font-bold flex items-center justify-center">-</button><span className="font-bold text-[#26170c]">{sel.quantity}</span><button type="button" onClick={()=>handleQuantityChange(sel.lineId,1)} className="w-6 h-6 rounded-full bg-[#26170c] text-white font-bold flex items-center justify-center">+</button><button type="button" onClick={()=>handleRemoveItem(sel.lineId)} className="text-[#ba1a1a] ml-1"><span className="material-symbols-outlined text-[16px]">delete</span></button></div></div>)}<div className="pt-2 flex justify-between items-center font-bold text-sm text-[#26170c] border-t border-[#d2c4bc]/40"><span>Order Total</span><span>₱{calculateTotal().toFixed(2)}</span></div></div>}</div></div><div className="p-4 bg-[#f9f2f0] border-t border-[#e8e1df] flex gap-2.5"><button type="button" onClick={onClose} className="px-4 py-2.5 rounded-full text-xs font-semibold text-[#4f453f]">Cancel</button><button type="button" disabled={!selectedItems.length} onClick={handleSubmit} className={`flex-1 py-2.5 rounded-full text-sm font-bold flex items-center justify-center gap-1.5 ${!selectedItems.length?'bg-[#d2c4bc] text-[#81756e] cursor-not-allowed':'bg-[#26170c] text-white'}`}><span className="material-symbols-outlined text-[18px]">receipt_long</span>Send to Kitchen (₱{calculateTotal().toFixed(2)})</button></div></div></div><CustomerProductModal isOpen={customizingProduct!==null} onClose={()=>setCustomizingProduct(null)} product={customizingProduct} addonsList={effectiveAddons} modifierCategories={effectiveModifierCategories} onAddToCart={handleCustomizedItem}/></>;
+interface NewOrderModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreateOrder: (newOrder: Order) => void;
+  menuItems: MenuItem[];
+  categories?: string[];
+  addonsList?: ProductAddon[];
+  modifierCategories?: ModifierCategory[];
+}
+interface SelectedOrderItem {
+  lineId: string;
+  item: MenuItem;
+  quantity: number;
+  customization: string;
+  temperature?: 'Hot' | 'Iced';
+  size?: string;
+  unitPrice: number;
+}
+
+export const NewOrderModal: React.FC<NewOrderModalProps> = ({
+  isOpen,
+  onClose,
+  onCreateOrder,
+  menuItems = [],
+  categories = [],
+  addonsList = [],
+  modifierCategories = [],
+}) => {
+  const [customerName, setCustomerName] = useState('');
+  const [selectedItems, setSelectedItems] = useState<SelectedOrderItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [customizingProduct, setCustomizingProduct] = useState<MenuItem | null>(null);
+  const [liveAddons, setLiveAddons] = useState<ProductAddon[]>(() => storageAdapter.getAddons());
+  const [liveModifierCategories, setLiveModifierCategories] = useState<ModifierCategory[]>(() => storageAdapter.getModifierCategories());
+  const [customerSectionOpen, setCustomerSectionOpen] = useState(true);
+  const [categorySectionOpen, setCategorySectionOpen] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    Promise.all([addonService.listAddons(), modifierCategoryService.listCategories()])
+      .then(([a, c]) => {
+        if (active) {
+          setLiveAddons(a);
+          setLiveModifierCategories(c);
+        }
+      })
+      .catch((e) => console.warn('[Barista POS] Failed to refresh modifiers:', e));
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const effectiveAddons = addonsList.length ? addonsList : liveAddons;
+  const effectiveModifierCategories = modifierCategories.length ? modifierCategories : liveModifierCategories;
+  const allCategoryList = ['All', ...Array.from(new Set([...categories, ...menuItems.map((m) => m.category)]))];
+  const filteredMenuItems = (activeCategory === 'All' ? menuItems : menuItems.filter((m) => m.category === activeCategory)).filter((m) => m.available);
+
+  const handleCustomizedItem = (cartItem: CustomerCartItem) => {
+    const d: string[] = [];
+    if (cartItem.selectedTemperature && cartItem.selectedTemperature !== 'N/A') d.push(cartItem.selectedTemperature === 'Hot' ? 'Hot Brewed' : 'Iced & Chilled');
+    if (cartItem.selectedSize) d.push(cartItem.selectedSize.volume ? `${cartItem.selectedSize.name} (${cartItem.selectedSize.volume})` : cartItem.selectedSize.name);
+    if (cartItem.sweetnessLevel) d.push(`Sweetness: ${cartItem.sweetnessLevel}`);
+    if (cartItem.iceLevel) d.push(`Ice: ${cartItem.iceLevel}`);
+    const addons = (cartItem.selectedAddons || [])
+      .filter((a) => a.name !== cartItem.sweetnessLevel && a.name !== cartItem.iceLevel)
+      .map((a) => a.name);
+    if (addons.length) d.push(`Add-ons: ${addons.join(', ')}`);
+    if (cartItem.specialInstructions) d.push(`Note: ${cartItem.specialInstructions}`);
+    setSelectedItems((p) => [...p, {
+      lineId: cartItem.id,
+      item: cartItem.menuItem,
+      quantity: cartItem.quantity,
+      customization: d.length ? d.join(' • ') : 'Standard',
+      temperature: cartItem.selectedTemperature === 'Hot' || cartItem.selectedTemperature === 'Iced' ? cartItem.selectedTemperature : undefined,
+      size: cartItem.selectedSize?.name,
+      unitPrice: cartItem.unitPrice,
+    }]);
+    setCustomizingProduct(null);
+  };
+
+  const handleRemoveItem = (id: string) => setSelectedItems((p) => p.filter((x) => x.lineId !== id));
+  const handleQuantityChange = (id: string, delta: number) => setSelectedItems((p) => p.map((x) => x.lineId === id ? { ...x, quantity: x.quantity + delta } : x).filter((x) => x.quantity > 0));
+  const calculateTotal = () => selectedItems.reduce((a, c) => a + c.unitPrice * c.quantity, 0);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedItems.length) return;
+    const items: OrderItem[] = selectedItems.map((s) => ({ name: s.item.name, quantity: s.quantity, customization: s.customization, price: s.unitPrice, temperature: s.temperature, size: s.size }));
+    const total = calculateTotal();
+    onCreateOrder({ id: generateOrderId(), orderNumber: generateOrderNumber(), customerName: customerName.trim() || 'Dine-in Guest', timeAgo: 'Just now', timestamp: Date.now(), status: 'New', items, total, subtotal: total, image: selectedItems[0]?.item.image });
+    setCustomerName('');
+    setSelectedItems([]);
+    setCustomizingProduct(null);
+    setCustomerSectionOpen(true);
+    setCategorySectionOpen(true);
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+        <div className="bg-[#fff8f5] rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl border border-[#e8e1df] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f3ecea] flex justify-between items-center bg-[#f9f2f0]">
+            <div><span className="text-[10px] font-bold uppercase tracking-wider bg-[#e1e1c9] text-[#636451] px-2 py-0.5 rounded-md">POS Terminal</span><h3 className="font-serif text-xl font-bold text-[#26170c] mt-0.5">New Barista Order</h3></div>
+            <button onClick={onClose} className="p-1 rounded-full text-[#4f453f] hover:bg-[#e8e1df] transition-colors"><span className="material-symbols-outlined text-[20px]">close</span></button>
+          </div>
+
+          <div className="p-5 overflow-y-auto flex-1 space-y-4">
+            <div className="rounded-xl border border-[#e8e1df] overflow-hidden">
+              <button type="button" onClick={() => setCustomerSectionOpen((open) => !open)} aria-expanded={customerSectionOpen} className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-[#f3ecea] hover:bg-[#e8e1df] transition-colors text-left">
+                <span className="text-xs font-semibold text-[#26170c]">Customer Name / Table #</span>
+                <span className="material-symbols-outlined text-[20px] text-[#636451]">{customerSectionOpen ? 'expand_less' : 'expand_more'}</span>
+              </button>
+              {customerSectionOpen && <div className="p-3.5 bg-[#fff8f5]"><input type="text" placeholder="Customer name, table #, or takeout #..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3.5 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:outline-none focus:ring-2 focus:ring-[#5e604d]" /></div>}
+            </div>
+
+            <div className="rounded-xl border border-[#e8e1df] overflow-hidden">
+              <button type="button" onClick={() => setCategorySectionOpen((open) => !open)} aria-expanded={categorySectionOpen} className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-[#f3ecea] hover:bg-[#e8e1df] transition-colors text-left">
+                <span className="text-xs font-semibold text-[#26170c]">Select Category</span>
+                <span className="material-symbols-outlined text-[20px] text-[#636451]">{categorySectionOpen ? 'expand_less' : 'expand_more'}</span>
+              </button>
+              {categorySectionOpen && <div className="p-2 bg-[#fff8f5]"><div className="w-full rounded-xl bg-[#f3ecea] p-1.5 overflow-visible"><div className="flex flex-wrap gap-1.5 w-full">{allCategoryList.map((cat) => <button key={cat} type="button" onClick={() => setActiveCategory(cat)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${activeCategory === cat ? 'bg-[#26170c] text-white shadow-sm' : 'bg-[#fff8f5] text-[#4f453f] hover:bg-[#e8e1df]'}`}>{cat}</button>)}</div></div></div>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1">
+              {filteredMenuItems.map((item) => <div key={item.id} onClick={() => setCustomizingProduct(item)} className="p-2.5 bg-[#f9f2f0] hover:bg-[#f3ecea] border border-[#e8e1df] rounded-xl flex items-center gap-2.5 cursor-pointer active:scale-95 transition-all shadow-xs"><img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" /><div className="min-w-0 flex-1"><h5 className="text-xs font-bold text-[#26170c] truncate">{item.name}</h5><div className="flex items-center gap-1"><p className="text-[11px] text-[#5e604d] font-semibold">₱{item.price.toFixed(2)}</p>{item.temperature !== 'N/A' && <span className="text-[9px] text-[#81756e]">{item.temperature === 'Both' ? '🔥/❄️' : item.temperature === 'Hot' ? '🔥' : '❄️'}</span>}</div></div><span className="material-symbols-outlined text-[18px] text-[#636451]">add_circle</span></div>)}
+            </div>
+
+            <div><label className="block text-xs font-semibold text-[#26170c] mb-1.5">Order Ticket ({selectedItems.length} items)</label>{!selectedItems.length ? <div className="p-4 bg-[#f3ecea] rounded-xl text-center text-xs text-[#81756e]">No items added yet. Tap an item above to choose temperature, size and modifiers.</div> : <div className="space-y-2 bg-[#f9f2f0] p-3 rounded-xl border border-[#e8e1df]">{selectedItems.map((sel) => <div key={sel.lineId} className="flex justify-between items-start gap-3 text-xs"><div className="min-w-0 flex-1"><span className="font-bold text-[#26170c]">{sel.item.name}</span><p className="text-[11px] text-[#5e604d] font-semibold">₱{sel.unitPrice.toFixed(2)} each</p><p className="text-[10px] text-[#81756e] leading-relaxed mt-0.5">{sel.customization}</p></div><div className="flex items-center gap-2 flex-shrink-0 pt-0.5"><button type="button" onClick={() => handleQuantityChange(sel.lineId, -1)} className="w-6 h-6 rounded-full bg-[#e8e1df] text-[#26170c] font-bold flex items-center justify-center">-</button><span className="font-bold text-[#26170c]">{sel.quantity}</span><button type="button" onClick={() => handleQuantityChange(sel.lineId, 1)} className="w-6 h-6 rounded-full bg-[#26170c] text-white font-bold flex items-center justify-center">+</button><button type="button" onClick={() => handleRemoveItem(sel.lineId)} className="text-[#ba1a1a] ml-1"><span className="material-symbols-outlined text-[16px]">delete</span></button></div></div>)}<div className="pt-2 flex justify-between items-center font-bold text-sm text-[#26170c] border-t border-[#d2c4bc]/40"><span>Order Total</span><span>₱{calculateTotal().toFixed(2)}</span></div></div>}</div>
+          </div>
+
+          <div className="p-4 bg-[#f9f2f0] border-t border-[#e8e1df] flex gap-2.5"><button type="button" onClick={onClose} className="px-4 py-2.5 rounded-full text-xs font-semibold text-[#4f453f]">Cancel</button><button type="button" disabled={!selectedItems.length} onClick={handleSubmit} className={`flex-1 py-2.5 rounded-full text-sm font-bold flex items-center justify-center gap-1.5 ${!selectedItems.length ? 'bg-[#d2c4bc] text-[#81756e] cursor-not-allowed' : 'bg-[#26170c] text-white'}`}><span className="material-symbols-outlined text-[18px]">receipt_long</span>Send to Kitchen (₱{calculateTotal().toFixed(2)})</button></div>
+        </div>
+      </div>
+      <CustomerProductModal isOpen={customizingProduct !== null} onClose={() => setCustomizingProduct(null)} product={customizingProduct} addonsList={effectiveAddons} modifierCategories={effectiveModifierCategories} onAddToCart={handleCustomizedItem} />
+    </>
+  );
 };
