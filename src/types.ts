@@ -285,6 +285,8 @@ export interface StoreSettings {
   deliveryFee: number;
   freeDeliveryThreshold: number;
   openHours: string;
+  kitchenLastCall?: string;
+  deliveryCutoff?: string;
   receiptFooter: string;
   wifiSsid?: string;
   wifiPassword?: string;
