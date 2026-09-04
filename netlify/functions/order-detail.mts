@@ -150,9 +150,13 @@ export default async function handler(request: Request, context: Context): Promi
       const existingOrder = await fetchOrderById(orderId);
       if (!existingOrder) throw new RequestError(404, `Order "${orderId}" not found.`);
 
-      const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod : undefined;
-      if (paymentMethod && !['GCash', 'Maya', 'Cash', 'Card'].includes(paymentMethod)) {
-        throw new RequestError(400, `Invalid payment method \"${paymentMethod}\".`);
+      const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.trim() : undefined;
+      const isSplitPayment = Boolean(paymentMethod?.startsWith('Split Payment: '));
+      if (paymentMethod && !['GCash', 'Maya', 'Cash', 'Card'].includes(paymentMethod) && !isSplitPayment) {
+        throw new RequestError(400, `Invalid payment method "${paymentMethod}".`);
+      }
+      if (isSplitPayment && status !== 'Completed') {
+        throw new RequestError(400, 'Split Payment can only be recorded when completing an order.');
       }
 
       const updatedOrder = await updateOrderStatusInDatabase(orderId, status, paymentMethod as 'GCash' | 'Maya' | 'Cash' | 'Card' | undefined);
