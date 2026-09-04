@@ -13,6 +13,8 @@ export interface StoreSettings {
   deliveryFee: number;
   freeDeliveryThreshold: number;
   openHours: string;
+  kitchenLastCall: string;
+  deliveryCutoff: string;
   receiptFooter: string;
   wifiSsid?: string;
   wifiPassword?: string;
@@ -34,6 +36,8 @@ export interface StoreSettingsRow {
   delivery_fee: string | number;
   free_delivery_threshold: string | number;
   open_hours: string;
+  kitchen_last_call: string;
+  delivery_cutoff: string;
   receipt_footer: string;
   wifi_ssid: string | null;
   wifi_password: string | null;
@@ -55,6 +59,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   deliveryFee: 49,
   freeDeliveryThreshold: 500,
   openHours: 'Mon-Sun: 7:00 AM - 10:00 PM',
+  kitchenLastCall: '9:30 PM',
+  deliveryCutoff: '5:00 PM',
   receiptFooter: 'Thank you for choosing iLuvKeyks! Enjoy your coffee.',
   wifiSsid: 'iLuvKeyks-Guest',
   wifiPassword: 'coffeelover2026',
@@ -75,6 +81,8 @@ export function mapStoreSettingsRecord(row: StoreSettingsRow): StoreSettings {
     deliveryFee: Math.max(0, Number(row.delivery_fee) || 0),
     freeDeliveryThreshold: Math.max(0, Number(row.free_delivery_threshold) || 0),
     openHours: row.open_hours || '',
+    kitchenLastCall: row.kitchen_last_call || DEFAULT_STORE_SETTINGS.kitchenLastCall,
+    deliveryCutoff: row.delivery_cutoff || DEFAULT_STORE_SETTINGS.deliveryCutoff,
     receiptFooter: row.receipt_footer || '',
     wifiSsid: row.wifi_ssid || undefined,
     wifiPassword: row.wifi_password || undefined,
@@ -87,10 +95,7 @@ export function mapStoreSettingsRecord(row: StoreSettingsRow): StoreSettings {
 export async function fetchStoreSettingsFromDatabase(): Promise<StoreSettings> {
   const db = database();
   const result = await db.pool.query(`SELECT * FROM store_settings WHERE id = 'default' LIMIT 1`);
-  if (result.rows.length === 0) {
-    // Seed default settings row if missing
-    return updateStoreSettingsInDatabase(DEFAULT_STORE_SETTINGS);
-  }
+  if (result.rows.length === 0) return updateStoreSettingsInDatabase(DEFAULT_STORE_SETTINGS);
   return mapStoreSettingsRecord(result.rows[0]);
 }
 
@@ -106,6 +111,8 @@ export async function updateStoreSettingsInDatabase(settings: Partial<StoreSetti
   const deliveryFee = settings.deliveryFee != null ? Math.max(0, Number(settings.deliveryFee)) : DEFAULT_STORE_SETTINGS.deliveryFee;
   const freeDeliveryThreshold = settings.freeDeliveryThreshold != null ? Math.max(0, Number(settings.freeDeliveryThreshold)) : DEFAULT_STORE_SETTINGS.freeDeliveryThreshold;
   const openHours = settings.openHours !== undefined ? settings.openHours.trim() : DEFAULT_STORE_SETTINGS.openHours;
+  const kitchenLastCall = settings.kitchenLastCall !== undefined ? settings.kitchenLastCall.trim() : DEFAULT_STORE_SETTINGS.kitchenLastCall;
+  const deliveryCutoff = settings.deliveryCutoff !== undefined ? settings.deliveryCutoff.trim() : DEFAULT_STORE_SETTINGS.deliveryCutoff;
   const receiptFooter = settings.receiptFooter !== undefined ? settings.receiptFooter.trim() : DEFAULT_STORE_SETTINGS.receiptFooter;
   const wifiSsid = settings.wifiSsid !== undefined ? (settings.wifiSsid.trim() || null) : null;
   const wifiPassword = settings.wifiPassword !== undefined ? (settings.wifiPassword.trim() || null) : null;
@@ -117,9 +124,9 @@ export async function updateStoreSettingsInDatabase(settings: Partial<StoreSetti
     `INSERT INTO store_settings (
       id, store_name, tagline, logo_url, branch_name, phone_number, email,
       address, currency_symbol, delivery_fee, free_delivery_threshold, open_hours,
-      receipt_footer, wifi_ssid, wifi_password, social_fb, social_ig, created_at, updated_at
+      kitchen_last_call, delivery_cutoff, receipt_footer, wifi_ssid, wifi_password, social_fb, social_ig, created_at, updated_at
     ) VALUES (
-      'default', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW()
+      'default', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
       store_name = EXCLUDED.store_name,
@@ -133,6 +140,8 @@ export async function updateStoreSettingsInDatabase(settings: Partial<StoreSetti
       delivery_fee = EXCLUDED.delivery_fee,
       free_delivery_threshold = EXCLUDED.free_delivery_threshold,
       open_hours = EXCLUDED.open_hours,
+      kitchen_last_call = EXCLUDED.kitchen_last_call,
+      delivery_cutoff = EXCLUDED.delivery_cutoff,
       receipt_footer = EXCLUDED.receipt_footer,
       wifi_ssid = EXCLUDED.wifi_ssid,
       wifi_password = EXCLUDED.wifi_password,
@@ -140,11 +149,7 @@ export async function updateStoreSettingsInDatabase(settings: Partial<StoreSetti
       social_ig = EXCLUDED.social_ig,
       updated_at = NOW()
     RETURNING *`,
-    [
-      storeName, tagline, logoUrl, branchName, phoneNumber, email,
-      address, currencySymbol, deliveryFee, freeDeliveryThreshold, openHours,
-      receiptFooter, wifiSsid, wifiPassword, socialFb, socialIg
-    ]
+    [storeName, tagline, logoUrl, branchName, phoneNumber, email, address, currencySymbol, deliveryFee, freeDeliveryThreshold, openHours, kitchenLastCall, deliveryCutoff, receiptFooter, wifiSsid, wifiPassword, socialFb, socialIg]
   );
   return mapStoreSettingsRecord(result.rows[0]);
 }
