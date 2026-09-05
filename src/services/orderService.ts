@@ -28,6 +28,18 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+async function resolveDeliveryFee(address: string | undefined, subtotal: number): Promise<number | null> {
+  if (!address || subtotal < 0) return null;
+  try {
+    const params = new URLSearchParams({ address, subtotal: String(subtotal) });
+    const response = await api<{ policy?: { fee?: number } }>(`/api/delivery-zones?${params.toString()}`, { method: 'GET' });
+    return response.policy ? Math.max(0, Number(response.policy.fee) || 0) : null;
+  } catch (err) {
+    console.warn('[OrderService] Delivery-zone lookup failed; retaining cart fee:', err);
+    return null;
+  }
+}
+
 export const orderService = {
   async listOrders(options: { customerId?: string; orderId?: string; orderNumber?: string; status?: OrderStatus; startDate?: string; endDate?: string; limit?: number; } = {}): Promise<Order[]> {
     try {
@@ -70,7 +82,15 @@ export const orderService = {
   async createOrder(orderInput: Partial<Order>): Promise<Order> {
     const rawItems = orderInput.items || [];
     const sanitizedItems = rawItems.map((item) => ({ name: item.name, quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)), customization: item.customization || undefined, price: Math.max(0, Number(item.price) || 0), completed: item.completed, temperature: item.temperature, size: item.size }));
-    const payload = { id: orderInput.id || generateOrderId(), orderNumber: orderInput.orderNumber || generateOrderNumber(), customerId: orderInput.customerId, customerName: orderInput.customerName?.trim() || 'Guest Customer', customerEmail: orderInput.customerEmail?.trim(), customerPhone: orderInput.customerPhone?.trim(), status: orderInput.status || 'New', items: sanitizedItems, total: orderInput.total || 0, subtotal: orderInput.subtotal ?? orderInput.total ?? 0, discount: orderInput.discount ?? 0, deliveryFee: orderInput.deliveryFee ?? 0, image: orderInput.image, notes: orderInput.notes?.trim(), orderType: orderInput.orderType || 'Dine-In', tableNumber: orderInput.tableNumber?.trim(), deliveryAddress: orderInput.deliveryAddress?.trim(), paymentMethod: orderInput.paymentMethod || 'Cash', isCustomerOrder: orderInput.isCustomerOrder ?? false, timestamp: orderInput.timestamp || Date.now(), timeAgo: orderInput.timeAgo || 'Just now' };
+    const subtotal = Math.max(0, Number(orderInput.subtotal ?? orderInput.total ?? 0));
+    let deliveryFee = Math.max(0, Number(orderInput.deliveryFee ?? 0));
+    if (orderInput.orderType === 'Delivery') {
+      const zoneFee = await resolveDeliveryFee(orderInput.deliveryAddress?.trim(), subtotal - Math.max(0, Number(orderInput.discount ?? 0)));
+      if (zoneFee !== null) deliveryFee = zoneFee;
+    }
+    const discount = Math.max(0, Number(orderInput.discount ?? 0));
+    const calculatedTotal = Math.max(0, subtotal - discount + deliveryFee);
+    const payload = { id: orderInput.id || generateOrderId(), orderNumber: orderInput.orderNumber || generateOrderNumber(), customerId: orderInput.customerId, customerName: orderInput.customerName?.trim() || 'Guest Customer', customerEmail: orderInput.customerEmail?.trim(), customerPhone: orderInput.customerPhone?.trim(), status: orderInput.status || 'New', items: sanitizedItems, total: calculatedTotal, subtotal, discount, deliveryFee, image: orderInput.image, notes: orderInput.notes?.trim(), orderType: orderInput.orderType || 'Dine-In', tableNumber: orderInput.tableNumber?.trim(), deliveryAddress: orderInput.deliveryAddress?.trim(), paymentMethod: orderInput.paymentMethod || 'Cash', isCustomerOrder: orderInput.isCustomerOrder ?? false, timestamp: orderInput.timestamp || Date.now(), timeAgo: orderInput.timeAgo || 'Just now' };
     try {
       const response = await api<{ order: Order }>('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
       if (response && response.order) { const saved = response.order; const local = storageAdapter.getOrders(); storageAdapter.setOrders([saved, ...local.filter((o) => o.id !== saved.id && o.orderNumber !== saved.orderNumber)]); return saved; }
