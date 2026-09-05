@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StoreSettings } from '../types';
 import { prepareUploadedImage } from '../utils/imageCompression';
+import { deliveryZoneService, DeliveryZone } from '../services/deliveryZoneService';
 
 interface SettingsViewProps {
   settings: StoreSettings;
@@ -21,7 +22,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [baseSettings, setBaseSettings] = useState<StoreSettings>(() => ({ ...settings }));
   const [activeTab, setActiveTab] = useState<'branding' | 'location' | 'ordering' | 'preview'>('branding');
   const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileInputRef] = useState(() => React.createRef<HTMLInputElement>());
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [zonesLoaded, setZonesLoaded] = useState(false);
+  const [isSavingZones, setIsSavingZones] = useState(false);
 
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(baseSettings);
 
@@ -31,6 +35,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setFormData({ ...settings });
     }
   }, [settings, hasChanges]);
+
+  useEffect(() => {
+    deliveryZoneService.list()
+      .then((zones) => setDeliveryZones(zones))
+      .catch((error) => console.warn('[SettingsView] Delivery zones could not be loaded:', error))
+      .finally(() => setZonesLoaded(true));
+  }, []);
 
   const handleInputChange = (field: keyof StoreSettings, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -55,6 +66,61 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     handleInputChange('logoUrl', '');
     if (fileInputRef.current) fileInputRef.current.value = '';
     onShowNotification('Logo cleared. Click Save to apply.');
+  };
+
+  const updateZone = (index: number, patch: Partial<DeliveryZone>) => {
+    setDeliveryZones((prev) => prev.map((zone, i) => i === index ? { ...zone, ...patch } : zone));
+  };
+
+  const addZone = () => {
+    setDeliveryZones((prev) => [...prev, {
+      id: `zone-${Date.now()}`,
+      name: 'New Delivery Zone',
+      keywords: [],
+      deliveryFee: formData.deliveryFee,
+      freeDeliveryThreshold: formData.freeDeliveryThreshold,
+      priority: prev.length + 1,
+      active: true,
+    }]);
+  };
+
+  const removeZone = (index: number) => {
+    setDeliveryZones((prev) => prev.filter((_, i) => i !== index).map((zone, i) => ({ ...zone, priority: i + 1 })));
+  };
+
+  const saveZones = async () => {
+    try {
+      setIsSavingZones(true);
+      const cleaned = deliveryZones
+        .map((zone, index) => ({ ...zone, priority: Number(zone.priority) || index + 1 }))
+        .filter((zone) => zone.name.trim() && zone.keywords.length);
+      const priorities = cleaned.map((zone) => zone.priority);
+      if (new Set(priorities).size !== priorities.length) {
+        onShowNotification('Each delivery zone must have a unique priority.');
+        return;
+      }
+      const saved = await deliveryZoneService.save(cleaned);
+      setDeliveryZones(saved);
+      onShowNotification('Delivery zones saved and active for customer checkout.');
+    } catch (error) {
+      onShowNotification(error instanceof Error ? error.message : 'Unable to save delivery zones.');
+    } finally {
+      setIsSavingZones(false);
+    }
+  };
+
+  const resetZones = async () => {
+    if (!window.confirm('Reset delivery zones to the default iLuvKeyks zones?')) return;
+    try {
+      setIsSavingZones(true);
+      const saved = await deliveryZoneService.reset();
+      setDeliveryZones(saved);
+      onShowNotification('Delivery zones reset to defaults.');
+    } catch (error) {
+      onShowNotification(error instanceof Error ? error.message : 'Unable to reset delivery zones.');
+    } finally {
+      setIsSavingZones(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,7 +186,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {activeTab === 'location' && <div className="bg-[#f9f2f0] p-3.5 sm:p-4 rounded-2xl border border-[#f3ecea] space-y-2.5"><div className="flex items-center gap-1.5 mb-1 pb-1.5 border-b border-[#dec1af]/40"><span className="material-symbols-outlined text-[18px] text-[#26170c]">pin_drop</span><h3 className="font-serif text-sm sm:text-base font-bold text-[#26170c]">Branch & Contact Information</h3></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Branch / Outlet Name</label><input type="text" value={formData.branchName} onChange={(e) => handleInputChange('branchName', e.target.value)} placeholder="e.g. Main St. Live, Manila" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-semibold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Contact Phone Number</label><input type="text" value={formData.phoneNumber} onChange={(e) => handleInputChange('phoneNumber', e.target.value)} placeholder="+63 (917) 823-4567" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div className="sm:col-span-2"><label className="block text-[11px] font-bold text-[#26170c] mb-1">Physical Store Address</label><input type="text" value={formData.address} onChange={(e) => handleInputChange('address', e.target.value)} placeholder="e.g. 128 Mahogany Ave, Sampaloc, Manila" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Official Email</label><input type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} placeholder="orders@iluvkeyks.ph" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Social Handle (IG / FB)</label><input type="text" value={formData.socialIg} onChange={(e) => handleInputChange('socialIg', e.target.value)} placeholder="@iluvkeyks.ph" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div></div></div>}
 
         {activeTab === 'ordering' && <div className="space-y-3">
-          <div className="bg-[#f9f2f0] p-3.5 sm:p-4 rounded-2xl border border-[#f3ecea]"><div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-[#dec1af]/40"><span className="material-symbols-outlined text-[18px] text-[#26170c]">schedule</span><h3 className="font-serif text-sm sm:text-base font-bold text-[#26170c]">Hours & Delivery Fees</h3></div><div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Operating Hours</label><input type="text" value={formData.openHours} onChange={(e) => handleInputChange('openHours', e.target.value)} placeholder="7:00 AM - 10:00 PM Daily" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Kitchen Last Call</label><input type="text" value={formData.kitchenLastCall || ''} onChange={(e) => handleInputChange('kitchenLastCall', e.target.value)} placeholder="9:30 PM" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Delivery Cut-off Time</label><input type="text" value={formData.deliveryCutoff || ''} onChange={(e) => handleInputChange('deliveryCutoff', e.target.value)} placeholder="5:00 PM" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Delivery Fee (₱)</label><input type="number" min="0" step="1" value={formData.deliveryFee} onChange={(e) => handleInputChange('deliveryFee', parseFloat(e.target.value) || 0)} placeholder="49" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Free Delivery Threshold (₱)</label><input type="number" min="0" step="10" value={formData.freeDeliveryThreshold} onChange={(e) => handleInputChange('freeDeliveryThreshold', parseFloat(e.target.value) || 0)} placeholder="500" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div></div></div>
+          <div className="bg-[#f9f2f0] p-3.5 sm:p-4 rounded-2xl border border-[#f3ecea]"><div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-[#dec1af]/40"><span className="material-symbols-outlined text-[18px] text-[#26170c]">schedule</span><h3 className="font-serif text-sm sm:text-base font-bold text-[#26170c]">Hours & Delivery Fees</h3></div><div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Operating Hours</label><input type="text" value={formData.openHours} onChange={(e) => handleInputChange('openHours', e.target.value)} placeholder="7:00 AM - 10:00 PM Daily" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Kitchen Last Call</label><input type="text" value={formData.kitchenLastCall || ''} onChange={(e) => handleInputChange('kitchenLastCall', e.target.value)} placeholder="9:30 PM" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Delivery Cut-off Time</label><input type="text" value={formData.deliveryCutoff || ''} onChange={(e) => handleInputChange('deliveryCutoff', e.target.value)} placeholder="5:00 PM" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Default Delivery Fee (₱)</label><input type="number" min="0" step="1" value={formData.deliveryFee} onChange={(e) => handleInputChange('deliveryFee', parseFloat(e.target.value) || 0)} placeholder="49" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Default Free Delivery Threshold (₱)</label><input type="number" min="0" step="10" value={formData.freeDeliveryThreshold} onChange={(e) => handleInputChange('freeDeliveryThreshold', parseFloat(e.target.value) || 0)} placeholder="500" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm font-bold text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div></div></div>
+
+          <div className="bg-[#f9f2f0] p-3.5 sm:p-4 rounded-2xl border border-[#f3ecea]"><div className="flex items-center justify-between gap-2 mb-2.5 pb-1.5 border-b border-[#dec1af]/40"><div><div className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[18px] text-[#26170c]">local_shipping</span><h3 className="font-serif text-sm sm:text-base font-bold text-[#26170c]">Delivery Zones</h3></div><p className="text-[10px] text-[#81756e] mt-0.5">Customer addresses are matched automatically. When multiple zones match, the lowest priority number wins.</p></div><button type="button" onClick={addZone} className="px-2.5 py-1.5 bg-[#26170c] text-white text-[10px] font-bold rounded-xl flex items-center gap-1 cursor-pointer"><span className="material-symbols-outlined text-[14px]">add</span>Add Zone</button></div>{!zonesLoaded ? <div className="py-5 text-center text-xs text-[#81756e]">Loading delivery zones...</div> : <div className="space-y-2.5">{deliveryZones.map((zone, index) => <div key={zone.id} className="bg-white border border-[#dec1af]/60 rounded-2xl p-3 space-y-2"><div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end"><div className="sm:col-span-3"><label className="block text-[10px] font-bold mb-1">Zone Name</label><input value={zone.name} onChange={(e) => updateZone(index, { name: e.target.value })} className="w-full px-2.5 py-1.5 text-xs bg-[#f9f2f0] border border-[#dec1af] rounded-xl" /></div><div className="sm:col-span-4"><label className="block text-[10px] font-bold mb-1">Address Keywords</label><input value={zone.keywords.join(', ')} onChange={(e) => updateZone(index, { keywords: e.target.value.split(',').map((v) => v.trim().toLocaleLowerCase()).filter(Boolean) })} placeholder="deca homes, tacunan" className="w-full px-2.5 py-1.5 text-xs bg-[#f9f2f0] border border-[#dec1af] rounded-xl" /></div><div className="sm:col-span-2"><label className="block text-[10px] font-bold mb-1">Delivery Fee</label><input type="number" min="0" step="1" value={zone.deliveryFee} onChange={(e) => updateZone(index, { deliveryFee: Math.max(0, Number(e.target.value) || 0) })} className="w-full px-2.5 py-1.5 text-xs bg-[#f9f2f0] border border-[#dec1af] rounded-xl" /></div><div className="sm:col-span-2"><label className="block text-[10px] font-bold mb-1">Free Delivery At</label><input type="number" min="0" step="10" value={zone.freeDeliveryThreshold} onChange={(e) => updateZone(index, { freeDeliveryThreshold: Math.max(0, Number(e.target.value) || 0) })} className="w-full px-2.5 py-1.5 text-xs bg-[#f9f2f0] border border-[#dec1af] rounded-xl" /></div><div className="sm:col-span-1 flex justify-end"><button type="button" onClick={() => removeZone(index)} className="w-8 h-8 rounded-xl bg-[#f3ecea] text-[#8b2616] flex items-center justify-center cursor-pointer" title="Delete zone"><span className="material-symbols-outlined text-[16px]">delete</span></button></div></div><div className="flex flex-wrap items-center justify-between gap-2"><label className="flex items-center gap-2 text-[10px] font-bold"><input type="checkbox" checked={zone.active} onChange={(e) => updateZone(index, { active: e.target.checked })} /> Active zone</label><label className="flex items-center gap-2 text-[10px] font-bold">Priority <input type="number" min="1" max="999" value={zone.priority} onChange={(e) => updateZone(index, { priority: Math.max(1, Number(e.target.value) || 1) })} className="w-16 px-2 py-1 bg-[#f9f2f0] border border-[#dec1af] rounded-lg" /></label></div></div>)}{deliveryZones.length === 0 && <div className="py-4 text-center text-xs text-[#81756e]">No delivery zones configured. Add one to enable zone-based pricing.</div>}<div className="flex flex-wrap justify-end gap-2 pt-1"><button type="button" onClick={resetZones} disabled={isSavingZones} className="px-3 py-1.5 bg-white border border-[#dec1af] text-[#4f453f] text-[10px] font-bold rounded-xl cursor-pointer disabled:opacity-50">Reset Zones</button><button type="button" onClick={saveZones} disabled={isSavingZones} className="px-3.5 py-1.5 bg-[#26170c] text-white text-[10px] font-bold rounded-xl cursor-pointer disabled:opacity-50">{isSavingZones ? 'Saving...' : 'Save Delivery Zones'}</button></div></div>}</div>
+
           <div className="bg-[#f9f2f0] p-3.5 sm:p-4 rounded-2xl border border-[#f3ecea]"><div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-[#dec1af]/40"><span className="material-symbols-outlined text-[18px] text-[#26170c]">wifi</span><h3 className="font-serif text-sm sm:text-base font-bold text-[#26170c]">Guest Wi-Fi & Receipt Footer</h3></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5"><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Guest Wi-Fi Network (SSID)</label><input type="text" value={formData.wifiSsid} onChange={(e) => handleInputChange('wifiSsid', e.target.value)} placeholder="e.g. CafeGuest_5G" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Wi-Fi Password</label><input type="text" value={formData.wifiPassword} onChange={(e) => handleInputChange('wifiPassword', e.target.value)} placeholder="e.g. coffeeandcakes" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div></div><div><label className="block text-[11px] font-bold text-[#26170c] mb-1">Receipt Footer Message</label><textarea rows={2} value={formData.receiptFooter} onChange={(e) => handleInputChange('receiptFooter', e.target.value)} placeholder="Thank you for supporting your local cafe! Tag us on IG @iluvkeyks.ph" className="w-full px-3 py-2 bg-white border border-[#dec1af] rounded-xl text-xs sm:text-sm text-[#26170c] focus:outline-none focus:ring-1 focus:ring-[#26170c]" /></div></div>
         </div>}
 
