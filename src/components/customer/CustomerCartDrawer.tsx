@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CustomerCartItem, CustomerUser, Order, OrderItem, StoreSettings } from '../../types';
 import { promoVoucherService, PromoVoucher } from '../../services/promoVoucherService';
+import { deliveryZoneService, DeliveryPolicy } from '../../services/deliveryZoneService';
 
 interface CustomerCartDrawerProps {
   isOpen: boolean;
@@ -28,6 +29,8 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({ isOpen, 
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'GCash' | 'Maya' | 'Cash' | 'Card'>('GCash');
+  const [deliveryPolicy, setDeliveryPolicy] = useState<DeliveryPolicy | null>(null);
+  const [deliveryPolicyLoading, setDeliveryPolicyLoading] = useState(false);
 
   useEffect(() => {
     if (currentCustomer) {
@@ -41,8 +44,32 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({ isOpen, 
   const baseDeliveryFee = storeSettings?.deliveryFee ?? 49;
   const freeThreshold = storeSettings?.freeDeliveryThreshold ?? 500;
   const discount = appliedPromo ? Math.min(subtotal, appliedPromo.discount) : 0;
-  const deliveryFee = fulfillmentType === 'Delivery' ? (subtotal >= freeThreshold ? 0 : baseDeliveryFee) : 0;
+  const effectiveFreeThreshold = deliveryPolicy?.freeDeliveryThreshold ?? freeThreshold;
+  const deliveryFee = fulfillmentType === 'Delivery'
+    ? (deliveryPolicy?.fee ?? (subtotal >= effectiveFreeThreshold ? 0 : baseDeliveryFee))
+    : 0;
   const grandTotal = Math.max(0, subtotal - discount + deliveryFee);
+
+  useEffect(() => {
+    if (fulfillmentType !== 'Delivery' || !deliveryAddress.trim()) {
+      setDeliveryPolicy(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        setDeliveryPolicyLoading(true);
+        const policy = await deliveryZoneService.resolve(deliveryAddress.trim(), subtotal);
+        if (!cancelled) setDeliveryPolicy(policy);
+      } catch (error) {
+        console.warn('[CustomerCartDrawer] Delivery-zone lookup failed:', error);
+        if (!cancelled) setDeliveryPolicy(null);
+      } finally {
+        if (!cancelled) setDeliveryPolicyLoading(false);
+      }
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [fulfillmentType, deliveryAddress, subtotal]);
 
   useEffect(() => {
     if (appliedPromo && subtotal < appliedPromo.minimumOrderAmount) {
@@ -115,13 +142,13 @@ export const CustomerCartDrawer: React.FC<CustomerCartDrawerProps> = ({ isOpen, 
           <div className="bg-white p-3.5 rounded-2xl border border-[#f3ecea] space-y-2.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2"><input required value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Your Name *" className="w-full px-3 py-2 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af]"/><input value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="Mobile Number" className="w-full px-3 py-2 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af]"/></div>
             {fulfillmentType==='Dine-In'&&<input value={tableNumber} onChange={e=>setTableNumber(e.target.value)} placeholder="Table / Booth Number" className="w-full px-3 py-2 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af]"/>}
-            {fulfillmentType==='Delivery'&&<textarea rows={2} required value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} placeholder="Delivery Address / Unit / Landmark *" className="w-full px-3 py-2 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af] resize-none"/>}
+            {fulfillmentType==='Delivery'&&<><textarea rows={2} required value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} placeholder="Delivery Address / Unit / Landmark *" className="w-full px-3 py-2 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af] resize-none"/>{deliveryAddress.trim() && <div className="text-[10px] rounded-xl bg-[#f9f2f0] border border-[#dec1af]/60 px-2.5 py-2 flex items-center justify-between gap-2"><span className="text-[#4f453f]">{deliveryPolicyLoading ? 'Checking delivery zone...' : deliveryPolicy?.zone ? `Delivery Zone: ${deliveryPolicy.zone.name}` : 'Default delivery zone / fee'}</span>{deliveryPolicy?.zone && <span className="font-bold">₱{deliveryPolicy.zone.deliveryFee.toFixed(2)} • Free at ₱{deliveryPolicy.zone.freeDeliveryThreshold.toFixed(2)}</span>}</div>}</>}
           </div>
           <div className="space-y-2.5"><div className="flex justify-between"><span className="text-xs font-bold uppercase tracking-wider text-[#4f453f]">Items in Cart</span><button onClick={onClearCart} className="text-[11px] text-[#ba1a1a] font-semibold">Clear All</button></div>{cartItems.map(item=><div key={item.id} className="p-3 bg-white rounded-2xl border border-[#f3ecea] flex gap-3"><img src={item.menuItem.image} alt={item.menuItem.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0"/><div className="flex-1 min-w-0"><div className="flex justify-between gap-2"><h5 className="text-xs font-bold truncate">{item.menuItem.name}</h5><button onClick={()=>onRemoveItem(item.id)} className="text-[#81756e] cursor-pointer"><span className="material-symbols-outlined text-[16px]">close</span></button></div><div className="mt-1 text-[10px] text-[#81756e] space-y-0.5">{item.selectedTemperature&&item.selectedTemperature!=='N/A'&&<div>{item.selectedTemperature}</div>}{item.selectedSize&&<div>{item.selectedSize.name}</div>}{item.sweetnessLevel&&<div>{item.sweetnessLevel} sugar</div>}{item.iceLevel&&item.selectedTemperature==='Iced'&&<div>{item.iceLevel}</div>}{item.selectedAddons?.length&&<div>+ {item.selectedAddons.map(a=>a.name).join(', ')}</div>}{item.specialInstructions&&<div>"{item.specialInstructions}"</div>}</div><div className="mt-2 flex items-center justify-between"><div className="flex items-center gap-2 bg-[#f9f2f0] px-2 py-1 rounded-lg border border-[#dec1af]/50"><button onClick={()=>onUpdateQuantity(item.id,-1)} className="font-bold">-</button><span className="text-xs font-bold min-w-[14px] text-center">{item.quantity}</span><button onClick={()=>onUpdateQuantity(item.id,1)} className="font-bold">+</button></div><span className="text-xs font-bold">₱{item.totalPrice.toFixed(2)}</span></div></div></div>)}</div>
           <div className="bg-white p-3 rounded-2xl border border-[#f3ecea]"><label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5">Have a Promo Voucher?</label>{appliedPromo?<div className="flex items-center justify-between p-2 bg-[#e1e1c9]/40 rounded-xl"><span className="text-xs font-bold truncate">{appliedPromo.code} ({appliedPromo.discountType==='percentage'?`${appliedPromo.discountValue}% OFF`:`₱${appliedPromo.discountValue.toFixed(2)} OFF`})</span><button onClick={()=>setAppliedPromo(null)} className="text-[11px] text-[#ba1a1a] font-bold">Remove</button></div>:<form onSubmit={handleApplyPromo} className="flex gap-2"><input value={promoInput} onChange={e=>setPromoInput(e.target.value)} placeholder="e.g. SEPTEMBER10" className="flex-1 px-3 py-1.5 text-xs bg-[#f9f2f0] rounded-xl border border-[#dec1af] uppercase font-bold min-w-0"/><button disabled={promoLoading} className="px-3.5 py-1.5 bg-[#26170c] text-white text-xs font-bold rounded-xl disabled:opacity-50">{promoLoading?'...':'Apply'}</button></form>}{promoError&&<p className="text-[10px] text-[#ba1a1a] mt-1">{promoError}</p>}</div>
           <div className="bg-white p-3 rounded-2xl border border-[#f3ecea]"><label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5">Payment Method</label><div className="grid grid-cols-4 gap-1.5">{(['GCash','Maya','Cash','Card'] as const).map(method=><button key={method} type="button" onClick={()=>setPaymentMethod(method)} className={`py-2 rounded-xl text-xs font-bold border cursor-pointer ${paymentMethod===method?'bg-[#26170c] text-white border-[#26170c]':'bg-[#f9f2f0] border-[#dec1af]'}`}>{method}</button>)}</div></div>
           <div><label className="text-[10px] font-bold uppercase tracking-wider">Overall Order Note</label><input value={orderNotes} onChange={e=>setOrderNotes(e.target.value)} placeholder="e.g. Please pack coffee and pastries separately" className="w-full mt-1 px-3 py-2 text-xs bg-white rounded-xl border border-[#dec1af]"/></div>
-          <div className="p-3.5 bg-[#f9f2f0] rounded-2xl border border-[#dec1af]/60 space-y-1.5 text-xs"><div className="flex justify-between"><span>Subtotal</span><span className="font-semibold">₱{subtotal.toFixed(2)}</span></div>{discount>0&&<div className="flex justify-between text-[#636451] font-bold"><span>Discount ({appliedPromo?.code})</span><span>-₱{discount.toFixed(2)}</span></div>}{fulfillmentType==='Delivery'&&<div className="flex justify-between"><span>Delivery Fee</span><span>{deliveryFee===0?'FREE':`₱${deliveryFee.toFixed(2)}`}</span></div>}<div className="pt-2 border-t border-[#dec1af]/80 flex justify-between font-serif"><span className="font-bold">Total Amount</span><span className="text-lg font-bold">₱{grandTotal.toFixed(2)}</span></div></div>
+          <div className="p-3.5 bg-[#f9f2f0] rounded-2xl border border-[#dec1af]/60 space-y-1.5 text-xs"><div className="flex justify-between"><span>Subtotal</span><span className="font-semibold">₱{subtotal.toFixed(2)}</span></div>{discount>0&&<div className="flex justify-between text-[#636451] font-bold"><span>Discount ({appliedPromo?.code})</span><span>-₱{discount.toFixed(2)}</span></div>}{fulfillmentType==='Delivery'&&<div className="flex justify-between"><span>Delivery Fee</span><span>{deliveryFee===0?'FREE':`₱${deliveryFee.toFixed(2)}`}</span></div>}{fulfillmentType==='Delivery'&&deliveryPolicy?.zone&&<div className="flex justify-between text-[10px] text-[#81756e]"><span>Free delivery at</span><span>₱{effectiveFreeThreshold.toFixed(2)} subtotal</span></div>}<div className="pt-2 border-t border-[#dec1af]/80 flex justify-between font-serif"><span className="font-bold">Total Amount</span><span className="text-lg font-bold">₱{grandTotal.toFixed(2)}</span></div></div>
         </>}
       </div>
       {cartItems.length>0&&<div className="p-4 bg-[#f9f2f0] border-t border-[#dec1af]/60"><button onClick={handleCheckout} className="w-full py-3.5 px-4 bg-[#26170c] text-white font-bold text-sm rounded-2xl flex items-center justify-between cursor-pointer"><span>Place {fulfillmentType} Order</span><span>₱{grandTotal.toFixed(2)}</span></button></div>}
