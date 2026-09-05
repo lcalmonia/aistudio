@@ -27,6 +27,7 @@ export interface AdminAccount {
   updatedAt: string;
   canResetPassword: boolean;
   canChangeStatus: boolean;
+  canDelete: boolean;
 }
 
 export type Permission =
