@@ -64,12 +64,33 @@ export async function listDeliveryZones(): Promise<DeliveryZone[]> {
   }));
 }
 
+async function getStoreDefaultDeliverySettings(): Promise<{ fee: number; freeDeliveryThreshold: number }> {
+  const db = database();
+  const result = await db.pool.query(`
+    SELECT delivery_fee, free_delivery_threshold
+    FROM store_settings
+    WHERE id = 'default'
+    LIMIT 1
+  `);
+
+  if (result.rows.length === 0) {
+    return { fee: DEFAULT_FEE, freeDeliveryThreshold: DEFAULT_FREE_THRESHOLD };
+  }
+
+  const row = result.rows[0];
+  return {
+    fee: Math.max(0, Number(row.delivery_fee) || DEFAULT_FEE),
+    freeDeliveryThreshold: Math.max(0, Number(row.free_delivery_threshold) || DEFAULT_FREE_THRESHOLD),
+  };
+}
+
 export async function resolveDeliveryPolicy(address: unknown, subtotal: number, zones?: DeliveryZone[]): Promise<DeliveryPolicy> {
   const allZones = zones || await listDeliveryZones();
   const matched = matchDeliveryZone(allZones, address);
   const zone = matched.zone;
-  const fee = zone ? zone.deliveryFee : DEFAULT_FEE;
-  const freeDeliveryThreshold = zone ? zone.freeDeliveryThreshold : DEFAULT_FREE_THRESHOLD;
+  const defaults = zone ? null : await getStoreDefaultDeliverySettings();
+  const fee = zone ? zone.deliveryFee : defaults!.fee;
+  const freeDeliveryThreshold = zone ? zone.freeDeliveryThreshold : defaults!.freeDeliveryThreshold;
   return {
     fee: subtotal >= freeDeliveryThreshold ? 0 : fee,
     freeDeliveryThreshold,
