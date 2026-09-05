@@ -16,6 +16,7 @@ import {
   enforceStatsDateRangeAccess,
   requireAuthenticatedAdmin,
 } from './_shared/auth.mts';
+import { resolveDeliveryPolicy } from './_shared/deliveryZones.mts';
 
 export default async function handler(request: Request): Promise<Response> {
   try {
@@ -65,6 +66,14 @@ export default async function handler(request: Request): Promise<Response> {
 
       if (!payload || typeof payload !== 'object') {
         throw new RequestError(400, 'Order data is required.');
+      }
+
+      if (payload.orderType === 'Delivery') {
+        const subtotal = Math.max(0, Number(payload.subtotal ?? payload.total ?? 0));
+        const discount = Math.max(0, Number(payload.discount ?? 0));
+        const policy = await resolveDeliveryPolicy(payload.deliveryAddress, Math.max(0, subtotal - discount));
+        payload.deliveryFee = policy.fee;
+        payload.total = Math.max(0, subtotal - discount + policy.fee);
       }
 
       const order = await insertOrderToDatabase(payload);
