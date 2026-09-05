@@ -168,16 +168,155 @@ export interface Order {
   isCustomerOrder?: boolean;
 }
 
-export interface CustomerUser { id:string; name:string; username?:string; email:string; mobile:string; address:string; createdAt:string; updatedAt?:string; status:'active'|'inactive'; accountType?:'Personal'|'Business'; role?:'customer'; stamps?:number; points?:number; }
+export interface CustomerUser {
+  id: string;
+  name: string;
+  username?: string;
+  email: string;
+  mobile: string;
+  address: string;
+  createdAt: string;
+  updatedAt?: string;
+  status: 'active' | 'inactive';
+  accountType?: 'Personal' | 'Business';
+  role?: 'customer';
+  stamps?: number;
+  points?: number;
+}
 
-export interface CustomerCartItem { id:string; menuItem:MenuItem; selectedTemperature?:'Hot'|'Iced'|'N/A'; selectedSize?:ProductSize|null; sweetnessLevel?:string; iceLevel?:string; selectedAddons?:ProductAddon[]; selectedModifiers?:Record<string,string|string[]>; selectedModifierItems?:ProductAddon[]; specialInstructions?:string; quantity:number; unitPrice:number; totalPrice:number; isBundle?:boolean; bundleData?:PromoBundle; }
+export interface CustomerCartItem {
+  id: string;
+  menuItem: MenuItem;
+  selectedTemperature?: 'Hot' | 'Iced' | 'N/A';
+  selectedSize?: ProductSize | null;
+  sweetnessLevel?: string;
+  iceLevel?: string;
+  selectedAddons?: ProductAddon[];
+  selectedModifiers?: Record<string, string | string[]>;
+  selectedModifierItems?: ProductAddon[];
+  specialInstructions?: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  isBundle?: boolean;
+  bundleData?: PromoBundle;
+}
 
-export interface InventoryItem { id:string; name:string; category:string; stock:number; unit:string; status:'In Stock'|'Low Stock'|'Critical'; minThreshold:number; costPerUnit?:number; supplier?:string; description?:string; sku?:string; notes?:string; active?:boolean; createdAt?:string; updatedAt?:string; lastRestocked?:string; }
-export interface InventoryMovement { id:string; inventoryItemId:string; itemName:string; type:'addition'|'deduction'|'adjustment'|'restock'|'waste'; quantity:number; previousQuantity:number; resultingQuantity:number; reason?:string; timestamp:number; createdAt:string; staffName?:string; }
-export interface LoyaltyTransaction { id:string; customerId:string; type:'earn_stamps'|'earn_points'|'redeem_stamps'|'redeem_points'|'welcome_bonus'|'adjustment'; amount:number; referenceOrderId?:string; reason:string; timestamp:number; createdAt:string; }
-export interface LoyaltySettings { welcomeEnabled:boolean; welcomeStamps:number; welcomePoints:number; stampMinimumPurchase:number; stampsPerQualifyingOrder:number; pointsMinimumPurchase:number; pointsMode:'fixed'|'ratio'; fixedPoints:number; pointsPerCurrency:number; currencyUnit:number; stampCycle:number; }
-export interface LoyaltyPerk { id:string; name:string; description:string; rewardSource:'menu'|'custom'; menuItemId?:string; customItemName?:string; redemptionType:'stamps'|'points'; redemptionCost:number; active:boolean; createdAt?:string; updatedAt?:string; }
-export interface StoreSettings { storeName:string; tagline:string; logoUrl:string; branchName:string; phoneNumber:string; email:string; address:string; currencySymbol:string; deliveryFee:number; freeDeliveryThreshold:number; openHours:string; kitchenLastCall?:string; deliveryCutoff?:string; receiptFooter:string; wifiSsid?:string; wifiPassword?:string; socialFb?:string; socialIg?:string; }
-export interface SalesSummary { totalSales:number; cupsServed:number; totalOrdersCount:number; averageOrderValue:number; activeOrdersCount:number; completedOrdersCount:number; pendingOrdersCount:number; cancelledOrdersCount:number; }
-export interface HourlySalesPoint { time:string; hour:number; cups:number; sales:number; }
-export interface TopSellingProduct { name:string; count:number; percentage:number; revenue:number; formattedRevenue:string; }
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  stock: number;
+  unit: string;
+  status: 'In Stock' | 'Low Stock' | 'Critical';
+  minThreshold: number;
+  costPerUnit?: number;
+  supplier?: string;
+  description?: string;
+  sku?: string;
+  notes?: string;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  lastRestocked?: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  inventoryItemId: string;
+  itemName: string;
+  type: 'addition' | 'deduction' | 'adjustment' | 'restock' | 'waste';
+  quantity: number;
+  previousQuantity: number;
+  resultingQuantity: number;
+  reason?: string;
+  timestamp: number;
+  createdAt: string;
+  staffName?: string;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  customerId: string;
+  type: 'earn_stamps' | 'earn_points' | 'redeem_stamps' | 'redeem_points' | 'welcome_bonus' | 'adjustment';
+  amount: number;
+  referenceOrderId?: string;
+  reason: string;
+  timestamp: number;
+  createdAt: string;
+}
+
+export interface LoyaltySettings {
+  welcomeEnabled: boolean;
+  welcomeStamps: number;
+  welcomePoints: number;
+  stampMinimumPurchase: number;
+  stampsPerQualifyingOrder: number;
+  pointsMinimumPurchase: number;
+  pointsMode: 'fixed' | 'ratio';
+  fixedPoints: number;
+  pointsPerCurrency: number;
+  currencyUnit: number;
+  stampCycle: number;
+}
+
+export interface LoyaltyPerk {
+  id: string;
+  name: string;
+  description: string;
+  rewardSource: 'menu' | 'custom';
+  menuItemId?: string;
+  customItemName?: string;
+  redemptionType: 'stamps' | 'points';
+  redemptionCost: number;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface StoreSettings {
+  storeName: string;
+  tagline: string;
+  logoUrl: string;
+  branchName: string;
+  phoneNumber: string;
+  email: string;
+  address: string;
+  currencySymbol: string;
+  deliveryFee: number;
+  freeDeliveryThreshold: number;
+  openHours: string;
+  kitchenLastCall?: string;
+  deliveryCutoff?: string;
+  receiptFooter: string;
+  wifiSsid?: string;
+  wifiPassword?: string;
+  socialFb?: string;
+  socialIg?: string;
+}
+
+export interface SalesSummary {
+  totalSales: number;
+  cupsServed: number;
+  totalOrdersCount: number;
+  averageOrderValue: number;
+  activeOrdersCount: number;
+  completedOrdersCount: number;
+  pendingOrdersCount: number;
+  cancelledOrdersCount: number;
+}
+
+export interface HourlySalesPoint {
+  time: string;
+  hour: number;
+  cups: number;
+  sales: number;
+}
+
+export interface TopSellingProduct {
+  name: string;
+  count: number;
+  percentage: number;
+  revenue: number;
+  formattedRevenue: string;
+}
