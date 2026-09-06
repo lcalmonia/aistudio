@@ -1226,6 +1226,9 @@ const handleDeleteInventoryCategory = async (category: string) => {
             onCreateOrder={handleCreateOrder}
             menuItems={menuItems}
             categories={categories}
+            addonsList={addons}
+            modifierCategories={modifierCategories}
+            promoBundles={promoBundles}
           />
 
           {/* Admin: Edit/Add Product Modal */}
