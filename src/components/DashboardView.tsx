@@ -8,6 +8,7 @@ interface DashboardViewProps {
   cupsServed: number;
   dailyGoal: number;
   todaySales: number;
+  todayCompletedOrdersCount: number;
   newMembers: number;
   onLogBrew: () => void;
   onOpenNewOrder: () => void;
@@ -20,6 +21,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   cupsServed,
   dailyGoal,
   todaySales,
+  todayCompletedOrdersCount,
   newMembers,
   onLogBrew,
   onOpenNewOrder,
@@ -63,7 +65,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </h3>
             <div className="flex items-center gap-1.5 mt-2 text-[#5e604d] font-semibold text-xs">
               <span className="material-symbols-outlined text-[16px]">payments</span>
-              <span>{orders.length} total orders recorded today</span>
+              <span>{todayCompletedOrdersCount} completed {todayCompletedOrdersCount === 1 ? 'order' : 'orders'} recorded today</span>
             </div>
           </div>
           {/* Abstract organic shape */}
