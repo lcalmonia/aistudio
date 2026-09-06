@@ -280,24 +280,25 @@ export default function App() {
 
   const refreshCatalogAndInventory = useCallback(async () => {
     try {
-      const [mItems, cats, ads, bundles, invItems, invCats, sets] = await Promise.all([
+      // Inventory does not need to be fetched for every catalog refresh. Keeping
+      // background sync focused on customer-facing catalog data avoids repeated
+      // database work while preserving cross-device availability updates.
+      const [mItems, cats, ads, modifierCats, bundles, sets] = await Promise.all([
         menuService.listMenuItems(),
         categoryService.listCategories(),
         addonService.listAddons(),
+        modifierCategoryService.listCategories(),
         promoService.listPromoBundles(),
-        inventoryService.listInventory(),
-        inventoryService.listCategories(),
         settingsService.getStoreSettings(),
       ]);
       setMenuItems(mItems);
       setCategories(cats);
       setAddons(ads);
+      setModifierCategories(modifierCats);
       setPromoBundles(bundles);
-      setInventoryItems(invItems);
-      setInventoryCategories(invCats);
       setStoreSettings(sets);
     } catch (err) {
-      console.warn('[App] Background catalog/inventory/settings sync error:', err);
+      console.warn('[App] Background catalog/settings sync error:', err);
     }
   }, []);
 
