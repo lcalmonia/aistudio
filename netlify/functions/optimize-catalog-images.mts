@@ -4,9 +4,9 @@ import { getAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts';
 import { database } from './_shared/database.mts';
 import { enforceSameOrigin, errorResponse, json, RequestError } from './_shared/http.mts';
 
-const MAX_DIMENSION = 1200;
-const TARGET_BYTES = 700 * 1024;
-const MIN_QUALITY = 55;
+const MAX_DIMENSION = 1024;
+const TARGET_BYTES = 300 * 1024;
+const MIN_QUALITY = 50;
 
 async function optimizeImage(input: Buffer): Promise<{ data: Buffer; contentType: string }> {
   let quality = 82;
@@ -26,7 +26,7 @@ async function optimizeImage(input: Buffer): Promise<{ data: Buffer; contentType
   }
 
   if (data.length > TARGET_BYTES) {
-    throw new RequestError(422, 'An image could not be compressed below 700KB.');
+    throw new RequestError(422, 'An image could not be compressed below 300KB.');
   }
 
   return { data, contentType: 'image/webp' };

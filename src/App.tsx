@@ -280,79 +280,98 @@ export default function App() {
 
   const refreshCatalogAndInventory = useCallback(async () => {
     try {
-      const [mItems, cats, ads, bundles, invItems, invCats, sets] = await Promise.all([
+      // Inventory does not need to be fetched for every catalog refresh. Keeping
+      // background sync focused on customer-facing catalog data avoids repeated
+      // database work while preserving cross-device availability updates.
+      const [mItems, cats, ads, modifierCats, bundles, sets] = await Promise.all([
         menuService.listMenuItems(),
         categoryService.listCategories(),
         addonService.listAddons(),
+        modifierCategoryService.listCategories(),
         promoService.listPromoBundles(),
-        inventoryService.listInventory(),
-        inventoryService.listCategories(),
         settingsService.getStoreSettings(),
       ]);
       setMenuItems(mItems);
       setCategories(cats);
       setAddons(ads);
+      setModifierCategories(modifierCats);
       setPromoBundles(bundles);
-      setInventoryItems(invItems);
-      setInventoryCategories(invCats);
       setStoreSettings(sets);
     } catch (err) {
-      console.warn('[App] Background catalog/inventory/settings sync error:', err);
+      console.warn('[App] Background catalog/settings sync error:', err);
     }
   }, []);
 
-  // Poll every 1 second only while the Admin Orders view is active and the tab is visible
-  // Keep order-driven dashboard and stats in sync with server-side changes, including deletions and cancellations.
-  const shouldPollOrders = portalMode === 'admin' && adminPrincipal && (currentTab === 'home' || currentTab === 'stats' || currentTab === 'orders' || currentTab === 'menu');
+  // Poll order data only on views that actually need live order changes.
+  // The old 1-second full-order refresh was generating a very high number of
+  // function/database requests, especially when multiple admin pages were open.
+  const orderPollIntervalMs =
+    portalMode === 'admin' && adminPrincipal
+      ? currentTab === 'orders'
+        ? 5000
+        : currentTab === 'home' || currentTab === 'stats'
+          ? 30000
+          : null
+      : null;
 
   useEffect(() => {
-    if (!shouldPollOrders) return;
+    if (!orderPollIntervalMs) return;
 
-    const interval = setInterval(() => {
+    const refreshVisibleOrders = () => {
       if (document.visibilityState === 'visible') {
-        refreshOrders();
-      }
-    }, 1000);
-
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        refreshOrders();
+        void refreshOrders();
       }
     };
 
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    const interval = setInterval(refreshVisibleOrders, orderPollIntervalMs);
+    window.addEventListener('focus', refreshVisibleOrders);
+    document.addEventListener('visibilitychange', refreshVisibleOrders);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', refreshVisibleOrders);
+      document.removeEventListener('visibilitychange', refreshVisibleOrders);
     };
-  }, [refreshOrders, shouldPollOrders]);
+  }, [refreshOrders, orderPollIntervalMs]);
 
-  // Poll catalog and inventory every 6 seconds or on window focus
+  // Catalog/inventory changes are much less frequent than order status changes.
+  // Refresh on focus and use a slower interval only while a customer is ordering
+  // or an admin is actively managing the menu.
+  const catalogPollIntervalMs =
+    portalMode === 'customer'
+      ? 30000
+      : portalMode === 'admin' && adminPrincipal && currentTab === 'admin-menu'
+        ? 60000
+        : null;
+
   useEffect(() => {
-    const interval = setInterval(() => {
+    const refreshVisibleCatalog = () => {
       if (document.visibilityState === 'visible') {
-        refreshCatalogAndInventory();
-      }
-    }, 6000);
-
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        refreshCatalogAndInventory();
+        void refreshCatalogAndInventory();
       }
     };
 
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    if (catalogPollIntervalMs) {
+      const interval = setInterval(refreshVisibleCatalog, catalogPollIntervalMs);
+      window.addEventListener('focus', refreshVisibleCatalog);
+      document.addEventListener('visibilitychange', refreshVisibleCatalog);
 
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', refreshVisibleCatalog);
+        document.removeEventListener('visibilitychange', refreshVisibleCatalog);
+      };
+    }
+
+    // Non-catalog views do not poll continuously, but refresh once when the user
+    // returns to the tab so cross-device changes are still picked up.
+    window.addEventListener('focus', refreshVisibleCatalog);
+    document.addEventListener('visibilitychange', refreshVisibleCatalog);
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', refreshVisibleCatalog);
+      document.removeEventListener('visibilitychange', refreshVisibleCatalog);
     };
-  }, [refreshCatalogAndInventory]);
+  }, [refreshCatalogAndInventory, catalogPollIntervalMs]);
 
   // -------------------------------------------------------------
   // Customer Auth Handlers
