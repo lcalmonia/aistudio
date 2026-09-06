@@ -140,10 +140,10 @@ test('Phase 8B - Date Range Boundaries: Custom range formats inclusive boundarie
   assert.ok(boundary.endDate?.startsWith('2026-08-15'));
 });
 
-test('Phase 8B - Stats Filtering: Cancelled orders are strictly excluded from calculations', () => {
+test('Phase 8B - Stats Filtering: Only completed orders are included in sales calculations', () => {
   const summary = reportingService.calculateSalesSummary(sampleOrders);
-  // Total of non-cancelled orders: 350 (today-1) + 180 (today-2) + 420 (yesterday) + 200 (past-5d) + 1000 (past-45d) = 2150
-  assert.equal(summary.totalSales, 2150);
+  // Completed orders only: 350 + 420 + 200 + 1000 = 1970. New and cancelled orders are excluded.
+  assert.equal(summary.totalSales, 1970);
   assert.equal(summary.cancelledOrdersCount, 1);
   assert.equal(summary.completedOrdersCount, 4);
 });
@@ -159,12 +159,36 @@ test('Phase 8B - Stats Filtering: Top products respect filtered order range and 
   );
 
   const topProducts = reportingService.calculateTopSellingItems(todayOrders);
-  // Spanish Latte: 2, Croissant: 1, Americano: 1 (Cancelled Caramel Macchiato excluded)
-  assert.equal(topProducts.length, 3);
+  // Spanish Latte: 2 and Croissant: 1. Unfinished Americano and cancelled Caramel Macchiato are excluded.
+  assert.equal(topProducts.length, 2);
   assert.equal(topProducts[0].name, 'Spanish Latte');
   assert.equal(topProducts[0].count, 2);
   assert.equal(topProducts[0].revenue, 300);
 });
+
+
+test('Completed-only sales reporting excludes new, brewing, ready, pending, and cancelled orders', () => {
+  const statuses = ['New', 'Brewing', 'Ready', 'Pending', 'Preparing', 'Cancelled'] as const;
+  const orders: Order[] = [
+    {
+      id: 'completed-sale', orderNumber: '#C1', customerName: 'Completed', timestamp: Date.now(), timeAgo: 'now',
+      status: 'Completed', total: 500, items: [{ name: 'Completed Item', quantity: 2, price: 250 }], paymentMethod: 'GCash',
+    },
+    ...statuses.map((status, index) => ({
+      id: 'unfinished-' + status, orderNumber: '#U' + index, customerName: status, timestamp: Date.now(), timeAgo: 'now',
+      status, total: 100, items: [{ name: status + ' Item', quantity: 1, price: 100 }], paymentMethod: 'Cash' as const,
+    })),
+  ];
+
+  const summary = reportingService.calculateSalesSummary(orders);
+  assert.equal(reportingService.calculateTotalSales(orders), 500);
+  assert.equal(summary.totalSales, 500);
+  assert.equal(summary.totalOrdersCount, 1);
+  assert.equal(summary.cupsServed, 2);
+  assert.equal(reportingService.calculateAverageOrderValue(orders), 500);
+  assert.equal(reportingService.calculateTopSellingItems(orders).length, 1);
+});
+
 
 test('Phase 8B - Empty Orders Handling: Safely returns zeros without runtime exceptions', () => {
   const emptySummary = reportingService.calculateSalesSummary([]);

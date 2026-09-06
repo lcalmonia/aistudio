@@ -2,22 +2,22 @@ import { Order, MenuItem, SalesSummary, HourlySalesPoint, TopSellingProduct } fr
 
 export const reportingService = {
   /**
-   * Calculates total gross sales from active and completed orders (excluding Cancelled).
+   * Calculates total gross sales from completed orders only.
    */
   calculateTotalSales(orders: Order[] = []): number {
     const list = orders || [];
     return list
-      .filter((o) => o && o.status !== 'Cancelled')
+      .filter((o) => o && o.status === 'Completed')
       .reduce((sum, o) => sum + (o.total || 0), 0);
   },
 
   /**
-   * Calculates total items/cups served from orders.
+   * Calculates total items/cups served from completed orders only.
    */
   calculateCupsServed(orders: Order[] = []): number {
     const list = orders || [];
     return list
-      .filter((o) => o && o.status !== 'Cancelled')
+      .filter((o) => o && o.status === 'Completed')
       .reduce((totalCups, order) => {
         const orderItemQty = (order.items || []).reduce((itemSum, item) => itemSum + (item.quantity || 1), 0);
         return totalCups + (orderItemQty > 0 ? orderItemQty : 1);
@@ -29,7 +29,7 @@ export const reportingService = {
    */
   calculateAverageOrderValue(orders: Order[] = []): number {
     const list = orders || [];
-    const validOrders = list.filter((o) => o && o.status !== 'Cancelled');
+    const validOrders = list.filter((o) => o && o.status === 'Completed');
     if (validOrders.length === 0) return 0;
     const totalSales = validOrders.reduce((sum, o) => sum + (o.total || 0), 0);
     return totalSales / validOrders.length;
@@ -47,7 +47,7 @@ export const reportingService = {
 
   /**
    * Generates hourly throughput breakdown based on actual order timestamps.
-   * Aggregates valid non-cancelled orders across the given range by all 24 hours of the day (12 AM - 11 PM).
+   * Aggregates completed orders only across the given range by all 24 hours of the day (12 AM - 11 PM).
    */
   calculateHourlyThroughput(orders: Order[] = []): HourlySalesPoint[] {
     const list = orders || [];
@@ -78,7 +78,7 @@ export const reportingService = {
       { label: '11 PM', hour: 23 },
     ];
 
-    const validOrders = list.filter((o) => o && o.status !== 'Cancelled');
+    const validOrders = list.filter((o) => o && o.status === 'Completed');
 
     return hours.map(({ label, hour }) => {
       const matchingOrders = validOrders.filter((o) => {
@@ -105,7 +105,7 @@ export const reportingService = {
    */
   calculateTopSellingItems(orders: Order[] = [], menuItems?: MenuItem[]): TopSellingProduct[] {
     const list = orders || [];
-    const validOrders = list.filter((o) => o && o.status !== 'Cancelled');
+    const validOrders = list.filter((o) => o && o.status === 'Completed');
     const productMap = new Map<string, { count: number; revenue: number }>();
 
     validOrders.forEach((order) => {
@@ -147,10 +147,10 @@ export const reportingService = {
    */
   calculateSalesSummary(orders: Order[] = []): SalesSummary {
     const list = orders || [];
-    const validOrders = list.filter((o) => o && o.status !== 'Cancelled');
+    const validOrders = list.filter((o) => o && o.status === 'Completed');
     const totalSales = validOrders.reduce((sum, o) => sum + (o.total || 0), 0);
     const cupsServed = this.calculateCupsServed(list);
-    const totalOrdersCount = list.length;
+    const totalOrdersCount = validOrders.length;
     const averageOrderValue = validOrders.length > 0 ? totalSales / validOrders.length : 0;
     const activeOrdersCount = this.calculateActiveOrdersCount(list);
     const completedOrdersCount = list.filter((o) => o && o.status === 'Completed').length;
