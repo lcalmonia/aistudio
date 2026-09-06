@@ -133,7 +133,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
 
   const paymentBreakdown = useMemo(() => {
     const breakdown = { ...EMPTY_PAYMENT_TOTALS };
-    rangeOrders.filter((order) => order && order.status !== 'Cancelled').forEach((order) => {
+    rangeOrders.filter((order) => order && order.status === 'Completed').forEach((order) => {
       const parsed = parsePaymentBreakdown(order.paymentMethod, Number(order.total) || 0);
       breakdown.GCash += parsed.GCash;
       breakdown.Maya += parsed.Maya;
