@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { CustomerCartItem, MenuItem, ModifierCategory, Order, OrderItem, ProductAddon } from '../types';
+import { CustomerCartItem, MenuItem, ModifierCategory, Order, OrderItem, ProductAddon, PromoBundle } from '../types';
 import { addonService, modifierCategoryService, storageAdapter } from '../services';
 import { generateOrderId, generateOrderNumber } from '../services/idGenerator';
 import { CustomerProductModal } from './customer/CustomerProductModal';
+import { BundleCustomizationModal } from './customer/BundleCustomizationModal';
 
 interface NewOrderModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface NewOrderModalProps {
   categories?: string[];
   addonsList?: ProductAddon[];
   modifierCategories?: ModifierCategory[];
+  promoBundles?: PromoBundle[];
 }
 interface SelectedOrderItem {
   lineId: string;
@@ -31,11 +33,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   categories = [],
   addonsList = [],
   modifierCategories = [],
+  promoBundles = [],
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [selectedItems, setSelectedItems] = useState<SelectedOrderItem[]>([]);
   const [activeCategory, setActiveCategory] = useState('All');
   const [customizingProduct, setCustomizingProduct] = useState<MenuItem | null>(null);
+  const [customizingBundle, setCustomizingBundle] = useState<PromoBundle | null>(null);
   const [liveAddons, setLiveAddons] = useState<ProductAddon[]>(() => storageAdapter.getAddons());
   const [liveModifierCategories, setLiveModifierCategories] = useState<ModifierCategory[]>(() => storageAdapter.getModifierCategories());
   const [customerSectionOpen, setCustomerSectionOpen] = useState(true);
@@ -61,8 +65,10 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
   const effectiveAddons = addonsList.length ? addonsList : liveAddons;
   const effectiveModifierCategories = modifierCategories.length ? modifierCategories : liveModifierCategories;
-  const allCategoryList = ['All', ...Array.from(new Set([...categories, ...menuItems.map((m) => m.category)]))];
-  const filteredMenuItems = (activeCategory === 'All' ? menuItems : menuItems.filter((m) => m.category === activeCategory)).filter((m) => m.available);
+  const allCategoryList = ['All', ...Array.from(new Set([...categories, ...menuItems.map((m) => m.category)])), ...(promoBundles.length ? ['Combos'] : [])];
+  const isComboCategory = activeCategory === 'Combos';
+  const filteredMenuItems = (activeCategory === 'All' || isComboCategory ? menuItems : menuItems.filter((m) => m.category === activeCategory)).filter((m) => m.available);
+  const filteredBundles = (activeCategory === 'All' || isComboCategory ? promoBundles : []).filter((bundle) => bundle.available !== false);
 
   const handleCustomizedItem = (cartItem: CustomerCartItem) => {
     const d: string[] = [];
@@ -85,6 +91,36 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       unitPrice: cartItem.unitPrice,
     }]);
     setCustomizingProduct(null);
+  };
+
+  const handleBundleComplete = (selections: CustomerCartItem[]) => {
+    if (!customizingBundle) return;
+    const details = selections.map((selection) => {
+      const parts: string[] = [selection.menuItem.name];
+      if (selection.selectedTemperature && selection.selectedTemperature !== 'N/A') parts.push(selection.selectedTemperature === 'Hot' ? 'Hot Brewed' : 'Iced & Chilled');
+      if (selection.selectedSize) parts.push(selection.selectedSize.volume ? `${selection.selectedSize.name} (${selection.selectedSize.volume})` : selection.selectedSize.name);
+      if (selection.selectedAddons?.length) parts.push(`Add-ons: ${selection.selectedAddons.map((addon) => addon.name).join(', ')}`);
+      if (selection.specialInstructions) parts.push(`Note: ${selection.specialInstructions}`);
+      return parts.join(' • ');
+    });
+    const bundleItem: MenuItem = {
+      id: `bundle-${customizingBundle.id}`,
+      name: customizingBundle.name,
+      category: 'Combos',
+      price: customizingBundle.price,
+      image: customizingBundle.image,
+      description: customizingBundle.description,
+      available: true,
+      temperature: 'N/A',
+    };
+    setSelectedItems((previous) => [...previous, {
+      lineId: `bundle-${customizingBundle.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      item: bundleItem,
+      quantity: 1,
+      customization: details.join(' | ') || 'Combo bundle',
+      unitPrice: customizingBundle.price,
+    }]);
+    setCustomizingBundle(null);
   };
 
   const handleRemoveItem = (id: string) => setSelectedItems((p) => p.filter((x) => x.lineId !== id));
@@ -132,7 +168,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1">
-              {filteredMenuItems.map((item) => <div key={item.id} onClick={() => setCustomizingProduct(item)} className="p-2.5 bg-[#f9f2f0] hover:bg-[#f3ecea] border border-[#e8e1df] rounded-xl flex items-center gap-2.5 cursor-pointer active:scale-95 transition-all shadow-xs"><img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" /><div className="min-w-0 flex-1"><h5 className="text-xs font-bold text-[#26170c] truncate">{item.name}</h5><div className="flex items-center gap-1"><p className="text-[11px] text-[#5e604d] font-semibold">₱{item.price.toFixed(2)}</p>{item.temperature !== 'N/A' && <span className="text-[9px] text-[#81756e]">{item.temperature === 'Both' ? '🔥/❄️' : item.temperature === 'Hot' ? '🔥' : '❄️'}</span>}</div></div><span className="material-symbols-outlined text-[18px] text-[#636451]">add_circle</span></div>)}
+              {!isComboCategory && filteredMenuItems.map((item) => <div key={item.id} onClick={() => setCustomizingProduct(item)} className="p-2.5 bg-[#f9f2f0] hover:bg-[#f3ecea] border border-[#e8e1df] rounded-xl flex items-center gap-2.5 cursor-pointer active:scale-95 transition-all shadow-xs"><img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" /><div className="min-w-0 flex-1"><h5 className="text-xs font-bold text-[#26170c] truncate">{item.name}</h5><div className="flex items-center gap-1"><p className="text-[11px] text-[#5e604d] font-semibold">₱{item.price.toFixed(2)}</p>{item.temperature !== 'N/A' && <span className="text-[9px] text-[#81756e]">{item.temperature === 'Both' ? '🔥/❄️' : item.temperature === 'Hot' ? '🔥' : '❄️'}</span>}</div></div><span className="material-symbols-outlined text-[18px] text-[#636451]">add_circle</span></div>)}
+              {filteredBundles.map((bundle) => <div key={bundle.id} onClick={() => setCustomizingBundle(bundle)} className="p-2.5 bg-[#f9f2f0] hover:bg-[#f3ecea] border border-[#e8e1df] rounded-xl flex items-center gap-2.5 cursor-pointer active:scale-95 transition-all shadow-xs"><img src={bundle.image} alt={bundle.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" /><div className="min-w-0 flex-1"><h5 className="text-xs font-bold text-[#26170c] truncate">{bundle.name}</h5><div className="flex items-center gap-1"><p className="text-[11px] text-[#5e604d] font-semibold">₱{bundle.price.toFixed(2)}</p><span className="text-[9px] text-[#81756e]">Combo</span></div></div><span className="material-symbols-outlined text-[18px] text-[#636451]">add_circle</span></div>)}
+              {isComboCategory && filteredBundles.length === 0 && <div className="col-span-2 p-4 bg-[#f3ecea] rounded-xl text-center text-xs text-[#81756e]">No active combo bundles available.</div>}
             </div>
 
             <div><label className="block text-xs font-semibold text-[#26170c] mb-1.5">Order Ticket ({selectedItems.length} items)</label>{!selectedItems.length ? <div className="p-4 bg-[#f3ecea] rounded-xl text-center text-xs text-[#81756e]">No items added yet. Tap an item above to choose temperature, size and modifiers.</div> : <div className="space-y-2 bg-[#f9f2f0] p-3 rounded-xl border border-[#e8e1df]">{selectedItems.map((sel) => <div key={sel.lineId} className="flex justify-between items-start gap-3 text-xs"><div className="min-w-0 flex-1"><span className="font-bold text-[#26170c]">{sel.item.name}</span><p className="text-[11px] text-[#5e604d] font-semibold">₱{sel.unitPrice.toFixed(2)} each</p><p className="text-[10px] text-[#81756e] leading-relaxed mt-0.5">{sel.customization}</p></div><div className="flex items-center gap-2 flex-shrink-0 pt-0.5"><button type="button" onClick={() => handleQuantityChange(sel.lineId, -1)} className="w-6 h-6 rounded-full bg-[#e8e1df] text-[#26170c] font-bold flex items-center justify-center">-</button><span className="font-bold text-[#26170c]">{sel.quantity}</span><button type="button" onClick={() => handleQuantityChange(sel.lineId, 1)} className="w-6 h-6 rounded-full bg-[#26170c] text-white font-bold flex items-center justify-center">+</button><button type="button" onClick={() => handleRemoveItem(sel.lineId)} className="text-[#ba1a1a] ml-1"><span className="material-symbols-outlined text-[16px]">delete</span></button></div></div>)}<div className="pt-2 flex justify-between items-center font-bold text-sm text-[#26170c] border-t border-[#d2c4bc]/40"><span>Order Total</span><span>₱{calculateTotal().toFixed(2)}</span></div></div>}</div>
@@ -141,6 +179,15 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
           <div className="p-4 bg-[#f9f2f0] border-t border-[#e8e1df] flex gap-2.5"><button type="button" onClick={onClose} className="px-4 py-2.5 rounded-full text-xs font-semibold text-[#4f453f]">Cancel</button><button type="button" disabled={!selectedItems.length} onClick={handleSubmit} className={`flex-1 py-2.5 rounded-full text-sm font-bold flex items-center justify-center gap-1.5 ${!selectedItems.length ? 'bg-[#d2c4bc] text-[#81756e] cursor-not-allowed' : 'bg-[#26170c] text-white'}`}><span className="material-symbols-outlined text-[18px]">receipt_long</span>Send to Kitchen (₱{calculateTotal().toFixed(2)})</button></div>
         </div>
       </div>
+      <BundleCustomizationModal
+        isOpen={customizingBundle !== null}
+        onClose={() => setCustomizingBundle(null)}
+        bundle={customizingBundle}
+        menuItems={menuItems}
+        addonsList={effectiveAddons}
+        modifierCategories={effectiveModifierCategories}
+        onComplete={handleBundleComplete}
+      />
       <CustomerProductModal isOpen={customizingProduct !== null} onClose={() => setCustomizingProduct(null)} product={customizingProduct} addonsList={effectiveAddons} modifierCategories={effectiveModifierCategories} onAddToCart={handleCustomizedItem} />
     </>
   );
