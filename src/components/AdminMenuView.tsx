@@ -78,6 +78,9 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
 }) => {
   const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
   const isAdminOnly = admin?.role === 'ADMIN';
+  // Both ADMIN and SUPER_ADMIN may change only availability/stock status.
+  // All other menu configuration remains restricted to SUPER_ADMIN.
+  const canManageAvailability = isSuperAdmin || isAdminOnly;
 
   // Defensive fallbacks for aliased handlers
   const handleAddProduct = onAddProduct || onOpenAddProduct || (() => {});
@@ -711,7 +714,7 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                   {/* Card Bottom Controls: In-Stock Toggle & Edit Actions */}
                   <div className="p-2.5 sm:p-3 bg-[#fff8f5] flex justify-between items-center gap-1.5 flex-wrap">
                     {/* Stock Switch */}
-                    {isSuperAdmin && (
+                    {canManageAvailability && (
                     <button
                       onClick={() => handleToggleProduct(product.id)}
                       className={`px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 ${
@@ -938,17 +941,17 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
       {/* ========================================================================= */}
       {adminTab === 'addons' && (
         <div className="space-y-4">
-          {/* Read-Only Notice for Admin Role */}
+          {/* Admin role guidance: availability is operational, configuration stays Super Admin-only. */}
           {isAdminOnly && (
             <div className="bg-[#f3ecea] border border-[#d2c4bc] text-[#4f453f] px-4 py-3 rounded-2xl flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-[#81756e]">lock</span>
+                <span className="material-symbols-outlined text-[20px] text-[#5e604d]">toggle_on</span>
                 <span>
-                  <strong>Admin Mode:</strong> Menu products, modifier groups, modifier options, pricing, categories, and availability settings are read-only. Only Super Admin can modify them.
+                  <strong>Admin Mode:</strong> You can mark menu products, modifiers, and add-ons as Available or Sold Out. Editing products, pricing, categories, groups, and deleting records remains restricted to Super Admin.
                 </span>
               </div>
-              <span className="text-[10px] font-bold bg-[#e8e1df] px-2 py-0.5 rounded uppercase tracking-wider text-[#636451]">
-                Read-Only Settings
+              <span className="text-[10px] font-bold bg-[#e1e1c9] px-2 py-0.5 rounded uppercase tracking-wider text-[#636451]">
+                Availability Access
               </span>
             </div>
           )}
@@ -1305,8 +1308,8 @@ export const AdminMenuView: React.FC<AdminMenuViewProps> = ({
                             </div>
 
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              {/* Modifier availability is configuration: SUPER_ADMIN only. Admin users have read-only access. */}
-                              {isSuperAdmin && (
+                              {/* Availability is operational: both ADMIN and SUPER_ADMIN may toggle it. */}
+                              {canManageAvailability && (
                                 <button
                                   type="button"
                                   onClick={() => onToggleAddonStock(addon.id)}
