@@ -127,8 +127,20 @@ export default function App() {
 
   // Live metrics calculation from real orders data via reportingService
   const [extraLoggedCups, setExtraLoggedCups] = useState<number>(0);
-  const todaySales = reportingService.calculateTotalSales(orders);
-  const cupsServed = reportingService.calculateCupsServed(orders) + extraLoggedCups;
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+  // Dashboard sales and daily brew progress are based on today's completed orders only.
+  const todayCompletedOrders = orders.filter((order) => {
+    if (!order || order.status !== 'Completed') return false;
+    const orderTime = Number(order.timestamp);
+    return Number.isFinite(orderTime) && orderTime >= todayStart.getTime() && orderTime <= todayEnd.getTime();
+  });
+  const todaySales = reportingService.calculateTotalSales(todayCompletedOrders);
+  const cupsServed = reportingService.calculateCupsServed(todayCompletedOrders) + extraLoggedCups;
+  const todayCompletedOrdersCount = todayCompletedOrders.length;
   const dailyGoal = 100;
   const newMembers = customers.length;
 
@@ -290,7 +302,8 @@ export default function App() {
   }, []);
 
   // Poll every 1 second only while the Admin Orders view is active and the tab is visible
-  const shouldPollOrders = portalMode === 'admin' && adminPrincipal && (currentTab === 'orders' || currentTab === 'menu');
+  // Keep order-driven dashboard and stats in sync with server-side changes, including deletions and cancellations.
+  const shouldPollOrders = portalMode === 'admin' && adminPrincipal && (currentTab === 'home' || currentTab === 'stats' || currentTab === 'orders' || currentTab === 'menu');
 
   useEffect(() => {
     if (!shouldPollOrders) return;
@@ -1117,6 +1130,7 @@ const handleDeleteInventoryCategory = async (category: string) => {
                 cupsServed={cupsServed}
                 dailyGoal={dailyGoal}
                 todaySales={todaySales}
+                todayCompletedOrdersCount={todayCompletedOrdersCount}
                 newMembers={customers.length}
                 onLogBrew={handleLogBrew}
                 onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
