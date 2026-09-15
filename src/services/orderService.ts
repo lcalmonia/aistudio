@@ -23,6 +23,14 @@ async function resolveDeliveryFee(address: string | undefined, subtotal: number)
   } catch (err) { console.warn('[OrderService] Delivery-zone lookup failed; retaining cart fee:', err); return null; }
 }
 
+// Admin order polling normally only needs records that changed since the last sync.
+// Keep a short-lived full-sync cursor so the normal 5-second polling loop does not
+// repeatedly download the same 200 orders and their line items.
+let lastAdminOrderSyncAt: string | null = null;
+let lastAdminOrderFullSyncAt = 0;
+const ADMIN_ORDER_FULL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const ADMIN_ORDER_SYNC_OVERLAP_MS = 2000;
+
 export const orderService = {
   async listOrders(options: { customerId?: string; orderId?: string; orderNumber?: string; status?: OrderStatus; startDate?: string; endDate?: string; limit?: number; } = {}): Promise<Order[]> {
     // The app's initial no-filter order load is only required by the admin portal.
@@ -41,11 +49,43 @@ export const orderService = {
       return storageAdapter.getOrders();
     }
 
+    const isUnfilteredAdminList = !hasFilters && parseRouteFromPath().portalMode === 'admin';
+
+    // After the first full admin load, poll only rows whose updated_at changed.
+    // A periodic full sync keeps the local cache resilient to out-of-band deletes
+    // or other changes that cannot be represented by an update cursor.
+    if (isUnfilteredAdminList && lastAdminOrderSyncAt && Date.now() - lastAdminOrderFullSyncAt < ADMIN_ORDER_FULL_SYNC_INTERVAL_MS) {
+      try {
+        const params = new URLSearchParams({ updatedSince: lastAdminOrderSyncAt });
+        const response = await api<{ orders: Order[]; serverTime: string }>(`/api/orders/updates?${params.toString()}`, { method: 'GET' });
+        if (response && Array.isArray(response.orders)) {
+          const current = storageAdapter.getOrders();
+          const byId = new Map(current.map((order) => [order.id, order]));
+          for (const updated of response.orders) byId.set(updated.id, updated);
+          const merged = Array.from(byId.values()).sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+          storageAdapter.setOrders(merged);
+          lastAdminOrderSyncAt = response.serverTime || new Date().toISOString();
+          return merged;
+        }
+      } catch (err) {
+        console.warn('[OrderService] Incremental order sync failed; falling back to full sync:', err);
+      }
+    }
+
     try {
       const params = new URLSearchParams();
       if (options.customerId) params.set('customerId', options.customerId); if (options.orderId) params.set('orderId', options.orderId); if (options.orderNumber) params.set('orderNumber', options.orderNumber); if (options.status) params.set('status', options.status); if (options.startDate) params.set('startDate', options.startDate); if (options.endDate) params.set('endDate', options.endDate); if (options.limit) params.set('limit', options.limit.toString());
       const qs = params.toString(); const response = await api<{ orders: Order[] }>(`/api/orders${qs ? `?${qs}` : ''}`, { method: 'GET' });
-      if (response && Array.isArray(response.orders)) { if (!options.customerId && !options.orderId && !options.status && !options.startDate && !options.endDate) storageAdapter.setOrders(response.orders); return response.orders; }
+      if (response && Array.isArray(response.orders)) {
+        if (!options.customerId && !options.orderId && !options.status && !options.startDate && !options.endDate) {
+          storageAdapter.setOrders(response.orders);
+          if (isUnfilteredAdminList) {
+            lastAdminOrderSyncAt = new Date(Date.now() - ADMIN_ORDER_SYNC_OVERLAP_MS).toISOString();
+            lastAdminOrderFullSyncAt = Date.now();
+          }
+        }
+        return response.orders;
+      }
     } catch (err) { console.warn('[OrderService] Server listOrders failed, using local storage fallback:', err); }
     let local = storageAdapter.getOrders(); if (options.customerId) local = local.filter((o) => o.customerId === options.customerId); if (options.orderId) local = local.filter((o) => o.id === options.orderId); if (options.orderNumber) local = local.filter((o) => o.orderNumber === options.orderNumber || o.orderNumber === `#${options.orderNumber}`); if (options.status) local = local.filter((o) => o.status === options.status); if (options.startDate) { const startMs = new Date(options.startDate).getTime(); if (!isNaN(startMs)) local = local.filter((o) => o.timestamp >= startMs); } if (options.endDate) { const endMs = new Date(options.endDate).getTime(); if (!isNaN(endMs)) local = local.filter((o) => o.timestamp <= endMs); } return local;
   },
@@ -66,6 +106,6 @@ export const orderService = {
   async updateOrderStatus(orderId: string, status: OrderStatus, paymentMethod?: 'GCash' | 'Maya' | 'Cash' | 'Card'): Promise<Order | null> { try { const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'PATCH', body: JSON.stringify({ status, ...(paymentMethod ? { paymentMethod } : {}) }) }); if (response && response.order) { const updated = response.order; const local = storageAdapter.getOrders(); storageAdapter.setOrders(local.map((o) => (o.id === updated.id || o.orderNumber === updated.orderNumber ? updated : o))); return updated; } } catch (err) { console.warn(`[OrderService] Server updateOrderStatus(${orderId}, ${status}) failed, applying locally:`, err); } const local = storageAdapter.getOrders(); const index = local.findIndex((o) => o.id === orderId || o.orderNumber === orderId); if (index === -1) return null; const updatedOrder: Order = { ...local[index], status, ...(paymentMethod ? { paymentMethod } : {}), updatedAt: new Date().toISOString(), completedAt: status === 'Completed' ? new Date().toISOString() : local[index].completedAt, cancelledAt: status === 'Cancelled' ? new Date().toISOString() : local[index].cancelledAt }; local[index] = updatedOrder; storageAdapter.setOrders(local); return updatedOrder; },
   async cancelCustomerOrder(orderId: string, customerId: string, customerEmail?: string): Promise<Order | null> { try { const response = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'PATCH', body: JSON.stringify({ action: 'customer-cancel', customerId, customerEmail }) }); if (response && response.order) { const updated = response.order; const local = storageAdapter.getOrders(); storageAdapter.setOrders(local.map((o) => o.id === updated.id || o.orderNumber === updated.orderNumber ? updated : o)); return updated; } } catch (err) { console.warn(`[OrderService] Customer cancellation failed for ${orderId}:`, err); throw err; } return null; },
   async cancelOrder(orderId: string, reason?: string): Promise<Order | null> { return this.updateOrderStatus(orderId, 'Cancelled'); },
-  async deleteOrder(orderId: string): Promise<boolean> { try { await api<{ deleted: boolean }>(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'DELETE', body: JSON.stringify({}) }); const local = storageAdapter.getOrders(); storageAdapter.setOrders(local.filter((o) => o.id !== orderId && o.orderNumber !== orderId)); return true; } catch (err) { console.warn(`[OrderService] Server deleteOrder(${orderId}) failed:`, err); throw err; } },
+  async deleteOrder(orderId: string): Promise<boolean> { try { await api<{ deleted: boolean }>(`/api/orders/${encodeURIComponent(orderId)}/`, { method: 'DELETE', body: JSON.stringify({}) }); const local = storageAdapter.getOrders(); storageAdapter.setOrders(local.filter((o) => o.id !== orderId && o.orderNumber !== orderId)); return true; } catch (err) { console.warn(`[OrderService] Server deleteOrder(${orderId}) failed:`, err); throw err; } },
   async saveOrders(orders: Order[]): Promise<Order[]> { storageAdapter.setOrders(orders); return orders; },
 };
