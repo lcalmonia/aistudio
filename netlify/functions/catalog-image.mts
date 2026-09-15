@@ -34,7 +34,10 @@ export default async function handler(_request: Request, context: Context): Prom
       status: 200,
       headers: {
         'Content-Type': row.content_type || 'image/webp',
-        'Cache-Control': 'public, max-age=300, must-revalidate',
+        // Image URLs are versioned on upload, so unchanged images can be cached
+        // for a long time without serving stale content after an update.
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Length': String(imageData.length),
         'X-Content-Type-Options': 'nosniff',
       },
     });
