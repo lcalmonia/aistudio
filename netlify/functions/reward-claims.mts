@@ -31,7 +31,11 @@ export default async function handler(request: Request): Promise<Response> {
         WHERE status = 'pending'
         ORDER BY requested_at ASC
       `);
-      return json({ claims: result.rows.map(mapClaim) });
+      return json(
+        { claims: result.rows.map(mapClaim) },
+        200,
+        'private, max-age=5, must-revalidate',
+      );
     }
 
     if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
