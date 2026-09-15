@@ -3,11 +3,13 @@ import { requireAuthenticatedAdmin } from './_shared/auth.mts';
 import { fetchBundlesFromDatabase, insertBundleToDatabase, PromoBundle } from './_shared/catalog.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject, requireString } from './_shared/http.mts';
 
+const PUBLIC_CATALOG_CACHE = 'public, max-age=30, stale-while-revalidate=60';
+
 export default async function handler(request: Request): Promise<Response> {
   try {
     if (request.method === 'GET') {
       const bundles = await fetchBundlesFromDatabase();
-      return json({ bundles });
+      return json({ bundles }, 200, PUBLIC_CATALOG_CACHE);
     }
 
     if (request.method === 'POST') {
