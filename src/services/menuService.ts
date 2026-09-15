@@ -46,12 +46,30 @@ function sortMenuItems(items: MenuItem[]): MenuItem[] {
   );
 }
 
+// Avoid duplicate menu API/database requests caused by focus events, visibility
+// changes, and polling firing close together. Writes invalidate this cache.
+const MENU_CACHE_TTL_MS = 30_000;
+let menuCache: MenuItem[] | null = null;
+let menuCacheAt = 0;
+
+function invalidateMenuCache(): void {
+  menuCache = null;
+  menuCacheAt = 0;
+}
+
 export const menuService = {
   async listMenuItems(): Promise<MenuItem[]> {
+    const now = Date.now();
+    if (menuCache && now - menuCacheAt < MENU_CACHE_TTL_MS) {
+      return menuCache;
+    }
+
     try {
       const response = await api<{ menuItems: MenuItem[] }>('/api/menu-items', { method: 'GET' });
       if (response && Array.isArray(response.menuItems)) {
         const sortedItems = sortMenuItems(response.menuItems);
+        menuCache = sortedItems;
+        menuCacheAt = Date.now();
         storageAdapter.setMenuItems(sortedItems);
         return sortedItems;
       }
@@ -98,6 +116,7 @@ export const menuService = {
     });
 
     if (response && response.menuItem) {
+      invalidateMenuCache();
       const items = storageAdapter.getMenuItems().filter((i) => i.id !== response.menuItem.id);
       storageAdapter.setMenuItems(sortMenuItems([response.menuItem, ...items]));
       return response.menuItem;
@@ -118,6 +137,7 @@ export const menuService = {
     });
 
     if (response && response.menuItem) {
+      invalidateMenuCache();
       const items = storageAdapter.getMenuItems();
       const index = items.findIndex((i) => i.id === id);
       if (index !== -1) {
@@ -137,6 +157,7 @@ export const menuService = {
       method: 'DELETE',
     });
 
+    invalidateMenuCache();
     const items = storageAdapter.getMenuItems();
     const filtered = items.filter((i) => i.id !== id);
     storageAdapter.setMenuItems(sortMenuItems(filtered));
@@ -150,6 +171,7 @@ export const menuService = {
     });
 
     if (response && response.menuItem) {
+      invalidateMenuCache();
       const items = storageAdapter.getMenuItems();
       const index = items.findIndex((i) => i.id === id);
       if (index !== -1) {
@@ -165,6 +187,7 @@ export const menuService = {
   },
 
   async saveMenuItems(items: MenuItem[]): Promise<MenuItem[]> {
+    invalidateMenuCache();
     const sortedItems = sortMenuItems(items);
     storageAdapter.setMenuItems(sortedItems);
     return sortedItems;
