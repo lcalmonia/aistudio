@@ -36,6 +36,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   promoBundles = [],
 }) => {
   const [customerName, setCustomerName] = useState('');
+  const [orderType, setOrderType] = useState<'Dine-In' | 'Take-Out'>('Dine-In');
   const [selectedItems, setSelectedItems] = useState<SelectedOrderItem[]>([]);
   const [activeCategory, setActiveCategory] = useState('All');
   const [customizingProduct, setCustomizingProduct] = useState<MenuItem | null>(null);
@@ -132,8 +133,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     if (!selectedItems.length) return;
     const items: OrderItem[] = selectedItems.map((s) => ({ name: s.item.name, quantity: s.quantity, customization: s.customization, price: s.unitPrice, temperature: s.temperature, size: s.size }));
     const total = calculateTotal();
-    onCreateOrder({ id: generateOrderId(), orderNumber: generateOrderNumber(), customerName: customerName.trim() || 'Dine-in Guest', timeAgo: 'Just now', timestamp: Date.now(), status: 'New', items, total, subtotal: total, image: selectedItems[0]?.item.image });
+    onCreateOrder({ id: generateOrderId(), orderNumber: generateOrderNumber(), customerName: customerName.trim() || (orderType === 'Dine-In' ? 'Dine-in Guest' : 'Take-out Guest'), timeAgo: 'Just now', timestamp: Date.now(), status: 'New', orderType, items, total, subtotal: total, image: selectedItems[0]?.item.image });
     setCustomerName('');
+    setOrderType('Dine-In');
     setSelectedItems([]);
     setCustomizingProduct(null);
     setCustomerSectionOpen(true);
@@ -156,7 +158,20 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 <span className="text-xs font-semibold text-[#26170c]">Customer Name / Table #</span>
                 <span className="material-symbols-outlined text-[20px] text-[#636451]">{customerSectionOpen ? 'expand_less' : 'expand_more'}</span>
               </button>
-              {customerSectionOpen && <div className="p-3.5 bg-[#fff8f5]"><input type="text" placeholder="Customer name, table #, or takeout #..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3.5 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:outline-none focus:ring-2 focus:ring-[#5e604d]" /></div>}
+              {customerSectionOpen && <div className="p-3.5 bg-[#fff8f5] space-y-3">
+                <input type="text" placeholder={orderType === 'Dine-In' ? 'Customer name or table #...' : 'Customer name or takeout #...'} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3.5 py-2 text-sm bg-white rounded-xl border border-[#d2c4bc] focus:outline-none focus:ring-2 focus:ring-[#5e604d]" />
+                <div>
+                  <label className="block text-xs font-semibold text-[#26170c] mb-1.5">Order Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setOrderType('Dine-In')} aria-pressed={orderType === 'Dine-In'} className={`py-2.5 rounded-xl text-sm font-bold border transition-all ${orderType === 'Dine-In' ? 'bg-[#26170c] text-white border-[#26170c] shadow-sm' : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'}`}>
+                      <span className="material-symbols-outlined text-[17px] align-middle mr-1">restaurant</span>Dine-In
+                    </button>
+                    <button type="button" onClick={() => setOrderType('Take-Out')} aria-pressed={orderType === 'Take-Out'} className={`py-2.5 rounded-xl text-sm font-bold border transition-all ${orderType === 'Take-Out' ? 'bg-[#26170c] text-white border-[#26170c] shadow-sm' : 'bg-white text-[#4f453f] border-[#d2c4bc] hover:bg-[#f3ecea]'}`}>
+                      <span className="material-symbols-outlined text-[17px] align-middle mr-1">takeout_dining</span>Take-Out
+                    </button>
+                  </div>
+                </div>
+              </div>}
             </div>
 
             <div className="rounded-xl border border-[#e8e1df] overflow-hidden">
