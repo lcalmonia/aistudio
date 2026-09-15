@@ -3,11 +3,13 @@ import { requireAuthenticatedAdmin, requireSuperAdmin } from './_shared/auth.mts
 import { fetchModifierCategoriesFromDatabase, insertModifierCategoryToDatabase, ModifierCategory } from './_shared/catalog.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject, requireString } from './_shared/http.mts';
 
+const PUBLIC_CATALOG_CACHE = 'public, max-age=30, stale-while-revalidate=60';
+
 export default async function handler(request: Request): Promise<Response> {
   try {
     if (request.method === 'GET') {
       const modifierCategories = await fetchModifierCategoriesFromDatabase();
-      return json({ modifierCategories });
+      return json({ modifierCategories }, 200, PUBLIC_CATALOG_CACHE);
     }
 
     if (request.method === 'POST') {
