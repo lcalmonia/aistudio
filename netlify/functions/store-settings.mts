@@ -3,11 +3,13 @@ import { requireAuthenticatedAdmin } from './_shared/auth.mts';
 import { fetchStoreSettingsFromDatabase, resetStoreSettingsInDatabase, updateStoreSettingsInDatabase } from './_shared/settings.mts';
 import { enforceSameOrigin, errorResponse, json, readJsonObject } from './_shared/http.mts';
 
+const PUBLIC_SETTINGS_CACHE = 'public, max-age=30, stale-while-revalidate=60';
+
 export default async function handler(request: Request): Promise<Response> {
   try {
     if (request.method === 'GET') {
       const settings = await fetchStoreSettingsFromDatabase();
-      return json({ settings });
+      return json({ settings }, 200, PUBLIC_SETTINGS_CACHE);
     }
 
     if (request.method === 'PUT' || request.method === 'PATCH') {
