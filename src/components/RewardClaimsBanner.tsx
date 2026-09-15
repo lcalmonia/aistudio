@@ -7,11 +7,13 @@ interface RewardClaimsBannerProps {
   admin: AdminPrincipal;
 }
 
+const REWARD_CLAIMS_POLL_MS = 10_000;
+
 export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentTab, admin }) => {
   const [claims, setClaims] = useState<RewardClaim[]>([]);
 
   const refresh = async () => {
-    if (currentTab !== 'orders') return;
+    if (currentTab !== 'orders' || document.visibilityState !== 'visible') return;
     try {
       setClaims(await rewardClaimService.listPendingClaims());
     } catch (error) {
@@ -24,9 +26,19 @@ export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentT
       setClaims([]);
       return;
     }
-    refresh();
-    const interval = setInterval(refresh, 3000);
-    return () => clearInterval(interval);
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), REWARD_CLAIMS_POLL_MS);
+    const handleFocus = () => void refresh();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [currentTab, admin.id]);
 
   if (currentTab !== 'orders' || claims.length === 0) return null;
@@ -65,7 +77,6 @@ export const RewardClaimsBanner: React.FC<RewardClaimsBannerProps> = ({ currentT
           </div>
           <span className="flex-shrink-0 px-2 py-1 rounded-full bg-[#26170c] text-white text-[9px] font-bold">{claims.length} PENDING</span>
         </div>
-
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {claims.map((claim) => (
             <div key={claim.id} className="min-w-[270px] sm:min-w-[340px] flex-1 bg-white rounded-xl border border-[#dec1af] px-3 py-2 flex items-center justify-between gap-3">
