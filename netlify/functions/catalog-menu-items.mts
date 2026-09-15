@@ -7,7 +7,16 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     if (request.method === 'GET') {
       const menuItems = await fetchMenuItemsFromDatabase();
-      return json({ menuItems });
+      // Menu changes are infrequent compared with customer page loads. A short
+      // browser/CDN cache reduces repeated database reads while keeping catalog
+      // updates responsive. Admin writes use POST/PATCH endpoints and are not cached.
+      return new Response(JSON.stringify({ menuItems }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=30, stale-while-revalidate=60',
+        },
+      });
     }
 
     if (request.method === 'POST') {
