@@ -1,6 +1,7 @@
 import { InventoryItem, InventoryMovement } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
+import { parseRouteFromPath } from './routeService';
 
 export class InventoryApiError extends Error {
   constructor(
@@ -46,6 +47,13 @@ export const inventoryService = {
   },
 
   async listInventory(options?: { includeInactive?: boolean }): Promise<InventoryItem[]> {
+    // Inventory is admin-only data. The initial App load currently calls this
+    // service for every portal, so avoid a database request for public/customer pages.
+    // Admin routes continue to use the authoritative server inventory.
+    if (!options && parseRouteFromPath().portalMode !== 'admin') {
+      return storageAdapter.getInventory();
+    }
+
     try {
       const response = await api<{ items: InventoryItem[] }>('/api/inventory', { method: 'GET' });
       if (response && Array.isArray(response.items)) {
@@ -243,6 +251,11 @@ export const inventoryService = {
   },
 
   async listCategories(): Promise<string[]> {
+    // Inventory categories are also admin-only. Avoid the startup request outside /admin.
+    if (parseRouteFromPath().portalMode !== 'admin') {
+      return storageAdapter.getInventoryCategories();
+    }
+
     try {
       const response = await api<{ categories: string[] }>('/api/inventory/categories', { method: 'GET' });
       if (response && Array.isArray(response.categories)) {
