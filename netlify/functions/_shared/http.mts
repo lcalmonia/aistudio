@@ -9,11 +9,11 @@ export class RequestError extends Error {
   }
 }
 
-export function json(data: unknown, status = 200): Response {
+export function json(data: unknown, status = 200, cacheControl = 'no-store'): Response {
   return Response.json(data, {
     status,
     headers: {
-      'Cache-Control': 'no-store',
+      'Cache-Control': cacheControl,
       'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
       'X-Content-Type-Options': 'nosniff',
     },
