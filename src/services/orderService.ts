@@ -1,6 +1,7 @@
 import { Order, OrderStatus } from '../types';
 import { storageAdapter } from './storageAdapter';
 import { generateOrderId, generateOrderNumber } from './idGenerator';
+import { parseRouteFromPath } from './routeService';
 
 class OrderApiError extends Error {
   constructor(message: string, public readonly status?: number) { super(message); }
@@ -24,6 +25,22 @@ async function resolveDeliveryFee(address: string | undefined, subtotal: number)
 
 export const orderService = {
   async listOrders(options: { customerId?: string; orderId?: string; orderNumber?: string; status?: OrderStatus; startDate?: string; endDate?: string; limit?: number; } = {}): Promise<Order[]> {
+    // The app's initial no-filter order load is only required by the admin portal.
+    // Public/customer pages already load their own customer-specific order data when needed.
+    // Returning the local cache here avoids a full orders query during public startup.
+    const hasFilters = Boolean(
+      options.customerId ||
+      options.orderId ||
+      options.orderNumber ||
+      options.status ||
+      options.startDate ||
+      options.endDate ||
+      options.limit
+    );
+    if (!hasFilters && parseRouteFromPath().portalMode !== 'admin') {
+      return storageAdapter.getOrders();
+    }
+
     try {
       const params = new URLSearchParams();
       if (options.customerId) params.set('customerId', options.customerId); if (options.orderId) params.set('orderId', options.orderId); if (options.orderNumber) params.set('orderNumber', options.orderNumber); if (options.status) params.set('status', options.status); if (options.startDate) params.set('startDate', options.startDate); if (options.endDate) params.set('endDate', options.endDate); if (options.limit) params.set('limit', options.limit.toString());
