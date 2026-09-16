@@ -3,6 +3,10 @@ import { storageAdapter } from './storageAdapter';
 import { generateEntityId } from './idGenerator';
 import { catalogImageService } from './catalogImageService';
 
+const PROMO_CACHE_TTL_MS = 30_000;
+let promoBundleCache: { data: PromoBundle[]; expiresAt: number } | null = null;
+let promoBundleRequest: Promise<PromoBundle[]> | null = null;
+
 export class PromoApiError extends Error {
   constructor(
     message: string,
@@ -35,23 +39,45 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+function invalidatePromoBundleCache() {
+  promoBundleCache = null;
+}
+
 export const promoService = {
   async listPromoBundles(): Promise<PromoBundle[]> {
-    try {
-      const response = await api<{ bundles: PromoBundle[] }>('/api/bundles', { method: 'GET' });
-      if (response && Array.isArray(response.bundles)) {
-        storageAdapter.setPromoBundles(response.bundles);
-        return response.bundles;
-      }
-    } catch (err) {
-      if (err instanceof PromoApiError) {
-        console.warn(`[PromoService] Server listPromoBundles error (${err.status}):`, err.message);
-      } else {
-        console.warn('[PromoService] Server listPromoBundles network failure:', err);
-      }
+    const now = Date.now();
+    if (promoBundleCache && promoBundleCache.expiresAt > now) {
+      return promoBundleCache.data;
     }
-    // Never fall back to a stale local catalog. The server is authoritative.
-    return [];
+    if (promoBundleRequest) {
+      return promoBundleRequest;
+    }
+
+    promoBundleRequest = (async () => {
+      try {
+        const response = await api<{ bundles: PromoBundle[] }>('/api/bundles', { method: 'GET' });
+        if (response && Array.isArray(response.bundles)) {
+          storageAdapter.setPromoBundles(response.bundles);
+          promoBundleCache = {
+            data: response.bundles,
+            expiresAt: Date.now() + PROMO_CACHE_TTL_MS,
+          };
+          return response.bundles;
+        }
+      } catch (err) {
+        if (err instanceof PromoApiError) {
+          console.warn(`[PromoService] Server listPromoBundles error (${err.status}):`, err.message);
+        } else {
+          console.warn('[PromoService] Server listPromoBundles network failure:', err);
+        }
+      } finally {
+        promoBundleRequest = null;
+      }
+      // Never fall back to a stale local catalog. The server is authoritative.
+      return [];
+    })();
+
+    return promoBundleRequest;
   },
 
   async getPromoBundle(id: string): Promise<PromoBundle | null> {
@@ -70,6 +96,7 @@ export const promoService = {
   },
 
   async savePromoBundles(bundles: PromoBundle[]): Promise<PromoBundle[]> {
+    invalidatePromoBundleCache();
     storageAdapter.setPromoBundles(bundles);
     return bundles;
   },
@@ -91,6 +118,7 @@ export const promoService = {
       body: JSON.stringify(newBundle),
     });
     if (response && response.bundle) {
+      invalidatePromoBundleCache();
       const bundles = storageAdapter.getPromoBundles().filter((b) => b.id !== response.bundle.id);
       storageAdapter.setPromoBundles([response.bundle, ...bundles]);
       return response.bundle;
@@ -113,6 +141,7 @@ export const promoService = {
       body: JSON.stringify(serverUpdates),
     });
     if (response && response.bundle) {
+      invalidatePromoBundleCache();
       const bundles = storageAdapter.getPromoBundles();
       const index = bundles.findIndex((b) => b.id === id);
       if (index !== -1) {
@@ -132,6 +161,7 @@ export const promoService = {
       method: 'DELETE',
     });
 
+    invalidatePromoBundleCache();
     const bundles = storageAdapter.getPromoBundles();
     storageAdapter.setPromoBundles(bundles.filter((b) => b.id !== id));
     return true;
@@ -147,6 +177,7 @@ export const promoService = {
       body: JSON.stringify({ available: targetAvailability }),
     });
     if (response && response.bundle) {
+      invalidatePromoBundleCache();
       const index = bundles.findIndex((b) => b.id === id);
       if (index !== -1) {
         bundles[index] = response.bundle;
