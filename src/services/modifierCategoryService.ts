@@ -12,6 +12,14 @@ export class ModifierCategoryApiError extends Error {
   }
 }
 
+const MODIFIER_CATEGORY_CACHE_TTL_MS = 30_000;
+let modifierCategoryCache: { categories: ModifierCategory[]; expiresAt: number } | null = null;
+let modifierCategoryRequest: Promise<ModifierCategory[]> | null = null;
+
+function invalidateModifierCategoryCache() {
+  modifierCategoryCache = null;
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -36,20 +44,40 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const modifierCategoryService = {
   async listCategories(): Promise<ModifierCategory[]> {
-    try {
-      const response = await api<{ modifierCategories: ModifierCategory[] }>('/api/modifier-categories', { method: 'GET' });
-      if (response && Array.isArray(response.modifierCategories)) {
-        storageAdapter.setModifierCategories(response.modifierCategories);
-        return response.modifierCategories;
-      }
-    } catch (err) {
-      if (err instanceof ModifierCategoryApiError) {
-        console.warn(`[ModifierCategoryService] Server list error (${err.status}):`, err.message);
-      } else {
-        console.warn('[ModifierCategoryService] Server network failure, using local storage fallback:', err);
-      }
+    const now = Date.now();
+    if (modifierCategoryCache && modifierCategoryCache.expiresAt > now) {
+      return modifierCategoryCache.categories;
     }
-    return storageAdapter.getModifierCategories();
+    if (modifierCategoryRequest) {
+      return modifierCategoryRequest;
+    }
+
+    modifierCategoryRequest = (async () => {
+      try {
+        const response = await api<{ modifierCategories: ModifierCategory[] }>('/api/modifier-categories', { method: 'GET' });
+        if (response && Array.isArray(response.modifierCategories)) {
+          storageAdapter.setModifierCategories(response.modifierCategories);
+          modifierCategoryCache = {
+            categories: response.modifierCategories,
+            expiresAt: Date.now() + MODIFIER_CATEGORY_CACHE_TTL_MS,
+          };
+          return response.modifierCategories;
+        }
+      } catch (err) {
+        if (err instanceof ModifierCategoryApiError) {
+          console.warn(`[ModifierCategoryService] Server list error (${err.status}):`, err.message);
+        } else {
+          console.warn('[ModifierCategoryService] Server network failure, using local storage fallback:', err);
+        }
+      }
+      return storageAdapter.getModifierCategories();
+    })();
+
+    try {
+      return await modifierCategoryRequest;
+    } finally {
+      modifierCategoryRequest = null;
+    }
   },
 
   async createCategory(cat: Omit<ModifierCategory, 'id'> & { id?: string }): Promise<ModifierCategory> {
@@ -66,6 +94,7 @@ export const modifierCategoryService = {
       if (response && response.modifierCategory) {
         const cats = storageAdapter.getModifierCategories().filter((c) => c.id !== response.modifierCategory.id);
         storageAdapter.setModifierCategories([...cats, response.modifierCategory]);
+        invalidateModifierCategoryCache();
         return response.modifierCategory;
       }
     } catch (err) {
@@ -77,6 +106,7 @@ export const modifierCategoryService = {
 
     const current = storageAdapter.getModifierCategories();
     storageAdapter.setModifierCategories([...current, newCat]);
+    invalidateModifierCategoryCache();
     return newCat;
   },
 
@@ -101,6 +131,7 @@ export const modifierCategoryService = {
             storageAdapter.setAddons(updatedAddons);
           }
         }
+        invalidateModifierCategoryCache();
         return response.category;
       }
     } catch (err) {
@@ -123,6 +154,7 @@ export const modifierCategoryService = {
         );
         storageAdapter.setAddons(updatedAddons);
       }
+      invalidateModifierCategoryCache();
       return cats[index];
     }
     return null;
@@ -142,6 +174,7 @@ export const modifierCategoryService = {
 
     const cats = storageAdapter.getModifierCategories();
     storageAdapter.setModifierCategories(cats.filter((c) => c.id !== id));
+    invalidateModifierCategoryCache();
     return true;
   },
 };
