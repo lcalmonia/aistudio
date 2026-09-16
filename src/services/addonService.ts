@@ -12,6 +12,14 @@ export class AddonApiError extends Error {
   }
 }
 
+const ADDON_CACHE_TTL_MS = 30_000;
+let addonCache: { addons: ProductAddon[]; expiresAt: number } | null = null;
+let addonRequest: Promise<ProductAddon[]> | null = null;
+
+function invalidateAddonCache() {
+  addonCache = null;
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -36,20 +44,40 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const addonService = {
   async listAddons(): Promise<ProductAddon[]> {
-    try {
-      const response = await api<{ addons: ProductAddon[] }>('/api/addons', { method: 'GET' });
-      if (response && Array.isArray(response.addons)) {
-        storageAdapter.setAddons(response.addons);
-        return response.addons;
-      }
-    } catch (err) {
-      if (err instanceof AddonApiError) {
-        console.warn(`[AddonService] Server listAddons error (${err.status}):`, err.message);
-      } else {
-        console.warn('[AddonService] Server listAddons network failure, using local storage fallback:', err);
-      }
+    const now = Date.now();
+    if (addonCache && addonCache.expiresAt > now) {
+      return addonCache.addons;
     }
-    return storageAdapter.getAddons();
+    if (addonRequest) {
+      return addonRequest;
+    }
+
+    addonRequest = (async () => {
+      try {
+        const response = await api<{ addons: ProductAddon[] }>('/api/addons', { method: 'GET' });
+        if (response && Array.isArray(response.addons)) {
+          storageAdapter.setAddons(response.addons);
+          addonCache = {
+            addons: response.addons,
+            expiresAt: Date.now() + ADDON_CACHE_TTL_MS,
+          };
+          return response.addons;
+        }
+      } catch (err) {
+        if (err instanceof AddonApiError) {
+          console.warn(`[AddonService] Server listAddons error (${err.status}):`, err.message);
+        } else {
+          console.warn('[AddonService] Server listAddons network failure, using local storage fallback:', err);
+        }
+      }
+      return storageAdapter.getAddons();
+    })();
+
+    try {
+      return await addonRequest;
+    } finally {
+      addonRequest = null;
+    }
   },
 
   async getAddon(id: string): Promise<ProductAddon | null> {
@@ -70,6 +98,7 @@ export const addonService = {
 
   async saveAddons(addons: ProductAddon[]): Promise<ProductAddon[]> {
     storageAdapter.setAddons(addons);
+    invalidateAddonCache();
     return addons;
   },
 
@@ -86,6 +115,7 @@ export const addonService = {
     if (response && response.addon) {
       const addons = storageAdapter.getAddons().filter((a) => a.id !== response.addon.id);
       storageAdapter.setAddons([...addons, response.addon]);
+      invalidateAddonCache();
       return response.addon;
     }
 
@@ -106,6 +136,7 @@ export const addonService = {
       } else {
         storageAdapter.setAddons([...addons, response.addon]);
       }
+      invalidateAddonCache();
       return response.addon;
     }
 
@@ -119,6 +150,7 @@ export const addonService = {
 
     const addons = storageAdapter.getAddons();
     storageAdapter.setAddons(addons.filter((a) => a.id !== id));
+    invalidateAddonCache();
     return true;
   },
 
@@ -136,10 +168,10 @@ export const addonService = {
       } else {
         storageAdapter.setAddons([...addons, response.addon]);
       }
+      invalidateAddonCache();
       return response.addon;
     }
 
     throw new AddonApiError('Failed to toggle modifier stock on server.');
   },
 };
-
