@@ -10,6 +10,14 @@ export class CategoryApiError extends Error {
   }
 }
 
+const CATEGORY_CACHE_TTL_MS = 30_000;
+let categoryCache: { categories: string[]; expiresAt: number } | null = null;
+let categoryRequest: Promise<string[]> | null = null;
+
+function invalidateCategoryCache() {
+  categoryCache = null;
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -34,24 +42,45 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const categoryService = {
   async listCategories(): Promise<string[]> {
-    try {
-      const response = await api<{ categories: string[] }>('/api/categories', { method: 'GET' });
-      if (response && Array.isArray(response.categories)) {
-        storageAdapter.setCategories(response.categories);
-        return response.categories;
-      }
-    } catch (err) {
-      if (err instanceof CategoryApiError) {
-        console.warn(`[CategoryService] Server listCategories error (${err.status}):`, err.message);
-      } else {
-        console.warn('[CategoryService] Server listCategories network failure, using local storage fallback:', err);
-      }
+    const now = Date.now();
+    if (categoryCache && categoryCache.expiresAt > now) {
+      return categoryCache.categories;
     }
-    return storageAdapter.getCategories();
+    if (categoryRequest) {
+      return categoryRequest;
+    }
+
+    categoryRequest = (async () => {
+      try {
+        const response = await api<{ categories: string[] }>('/api/categories', { method: 'GET' });
+        if (response && Array.isArray(response.categories)) {
+          storageAdapter.setCategories(response.categories);
+          categoryCache = {
+            categories: response.categories,
+            expiresAt: Date.now() + CATEGORY_CACHE_TTL_MS,
+          };
+          return response.categories;
+        }
+      } catch (err) {
+        if (err instanceof CategoryApiError) {
+          console.warn(`[CategoryService] Server listCategories error (${err.status}):`, err.message);
+        } else {
+          console.warn('[CategoryService] Server listCategories network failure, using local storage fallback:', err);
+        }
+      }
+      return storageAdapter.getCategories();
+    })();
+
+    try {
+      return await categoryRequest;
+    } finally {
+      categoryRequest = null;
+    }
   },
 
   async saveCategories(categories: string[]): Promise<string[]> {
     storageAdapter.setCategories(categories);
+    invalidateCategoryCache();
     return categories;
   },
 
@@ -65,6 +94,7 @@ export const categoryService = {
     });
     if (response && Array.isArray(response.categories)) {
       storageAdapter.setCategories(response.categories);
+      invalidateCategoryCache();
       return response.categories;
     }
 
@@ -81,6 +111,7 @@ export const categoryService = {
     });
     if (response && Array.isArray(response.categories)) {
       storageAdapter.setCategories(response.categories);
+      invalidateCategoryCache();
       return response.categories;
     }
 
@@ -94,10 +125,10 @@ export const categoryService = {
     });
     if (response && Array.isArray(response.categories)) {
       storageAdapter.setCategories(response.categories);
+      invalidateCategoryCache();
       return response.categories;
     }
 
     throw new CategoryApiError('Failed to delete category on server.');
   },
 };
-
