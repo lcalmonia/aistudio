@@ -9,8 +9,9 @@ export default async function handler(request: Request): Promise<Response> {
     await requireAuthenticatedStaff(request);
     const url = new URL(request.url);
     const sinceValue = url.searchParams.get('updatedSince');
-    const serverTime = new Date().toISOString();
     const db = database();
+    const clockRows = await db.sql`SELECT NOW() AS server_time`;
+    const serverTime = new Date(clockRows[0].server_time as string).toISOString();
     const client = await db.pool.connect();
     try {
       const params: unknown[] = [];
