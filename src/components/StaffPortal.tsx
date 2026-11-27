@@ -36,7 +36,7 @@ export const StaffPortal:React.FC=()=>{
         if(initial)return result.orders;
         const next=new Map(current.map(order=>[order.id,order]));
         for(const order of result.orders){
-          if(['Completed','Cancelled'].includes(order.status))next.delete(order.id);
+          if(!['New','Brewing','Preparing','Ready'].includes(order.status))next.delete(order.id);
           else next.set(order.id,order);
         }
         return Array.from(next.values()).sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
