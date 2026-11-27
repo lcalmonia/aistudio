@@ -8,9 +8,8 @@ export default async function handler(request: Request, context: Context): Promi
     const staff = await requireAuthenticatedStaff(request);
     return json({ authenticated: true, staff });
   } catch (error) {
-    clearStaffSessionCookie(context);
     const response = errorResponse(error);
-    if (response.status === 401) return response;
+    if (response.status === 401) clearStaffSessionCookie(context);
     return response;
   }
 }
