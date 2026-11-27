@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 type Cashier={id:string;username:string;displayName:string};
-type Product={id:string;name:string;category:string;price:number|string;temperature:string;sizes?:{name:string;priceDelta?:number;price_delta?:number;volume?:string}[]|string|null;add_on_ids?:string[]|null;modifier_category_ids?:string[]|null};
+type Product={id:string;name:string;category:string;price:number|string;temperature:string;sizes?:{name:string;priceDelta?:number;price_delta?:number;volume?:string;availableTemperatures?:string[];available_temperatures?:string[];applicableTemperature?:string;applicable_temperature?:string}[]|string|null;add_on_ids?:string[]|null;modifier_category_ids?:string[]|null};
 type Addon={id:string;name:string;price:number|string;category:string;applicable_temperature?:string};
 type ModifierCategory={id:string;name:string;item_type:string;required:boolean;selection_type:string;applicable_temperature?:string};
 type CartLine={key:string;menuItemId:string;name:string;quantity:number;unitPrice:number;sizeName?:string;addonIds:string[];addonNames:string[];temperature?:string};
