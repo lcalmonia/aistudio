@@ -22,7 +22,7 @@ export default async function handler(request: Request, context: Context): Promi
       UPDATE orders
       SET status = ${status}, updated_at = NOW()
       WHERE id = ${orderId}
-        AND status IN ('New', 'Brewing', 'Preparing', 'Ready')
+        AND ((status = 'New' AND ${status} = 'Brewing') OR (status IN ('Brewing', 'Preparing') AND ${status} = 'Ready'))
       RETURNING id, order_number, status, updated_at
     `;
     if (!rows.length) throw new RequestError(404, 'Active order not found or it can no longer be updated.');
