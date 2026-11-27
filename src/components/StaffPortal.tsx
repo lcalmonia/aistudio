@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 type StaffOrder = {
   id: string; order_number: string; customer_name: string; status: string;
@@ -24,13 +24,13 @@ export const StaffPortal:React.FC=()=>{
   const [loading,setLoading]=useState(true);
   const [busyOrder,setBusyOrder]=useState<string|null>(null);
   const [refreshing,setRefreshing]=useState(false);
-  const [cursor,setCursor]=useState<string|null>(null);
+  const cursorRef=useRef<string|null>(null);
 
   const refresh=useCallback(async(initial=false)=>{
     if(!staff)return;
     setRefreshing(true);
     try{
-      const query=!initial&&cursor?('?updatedSince='+encodeURIComponent(cursor)):'';
+      const query=!initial&&cursorRef.current?('?updatedSince='+encodeURIComponent(cursorRef.current)):'';
       const result=await request<{orders:StaffOrder[];serverTime:string}>('/api/staff/orders'+query);
       setOrders(current=>{
         if(initial)return result.orders;
@@ -41,7 +41,7 @@ export const StaffPortal:React.FC=()=>{
         }
         return Array.from(next.values()).sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
       });
-      setCursor(result.serverTime);
+      cursorRef.current=result.serverTime;
       setError('');
     }catch(e){setError(e instanceof Error?e.message:'Unable to refresh orders.');}
     finally{setRefreshing(false);}
@@ -58,23 +58,23 @@ export const StaffPortal:React.FC=()=>{
   useEffect(()=>{
     if(!staff){setLoading(false);return;}
     let alive=true;
-    const run=async()=>{if(!alive||document.visibilityState!=='visible')return;await refresh(!cursor);setLoading(false);};
+    const run=async()=>{if(!alive||document.visibilityState!=='visible')return;await refresh(!cursorRef.current);setLoading(false);};
     void run();
     const timer=window.setInterval(()=>void run(),15000);
     const onFocus=()=>{if(document.visibilityState==='visible')void run();};
     document.addEventListener('visibilitychange',onFocus);
     window.addEventListener('focus',onFocus);
     return()=>{alive=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',onFocus);window.removeEventListener('focus',onFocus);};
-  },[staff,refresh,cursor]);
+  },[staff,refresh]);
 
   const login=async(event:React.FormEvent)=>{
     event.preventDefault();setError('');setLoading(true);
-    try{const result=await request<{staff:StaffIdentity}>('/api/staff/login',{method:'POST',body:JSON.stringify({username,password})});setStaff(result.staff);setPassword('');setCursor(null);}
+    try{const result=await request<{staff:StaffIdentity}>('/api/staff/login',{method:'POST',body:JSON.stringify({username,password})});setStaff(result.staff);setPassword('');cursorRef.current=null;}
     catch(e){setError(e instanceof Error?e.message:'Unable to sign in.');}
     finally{setLoading(false);}
   };
 
-  const logout=async()=>{try{await request('/api/staff/logout',{method:'POST',body:'{}'});}catch{}setStaff(null);setOrders([]);setCursor(null);};
+  const logout=async()=>{try{await request('/api/staff/logout',{method:'POST',body:'{}'});}catch{}setStaff(null);setOrders([]);cursorRef.current=null;};
 
   const updateStatus=async(order:StaffOrder,status:'Brewing'|'Preparing'|'Ready')=>{
     setBusyOrder(order.id);setError('');
