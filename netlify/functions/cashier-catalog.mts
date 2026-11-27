@@ -6,11 +6,12 @@ export default async function handler(request:Request):Promise<Response>{
  if(request.method!=='GET')return json({error:'Method not allowed.'},405);
  try{
   await requireAuthenticatedCashier(request);const db=database();
-  const [items,addons]=await Promise.all([
+  const [items,addons,modifierCategories]=await Promise.all([
    db.sql`SELECT id,name,category,price,temperature,sizes,add_on_ids,modifier_category_ids FROM menu_items WHERE available=TRUE ORDER BY category,name`,
-   db.sql`SELECT id,name,category,item_type,price,applicable_temperature,available,required,selection_type,applicable_categories,sort_order FROM add_ons WHERE available=TRUE ORDER BY category,name`
+   db.sql`SELECT id,name,category,item_type,price,applicable_temperature,available,required,selection_type,applicable_categories,sort_order FROM add_ons WHERE available=TRUE ORDER BY category,name`,
+   db.sql`SELECT id,name,item_type,required,selection_type,applicable_categories,applicable_temperature,sort_order,active FROM modifier_categories WHERE active=TRUE ORDER BY sort_order,name`
   ]);
-  return json({items,addons},200,'private, max-age=60, stale-while-revalidate=120');
+  return json({items,addons,modifierCategories},200,'private, max-age=60, stale-while-revalidate=120');
  }catch(e){return errorResponse(e);}
 }
 export const config:Config={path:'/api/cashier/catalog',method:['GET']};
