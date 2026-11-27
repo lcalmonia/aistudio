@@ -84,7 +84,7 @@ export default async function handler(request:Request):Promise<Response>{
    }
    await client.query('COMMIT');
    return json({order:inserted.rows[0],change:paymentMethod==='Cash'?money(tendered-total):0,subtotal,deliveryFee,total});
-  }catch(e){await client.query('ROLLBACK');if(typeof e==='object'&&e!==null&&'code'in e&&e.code==='23505'){const existing=await db.sql`SELECT id,order_number,total,status,payment_status FROM orders WHERE cashier_idempotency_key=${idem} LIMIT 1`;if(existing.length)return json({order:existing[0],duplicate:true});}throw e;}
+  }catch(e){await client.query('ROLLBACK');if(typeof e==='object'&&e!==null&&'code'in e&&e.code==='23505'){const existing=await db.sql`SELECT id,order_number,total,status,payment_status FROM orders WHERE cashier_idempotency_key=${idem} AND cashier_user_id=${cashier.id} LIMIT 1`;if(existing.length)return json({order:existing[0],duplicate:true});}throw e;}
   finally{client.release();}
  }catch(e){return errorResponse(e);}
 }
