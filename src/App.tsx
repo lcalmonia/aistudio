@@ -55,7 +55,6 @@ import { EditAddonModal } from './components/EditAddonModal';
 import { adminAuthService } from './services/adminAuthService';
 import { parseRouteFromPath, syncBrowserUrl } from './services/routeService';
 import { generateCopiedProductName, cloneProductForPaste } from './utils/productCopy';
-
 export default function App() {
   // -------------------------------------------------------------
   // Portal Mode: 'public' | 'customer' | 'admin'
@@ -1319,3 +1318,4 @@ const handleDeleteInventoryCategory = async (category: string) => {
     </div>
   );
 }
+
