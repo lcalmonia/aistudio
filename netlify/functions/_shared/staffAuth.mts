@@ -16,7 +16,7 @@ function readStaffCookie(request: Request): string | null {
   for (const part of header.split(';')) {
     const separator = part.indexOf('=');
     if (separator >= 0 && part.slice(0, separator).trim() === STAFF_SESSION_COOKIE) {
-      return decodeURIComponent(part.slice(separator + 1).trim());
+      return part.slice(separator + 1).trim();
     }
   }
   return null;
