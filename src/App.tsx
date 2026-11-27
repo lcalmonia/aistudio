@@ -55,7 +55,7 @@ import { EditAddonModal } from './components/EditAddonModal';
 import { adminAuthService } from './services/adminAuthService';
 import { parseRouteFromPath, syncBrowserUrl } from './services/routeService';
 import { generateCopiedProductName, cloneProductForPaste } from './utils/productCopy';
-import { StaffPortal } from './components/StaffPortal';
+const StaffPortal = React.lazy(() => import('./components/StaffPortal').then((module) => ({ default: module.StaffPortal })));
 
 function MainApp() {
   // -------------------------------------------------------------
@@ -1325,7 +1325,11 @@ const handleDeleteInventoryCategory = async (category: string) => {
 /** Dedicated low-data staff route. It intentionally mounts no Admin/Customer data services. */
 export default function App() {
   if (typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/staff') {
-    return <StaffPortal />;
+    return (
+      <React.Suspense fallback={<main className="min-h-screen flex items-center justify-center bg-[#fff8f5] text-[#81756e] text-sm">Loading Staff Portal…</main>}>
+        <StaffPortal />
+      </React.Suspense>
+    );
   }
   return <MainApp />;
 }
