@@ -25,6 +25,7 @@ export const StaffPortal:React.FC=()=>{
   const [busyOrder,setBusyOrder]=useState<string|null>(null);
   const [refreshing,setRefreshing]=useState(false);
   const cursorRef=useRef<string|null>(null);
+  const pollInFlightRef=useRef(false);
 
   const refresh=useCallback(async(initial=false)=>{
     if(!staff)return;
@@ -58,7 +59,12 @@ export const StaffPortal:React.FC=()=>{
   useEffect(()=>{
     if(!staff){setLoading(false);return;}
     let alive=true;
-    const run=async()=>{if(!alive||document.visibilityState!=='visible')return;await refresh(!cursorRef.current);setLoading(false);};
+    const run=async()=>{
+      if(!alive||document.visibilityState!=='visible'||pollInFlightRef.current)return;
+      pollInFlightRef.current=true;
+      try{await refresh(!cursorRef.current);if(alive)setLoading(false);}
+      finally{pollInFlightRef.current=false;}
+    };
     void run();
     const timer=window.setInterval(()=>void run(),15000);
     const onFocus=()=>{if(document.visibilityState==='visible')void run();};
