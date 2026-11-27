@@ -55,8 +55,9 @@ import { EditAddonModal } from './components/EditAddonModal';
 import { adminAuthService } from './services/adminAuthService';
 import { parseRouteFromPath, syncBrowserUrl } from './services/routeService';
 import { generateCopiedProductName, cloneProductForPaste } from './utils/productCopy';
+import { StaffPortal } from './components/StaffPortal';
 
-export default function App() {
+function MainApp() {
   // -------------------------------------------------------------
   // Portal Mode: 'public' | 'customer' | 'admin'
   // -------------------------------------------------------------
@@ -1318,4 +1319,13 @@ const handleDeleteInventoryCategory = async (category: string) => {
       )}
     </div>
   );
+}
+
+
+/** Dedicated low-data staff route. It intentionally mounts no Admin/Customer data services. */
+export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/staff') {
+    return <StaffPortal />;
+  }
+  return <MainApp />;
 }
