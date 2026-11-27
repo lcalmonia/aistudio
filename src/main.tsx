@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 
 const root = createRoot(document.getElementById('root')!);
-const isStaffRoute = window.location.pathname.replace(/\\/+$/, '').toLowerCase() === '/staff';
+const isStaffRoute = window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/staff';
 
 async function mountApplication() {
   if (isStaffRoute) {
