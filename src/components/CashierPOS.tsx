@@ -1,7 +1,8 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 type Cashier={id:string;username:string;displayName:string};
 type Product={id:string;name:string;category:string;price:number|string;temperature:string;sizes?:{name:string;priceDelta?:number;price_delta?:number;volume?:string}[]|string|null;add_on_ids?:string[]|null;modifier_category_ids?:string[]|null};
-type Addon={id:string;name:string;price:number|string;category:string;applicable_temperature?:string};\ntype ModifierCategory={id:string;name:string;item_type:string;required:boolean;selection_type:string;applicable_temperature?:string};
+type Addon={id:string;name:string;price:number|string;category:string;applicable_temperature?:string};
+type ModifierCategory={id:string;name:string;item_type:string;required:boolean;selection_type:string;applicable_temperature?:string};
 type CartLine={key:string;menuItemId:string;name:string;quantity:number;unitPrice:number;sizeName?:string;addonIds:string[];addonNames:string[];temperature?:string};
 const peso=(v:number)=>'₱'+Number(v||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const request=async<T,>(url:string,init?:RequestInit):Promise<T>=>{const r=await fetch(url,{credentials:'same-origin',...init,headers:{...(init?.body?{'Content-Type':'application/json'}:{}),...(init?.headers||{})}});const d=await r.json().catch(()=>({})) as T&{error?:string};if(!r.ok)throw new Error(d.error||'Request failed.');return d;};
