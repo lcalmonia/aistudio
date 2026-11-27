@@ -73,7 +73,6 @@ export async function requireAuthenticatedStaff(request: Request): Promise<{ id:
   `;
   const staff = rows[0] as { id: string; username: string; display_name: string } | undefined;
   if (!staff) throw new RequestError(401, 'Your staff session is no longer valid. Please sign in again.');
-  await db.sql`UPDATE staff_sessions SET last_seen_at = NOW() WHERE token_hash = ${hashToken(token)}`;
   return { id: staff.id, username: staff.username, displayName: staff.display_name };
 }
 
