@@ -45,7 +45,7 @@ export const StaffPortal:React.FC=()=>{
       setError('');
     }catch(e){setError(e instanceof Error?e.message:'Unable to refresh orders.');}
     finally{setRefreshing(false);}
-  },[staff,cursor]);
+  },[staff]);
 
   useEffect(()=>{
     let alive=true;
