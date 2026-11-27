@@ -19,7 +19,7 @@ export default async function handler(request:Request):Promise<Response>{
   const lines=body.items;
   if(!Array.isArray(lines)||lines.length===0||lines.length>80)throw new RequestError(400,'Add at least one item to the order.');
   const db=database();
-  const previous=await db.sql`SELECT id,order_number,total,status,payment_status FROM orders WHERE cashier_idempotency_key=${idem} LIMIT 1`;
+  const previous=await db.sql`SELECT id,order_number,total,status,payment_status FROM orders WHERE cashier_idempotency_key=${idem} AND cashier_user_id=${cashier.id} LIMIT 1`;
   if(previous.length)return json({order:previous[0],duplicate:true});
   const menuIds=[...new Set(lines.map((x)=>String((x as CartLine)?.menuItemId||'')))];
   if(menuIds.some(x=>!x))throw new RequestError(400,'An order item is invalid.');
