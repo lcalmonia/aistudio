@@ -28,13 +28,16 @@ export default async function handler(request:Request):Promise<Response>{
   if(menu.size!==menuIds.length)throw new RequestError(409,'A selected product is no longer available. Refresh the menu.');
   const modifierRows=await db.sql`SELECT id,name,item_type,required,selection_type,applicable_temperature FROM modifier_categories WHERE active=TRUE`;
   const addonIds=[...new Set(lines.flatMap((x)=>Array.isArray((x as CartLine).addonIds)?(x as CartLine).addonIds!:[]))];
-  const addonRows=addonIds.length?await db.pool.query('SELECT id,name,category,price,available,applicable_temperature FROM add_ons WHERE id = ANY($1::text[]) AND available=TRUE',[addonIds]):{rows:[] as any[]};
+  const allAddonRows=await db.pool.query('SELECT id,name,category,price,available,applicable_temperature FROM add_ons WHERE available=TRUE');
+  const addonRows={rows:allAddonRows.rows.filter((x:any)=>addonIds.includes(x.id))};
   const addons=new Map(addonRows.rows.map((x:any)=>[x.id,x]));
   if(addons.size!==addonIds.length)throw new RequestError(409,'A selected add-on is no longer available. Refresh the menu.');
   const orderItems:any[]=[];let subtotal=0;
   for(let i=0;i<lines.length;i++){
    const line=lines[i] as CartLine;const product:any=menu.get(line.menuItemId);
    const qty=Number(line.quantity);if(!Number.isInteger(qty)||qty<1||qty>99)throw new RequestError(400,'Item quantity must be between 1 and 99.');
+   if(product.temperature==='Hot'&&line.temperature==='Iced')throw new RequestError(400,'This product is available hot only.');
+   if(product.temperature==='Cold'&&line.temperature==='Hot')throw new RequestError(400,'This product is available iced only.');
    const sizes=Array.isArray(product.sizes)?product.sizes:(typeof product.sizes==='string'?JSON.parse(product.sizes||'[]'):[]);
    let sizeDelta=0;let sizeName='';
    if(line.sizeName){const size=sizes.find((x:any)=>String(x.name)===line.sizeName);if(!size)throw new RequestError(400,'The selected size is not valid for '+product.name+'.');const availableTemps=size.availableTemperatures??size.available_temperatures;if(Array.isArray(availableTemps)&&line.temperature&&!availableTemps.includes('Both')&&!availableTemps.includes(line.temperature==='Iced'?'Cold':line.temperature))throw new RequestError(400,'The selected size is not available at that temperature.');const applicable=size.applicableTemperature??size.applicable_temperature;if(line.temperature&&applicable&&applicable!=='All'&&applicable!=='Both'&&!(applicable==='Cold'&&line.temperature==='Iced')&&!(applicable==='Hot'&&line.temperature==='Hot'))throw new RequestError(400,'The selected size is not available at that temperature.');sizeDelta=Number(size.priceDelta??size.price_delta)||0;sizeName=String(size.name);}
@@ -50,7 +53,7 @@ export default async function handler(request:Request):Promise<Response>{
     if(option.applicable_temperature==='Cold'&&line.temperature==='Hot')throw new RequestError(400,'A selected option is not available for hot drinks.');
    }
    for(const group of assignedGroups as any[]){
-    const groupOptions=addonRows.rows.filter((a:any)=>String(a.category).toLowerCase()===String(group.name).toLowerCase()||a.category===group.id);
+    const groupOptions=allAddonRows.rows.filter((a:any)=>String(a.category).toLowerCase()===String(group.name).toLowerCase()||a.category===group.id);
     if(group.required&&groupOptions.length>0&&!groupOptions.some((a:any)=>chosen.includes(a.id)))throw new RequestError(400,'Please select an option for '+group.name+'.');
     if((group.selection_type==='single'||group.item_type==='modifier')&&chosen.filter(id=>groupOptions.some((a:any)=>a.id===id)).length>1)throw new RequestError(400,'Choose only one option for '+group.name+'.');
    }
