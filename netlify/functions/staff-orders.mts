@@ -9,6 +9,7 @@ export default async function handler(request: Request): Promise<Response> {
     await requireAuthenticatedStaff(request);
     const url = new URL(request.url);
     const sinceValue = url.searchParams.get('updatedSince');
+    const serverTime = new Date().toISOString();
     const db = database();
     const client = await db.pool.connect();
     try {
@@ -35,7 +36,7 @@ export default async function handler(request: Request): Promise<Response> {
         ORDER BY o.created_at DESC
         LIMIT 80
       `, params);
-      return json({ orders: result.rows, serverTime: new Date().toISOString() });
+      return json({ orders: result.rows, serverTime });
     } finally {
       client.release();
     }
