@@ -67,18 +67,21 @@ export default async function handler(request:Request):Promise<Response>{
    subtotal+=unit*qty;
   }
   subtotal=money(subtotal);
-  const customerName=typeof body.customerName==='string'&&body.customerName.trim()?body.customerName.trim():'Walk-in Guest';
+  const suppliedCustomerName=typeof body.customerName==='string'?body.customerName.trim():'';
+  const customerName=suppliedCustomerName||'Walk-in Guest';
   const customerPhone=typeof body.customerPhone==='string'?body.customerPhone.trim():'';
   const deliveryAddress=typeof body.deliveryAddress==='string'?body.deliveryAddress.trim():'';
   const tableNumber=typeof body.tableNumber==='string'?body.tableNumber.trim():'';
   const notes=typeof body.notes==='string'?body.notes.trim():'';
   let deliveryFee=0;
   if(orderType==='Delivery'){
-   if(!customerName||!customerPhone||!deliveryAddress)throw new RequestError(400,'Delivery requires customer name, contact number, and complete address.');
+   if(!suppliedCustomerName||!customerPhone||!deliveryAddress)throw new RequestError(400,'Delivery requires customer name, contact number, and complete address.');
    const policy=await resolveDeliveryPolicy(deliveryAddress,subtotal);deliveryFee=policy.fee;
   }
   if(orderType==='Dine-In'&&!tableNumber)throw new RequestError(400,'Enter the table number for Dine-In.');
   const total=money(subtotal+deliveryFee);
+  const expectedTotal=Number(body.expectedTotal);
+  if(!Number.isFinite(expectedTotal)||money(expectedTotal)!==total)throw new RequestError(409,'The order total has changed. Refresh the menu and recalculate the delivery fee before taking payment.');
   const tendered=Number(body.amountTendered??0);
   if(paymentMethod==='Cash'&&(!Number.isFinite(tendered)||tendered<total))throw new RequestError(400,'Cash received must be at least the total amount due.');
   const id='ord-pos-'+randomBytes(12).toString('hex');
