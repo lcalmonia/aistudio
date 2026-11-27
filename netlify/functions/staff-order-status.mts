@@ -22,6 +22,7 @@ export default async function handler(request: Request, context: Context): Promi
       UPDATE orders
       SET status = ${status}, updated_at = NOW()
       WHERE id = ${orderId}
+        AND created_at >= NOW() - INTERVAL '24 hours'
         AND ((status = 'New' AND ${status} = 'Brewing') OR (status IN ('Brewing', 'Preparing') AND ${status} = 'Ready'))
       RETURNING id, order_number, status, updated_at
     `;
