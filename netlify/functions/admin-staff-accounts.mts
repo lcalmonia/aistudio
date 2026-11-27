@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { Config, Context } from '@netlify/functions';
+import type { Config } from '@netlify/functions';
 import { getSuperAdminCredentials, normalizeUsername, requireAuthenticatedAdmin, secureStringEqual } from './_shared/auth.mts';
 import { invalidateStaffSessions } from './_shared/staffAuth.mts';
 import { database } from './_shared/database.mts';
