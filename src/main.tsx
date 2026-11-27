@@ -8,9 +8,21 @@ root.render(
     <main className="min-h-screen flex items-center justify-center bg-[#fff8f5] text-[#81756e] text-sm">Loading iLuvKeyks…</main>
   </StrictMode>,
 );
-const isStaffRoute = window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/staff';
+const normalizedPath = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+const isStaffRoute = normalizedPath === '/staff';
+const isCashierRoute = normalizedPath === '/pos';
 
 async function mountApplication() {
+  if (isCashierRoute) {
+    const { CashierPOS } = await import('./components/CashierPOS');
+    root.render(
+      <StrictMode>
+        <CashierPOS />
+      </StrictMode>,
+    );
+    return;
+  }
+
   if (isStaffRoute) {
     const { StaffPortal } = await import('./components/StaffPortal');
     root.render(
