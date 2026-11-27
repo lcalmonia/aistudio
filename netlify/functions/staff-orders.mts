@@ -29,9 +29,8 @@ export default async function handler(request: Request): Promise<Response> {
                ) ORDER BY oi.line_position ASC) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
         FROM orders o
         LEFT JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.status IN ('New', 'Brewing', 'Preparing', 'Ready')
-          AND o.created_at >= NOW() - INTERVAL '24 hours'
-          ${cursorClause}
+        WHERE o.created_at >= NOW() - INTERVAL '24 hours'
+          ${cursorClause || "AND o.status IN ('New', 'Brewing', 'Preparing', 'Ready')"}
         GROUP BY o.id
         ORDER BY o.created_at DESC
         LIMIT 80
