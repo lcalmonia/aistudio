@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 
 const root = createRoot(document.getElementById('root')!);
+root.render(
+  <StrictMode>
+    <main className="min-h-screen flex items-center justify-center bg-[#fff8f5] text-[#81756e] text-sm">Loading iLuvKeyks…</main>
+  </StrictMode>,
+);
 const isStaffRoute = window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/staff';
 
 async function mountApplication() {
