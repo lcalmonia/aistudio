@@ -23,11 +23,12 @@ export default async function handler(request:Request):Promise<Response>{
   if(previous.length)return json({order:previous[0],duplicate:true});
   const menuIds=[...new Set(lines.map((x)=>String((x as CartLine)?.menuItemId||'')))];
   if(menuIds.some(x=>!x))throw new RequestError(400,'An order item is invalid.');
-  const menuRows=await db.pool.query('SELECT id,name,category,price,temperature,sizes,add_on_ids FROM menu_items WHERE available=TRUE AND id = ANY($1::text[])',[menuIds]);
+  const menuRows=await db.pool.query('SELECT id,name,category,price,temperature,sizes,add_on_ids,modifier_category_ids FROM menu_items WHERE available=TRUE AND id = ANY($1::text[])',[menuIds]);
   const menu=new Map(menuRows.rows.map((x:any)=>[x.id,x]));
   if(menu.size!==menuIds.length)throw new RequestError(409,'A selected product is no longer available. Refresh the menu.');
+  const modifierRows=await db.sql`SELECT id,name,item_type,required,selection_type,applicable_temperature FROM modifier_categories WHERE active=TRUE`;
   const addonIds=[...new Set(lines.flatMap((x)=>Array.isArray((x as CartLine).addonIds)?(x as CartLine).addonIds!:[]))];
-  const addonRows=addonIds.length?await db.pool.query('SELECT id,name,price,available FROM add_ons WHERE id = ANY($1::text[]) AND available=TRUE',[addonIds]):{rows:[] as any[]};
+  const addonRows=addonIds.length?await db.pool.query('SELECT id,name,category,price,available,applicable_temperature FROM add_ons WHERE id = ANY($1::text[]) AND available=TRUE',[addonIds]):{rows:[] as any[]};
   const addons=new Map(addonRows.rows.map((x:any)=>[x.id,x]));
   if(addons.size!==addonIds.length)throw new RequestError(409,'A selected add-on is no longer available. Refresh the menu.');
   const orderItems:any[]=[];let subtotal=0;
@@ -37,10 +38,22 @@ export default async function handler(request:Request):Promise<Response>{
    const sizes=Array.isArray(product.sizes)?product.sizes:(typeof product.sizes==='string'?JSON.parse(product.sizes||'[]'):[]);
    let sizeDelta=0;let sizeName='';
    if(line.sizeName){const size=sizes.find((x:any)=>String(x.name)===line.sizeName);if(!size)throw new RequestError(400,'The selected size is not valid for '+product.name+'.');sizeDelta=Number(size.priceDelta??size.price_delta)||0;sizeName=String(size.name);}
-   const allowed=Array.isArray(product.add_on_ids)?product.add_on_ids:[];
+   const directAllowed=Array.isArray(product.add_on_ids)?product.add_on_ids:[];
+   const assignedIds=Array.isArray(product.modifier_category_ids)?product.modifier_category_ids:[];
+   const assignedGroups=modifierRows.filter((cat:any)=>assignedIds.some((id:string)=>id===cat.id||id.toLowerCase()===String(cat.name).toLowerCase()));
    const chosen=Array.isArray(line.addonIds)?[...new Set(line.addonIds)]:[];
-   for(const id of chosen)if(!allowed.includes(id))throw new RequestError(400,'An add-on is not available for '+product.name+'.');
    const selected=chosen.map(id=>addons.get(id) as any);
+   for(const option of selected){
+    const groupMatch=assignedGroups.some((cat:any)=>String(option.category).toLowerCase()===String(cat.name).toLowerCase()||option.category===cat.id);
+    if(!directAllowed.includes(option.id)&&!groupMatch)throw new RequestError(400,'An option is not assigned to '+product.name+'.');
+    if(option.applicable_temperature==='Hot'&&line.temperature==='Iced')throw new RequestError(400,'A selected option is not available for iced drinks.');
+    if(option.applicable_temperature==='Cold'&&line.temperature==='Hot')throw new RequestError(400,'A selected option is not available for hot drinks.');
+   }
+   for(const group of assignedGroups as any[]){
+    const groupOptions=addonRows.rows.filter((a:any)=>String(a.category).toLowerCase()===String(group.name).toLowerCase()||a.category===group.id);
+    if(group.required&&groupOptions.length>0&&!groupOptions.some((a:any)=>chosen.includes(a.id)))throw new RequestError(400,'Please select an option for '+group.name+'.');
+    if((group.selection_type==='single'||group.item_type==='modifier')&&chosen.filter(id=>groupOptions.some((a:any)=>a.id===id)).length>1)throw new RequestError(400,'Choose only one option for '+group.name+'.');
+   }
    const addonPrice=selected.reduce((sum:number,a:any)=>sum+Number(a.price||0),0);
    const unit=money(Number(product.price)+sizeDelta+addonPrice);
    if(!Number.isFinite(unit)||unit<0)throw new RequestError(400,'Invalid product price.');
